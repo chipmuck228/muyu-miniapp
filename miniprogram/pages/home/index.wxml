@@ -1,0 +1,33 @@
+<!-- 木鱼香案：暂隐 3D 模型，只留金线上方的敲击热区 -->
+<view class="page home-page phase-{{enterPhase}} kind-{{enterKind}}">
+  <view class="enter-veil" wx:if="{{enterPhase !== 'done'}}" catchtouchmove="noop"></view>
+
+  <block wx:if="{{readyToKnock}}">
+    <view class="home-stage">
+      <smoke-gl class="smoke-gl-fill" />
+
+      <view class="altar-fill enter-altar"></view>
+
+      <view class="knock-wrap enter-altar">
+        <view
+          class="knock-pad {{pulsing ? 'pulsing' : ''}}"
+          hover-class="knock-hover"
+          hover-stay-time="60"
+          bindtap="onKnockTap"
+        >
+          <view class="ripple-ring {{rippleOn ? 'on' : ''}}"></view>
+        </view>
+        <view class="floats-layer">
+          <view
+            wx:for="{{floats}}"
+            wx:key="key"
+            class="float-text {{item.kind}}"
+            style="left: {{item.left}}%;"
+          >{{item.text}}</view>
+        </view>
+      </view>
+
+      <hall-dock mode="hall" current="{{0}}" />
+    </view>
+  </block>
+</view>

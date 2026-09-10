@@ -1,0 +1,19 @@
+<view class="dock-root">
+  <view class="exit-mask {{mode === 'hall' && open ? 'on' : ''}}" bindtap="onMask"></view>
+  <view class="exit-dock {{open ? 'open' : ''}} {{mode === 'wing' ? 'wing' : 'hall'}}" style="padding-bottom: {{pad}}px;">
+    <view class="exit-row">
+      <text
+        wx:for="{{links}}"
+        wx:key="index"
+        class="exit-item {{current === item.index ? 'current' : ''}}"
+        hover-class="{{current === item.index ? '' : 'exit-hover'}}"
+        data-index="{{item.index}}"
+        data-url="{{item.url}}"
+        catchtap="onPick"
+      >{{item.name}}</text>
+    </view>
+    <view class="exit-hair" hover-class="exit-hair-hover" catchtap="onHair" catchtouchmove="onNoop">
+      <view class="exit-hair-line"></view>
+    </view>
+  </view>
+</view>

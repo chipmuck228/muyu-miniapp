@@ -1,0 +1,113 @@
+<!-- 心愿详情 -->
+<view class="page detail-page">
+  <view class="navbar" style="padding-top: {{statusBarHeight}}px;">
+    <view class="navbar-inner">
+      <view class="nav-slot nav-left">
+        <view class="nav-back" hover-class="hover-dim" bindtap="goBack">
+          <view class="back-arrow"></view>
+        </view>
+      </view>
+      <text class="navbar-title">{{wish ? wish.name : ''}}</text>
+      <view class="nav-slot nav-right"></view>
+    </view>
+  </view>
+
+  <block wx:if="{{!loading && wish}}">
+    <scroll-view class="detail-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+      <view class="detail-body">
+        <!-- 心愿 Hero -->
+        <view class="card hero-card">
+          <view class="hero-meta">
+            <view class="status-chip {{wish.statusCls}}">{{wish.statusText}}</view>
+            <text class="hero-date" wx:if="{{wish.status === 'completed' && wish.completedDate}}">圆满于 {{wish.completedDate}}</text>
+            <text class="hero-date" wx:elif="{{wish.status === 'fulfilled' && wish.fulfilledDate}}">还愿于 {{wish.fulfilledDate}}</text>
+          </view>
+          <text class="hero-name">{{wish.name}}</text>
+          <view class="hero-progress">
+            <view class="progress-track big-track">
+              <view class="progress-fill" style="width: {{wish.percent}}%;"></view>
+            </view>
+          </view>
+          <view class="hero-foot">
+            <text class="hf-nums text-dim">{{wish.currentText}} / {{wish.goalText}} 功德</text>
+            <text class="hf-percent">{{wish.percent}}%</text>
+          </view>
+        </view>
+
+        <!-- 功德统计 -->
+        <view class="stats-row">
+          <view class="card stat-card">
+            <text class="st-num mono-num">{{wish.currentText}}</text>
+            <text class="st-label">已积功德</text>
+          </view>
+          <view class="card stat-card">
+            <text class="st-num mono-num">{{wish.goalText}}</text>
+            <text class="st-label">目标功德</text>
+          </view>
+          <view class="card stat-card">
+            <text class="st-num mono-num">{{wish.percent}}</text>
+            <text class="st-label">完成度 %</text>
+          </view>
+        </view>
+
+        <!-- 近 14 天柱状图 -->
+        <view class="card chart-card">
+          <view class="section-title">
+            <text>近 14 天敲击</text>
+            <text class="st-sub">今日 {{localToday}} 次</text>
+          </view>
+          <view class="chart">
+            <view class="chart-col" wx:for="{{bars}}" wx:key="key">
+              <view class="bar-wrap">
+                <view class="bar {{item.hasValue ? 'val' : ''}} {{item.isToday ? 'today' : ''}}" style="height: {{item.ratio}}%;"></view>
+              </view>
+              <text class="bar-label {{item.isToday ? 'today' : ''}}">{{item.label}}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 敲击记录 -->
+        <view class="card records-card">
+          <view class="section-title">
+            <text>敲击记录</text>
+            <text class="st-sub">最近 10 条</text>
+          </view>
+          <block wx:if="{{records.length > 0}}">
+            <view class="record-row" wx:for="{{records}}" wx:key="date">
+              <text class="record-date">{{item.text}}</text>
+              <text class="record-count mono-num">{{item.count}} 次</text>
+            </view>
+          </block>
+          <view class="no-record" wx:else>暂无敲击记录，敲一敲开始积累功德吧</view>
+        </view>
+
+        <view class="action-space"></view>
+      </view>
+    </scroll-view>
+
+    <!-- 底部操作栏 -->
+    <view class="action-bar" style="padding-bottom: {{safeBottom}}px;">
+      <block wx:if="{{canEdit}}">
+        <view class="ab-edit" hover-class="hover-dim" bindtap="goEdit">
+          <text class="ab-edit-icon">✎</text>
+          <text>修改</text>
+        </view>
+        <view wx:if="{{canKnock}}" class="ab-knock" hover-class="ab-knock-hover" bindtap="doKnock">
+          <view class="ab-knock-face"></view>
+          <text class="ab-knock-text">敲 一 下</text>
+        </view>
+        <view wx:elif="{{showFulfill}}" class="ab-fulfill" hover-class="hover-dim" bindtap="doFulfill">
+          <text>🙏 还愿</text>
+        </view>
+      </block>
+    </view>
+  </block>
+
+  <view wx:if="{{!loading && !wish}}" class="empty-area">
+    <view class="empty">
+      <view class="empty-emoji">🍂</view>
+      <view class="empty-title">心愿不存在或已删除</view>
+      <view class="empty-btn" bindtap="goBack">返 回</view>
+    </view>
+  </view>
+</view>

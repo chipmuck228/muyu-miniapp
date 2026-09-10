@@ -1,0 +1,12 @@
+<view class="smoke-root">
+  <canvas wx:if="{{canvasOn}}" type="webgl" id="smokeCanvas" class="void-canvas" />
+  <view class="void-fallback" wx:if="{{smokeFallback}}">
+    <view class="ember"></view>
+    <view class="puff p0"></view>
+    <view class="puff p1"></view>
+    <view class="puff p2"></view>
+    <view class="puff p3"></view>
+    <view class="puff p4"></view>
+  </view>
+  <text class="smoke-rev">{{smokeRev}}</text>
+</view>

@@ -1,0 +1,40 @@
+<!-- 心愿：侧殿列表 -->
+<view class="page wing-page wishes-page">
+  <view class="wing-head" style="padding-top: {{statusBarHeight}}px;">
+    <text class="wing-title">心 愿</text>
+  </view>
+
+  <scroll-view
+    class="wing-scroll"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    refresher-enabled
+    refresher-triggered="{{refreshing}}"
+    bindrefresherrefresh="onRefresh"
+  >
+    <view class="wing-body">
+      <block wx:if="{{wishes.length > 0}}">
+        <view
+          wx:for="{{wishes}}"
+          wx:key="_id"
+          class="wish-row"
+          hover-class="hover-dim"
+          data-id="{{item._id}}"
+          bindtap="openDetail"
+        >
+          <text class="wish-name">{{item.name}}</text>
+          <view class="wish-line">
+            <view class="wish-fill" style="width: {{item.percent}}%;"></view>
+          </view>
+        </view>
+      </block>
+      <view class="empty" wx:elif="{{!loading}}">
+        <text class="empty-title">尚未立愿</text>
+        <text class="empty-sub">先许一心，再来叩击</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <hall-dock mode="wing" current="{{1}}" />
+</view>

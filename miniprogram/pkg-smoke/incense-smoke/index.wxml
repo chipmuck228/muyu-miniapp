@@ -1,0 +1,29 @@
+<!-- 香案 XR：黄花梨木鱼。青烟改由页面 canvas 绘制，此处不再挂粒子。 -->
+<xr-scene id="xr-scene" render-system="alpha:true" bind:ready="onSceneReady">
+  <xr-assets>
+    <xr-asset-load type="gltf" asset-id="muyu-wood" src="/pkg-smoke/models/muyu.glb" />
+  </xr-assets>
+
+  <xr-light type="ambient" color="1 0.94 0.86" intensity="1.15" />
+  <xr-light type="directional" color="1 0.93 0.82" intensity="2.6" rotation="38 -28 0" />
+
+  <xr-node>
+    <xr-node node-id="fx-anchor" position="0 0.38 0" />
+
+    <xr-gltf
+      id="muyu"
+      node-id="muyu"
+      model="{{muyuAsset}}"
+      position="0 -0.22 0"
+      scale="{{muyuScaleStr}}"
+      rotation="0 -18 0"
+    />
+  </xr-node>
+  <xr-camera
+    id="camera"
+    node-id="camera"
+    position="1.62 1.05 2.28"
+    target="fx-anchor"
+    clear-color="0 0 0 0"
+  />
+</xr-scene>

@@ -1,0 +1,68 @@
+.smoke-root {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+.void-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+.void-fallback {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+}
+.void-fallback .ember {
+  position: absolute;
+  left: 50%;
+  top: 72%;
+  width: 18rpx;
+  height: 18rpx;
+  margin-left: -9rpx;
+  margin-top: -9rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ff5c2a 0%, rgba(120, 20, 0, 0) 70%);
+  animation: ember-breathe 3.6s ease-in-out infinite;
+}
+.void-fallback .puff {
+  position: absolute;
+  left: 50%;
+  top: 72%;
+  width: 4rpx;
+  height: 4rpx;
+  margin-left: -2rpx;
+  border-radius: 50%;
+  background: rgba(196, 222, 226, 0.62);
+  animation: puff-rise 9.2s linear infinite;
+}
+.void-fallback .puff.p0 { animation-delay: 0s; }
+.void-fallback .puff.p1 { animation-delay: 1.8s; }
+.void-fallback .puff.p2 { animation-delay: 3.6s; }
+.void-fallback .puff.p3 { animation-delay: 5.4s; }
+.void-fallback .puff.p4 { animation-delay: 7.2s; }
+.smoke-rev {
+  position: absolute;
+  left: 16rpx;
+  top: 88rpx;
+  z-index: 8;
+  font-size: 22rpx;
+  color: rgba(224, 181, 119, 0.55);
+}
+@keyframes ember-breathe {
+  0%, 100% { opacity: 0.65; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.18); }
+}
+@keyframes puff-rise {
+  0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.7; filter: blur(0); }
+  62% { transform: translate3d(2rpx, -38vh, 0) scale(1.8); opacity: 0.4; filter: blur(1rpx); }
+  100% { transform: translate3d(72rpx, -52vh, 0) scale(6); opacity: 0; filter: blur(8rpx); }
+}

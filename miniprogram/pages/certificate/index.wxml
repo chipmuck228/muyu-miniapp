@@ -1,0 +1,38 @@
+<!-- 功德证书 -->
+<view class="page wing-page cert-page">
+  <view class="wing-head" style="padding-top: {{statusBarHeight}}px;">
+    <text class="wing-title">证 书</text>
+  </view>
+
+  <scroll-view class="wing-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="wing-body">
+      <block wx:if="{{hasCert && cert}}">
+        <view class="congrats">
+          <text class="cong-title">随喜赞叹</text>
+          <text class="cong-sub">{{cert.name}}</text>
+        </view>
+
+        <view class="paper-frame">
+          <view class="paper-placeholder" wx:if="{{!certPath}}"></view>
+          <image wx:else class="paper-img" src="{{certPath}}" mode="widthFix"></image>
+        </view>
+
+        <view class="actions">
+          <text class="act" hover-class="hover-dim" bindtap="saveAlbum">保存相册</text>
+          <text class="act" hover-class="hover-dim" bindtap="shareCert">转发</text>
+        </view>
+        <text class="tip">长按亦可截取</text>
+      </block>
+
+      <block wx:else>
+        <view class="empty" wx:if="{{!loading}}">
+          <text class="empty-title">待心愿圆满</text>
+          <text class="empty-sub">功德既满，证书自现</text>
+        </view>
+      </block>
+    </view>
+  </scroll-view>
+
+  <canvas type="2d" id="certCanvas" class="hidden-canvas"></canvas>
+  <hall-dock mode="wing" current="{{3}}" />
+</view>

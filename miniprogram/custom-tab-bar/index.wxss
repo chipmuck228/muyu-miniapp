@@ -1,0 +1,82 @@
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  display: flex;
+  align-items: flex-start;
+  height: 100rpx;
+  background: rgba(24, 18, 13, 0.96);
+  border-top: 1rpx solid rgba(212, 165, 116, 0.14);
+  backdrop-filter: blur(20rpx);
+}
+
+.tab-item {
+  position: relative;
+  flex: 1;
+  height: 100rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+
+.tab-hover {
+  opacity: 0.6;
+}
+
+.icon-wrap {
+  height: 52rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon {
+  font-size: 40rpx;
+  line-height: 1;
+  filter: grayscale(0.85) brightness(0.7);
+  transition: filter 0.2s ease, transform 0.2s ease;
+}
+
+.label {
+  margin-top: 2rpx;
+  font-size: 20rpx;
+  line-height: 1.2;
+  color: rgba(240, 230, 216, 0.45);
+  transition: color 0.2s ease;
+}
+
+.tab-item.active .icon {
+  filter: none;
+  transform: translateY(-2rpx) scale(1.06);
+}
+
+.tab-item.active .label {
+  color: #e0b577;
+  font-weight: 600;
+}
+
+.active-dot {
+  position: absolute;
+  top: 6rpx;
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: #e0b577;
+  box-shadow: 0 0 12rpx rgba(224, 181, 119, 0.8);
+}
+
+.tab-item.home-pulse .icon {
+  animation: home-tab-in 0.42s ease;
+}
+.tab-item.home-pulse .label {
+  animation: home-tab-in 0.42s ease;
+}
+@keyframes home-tab-in {
+  0% { transform: scale(0.86); opacity: 0.5; }
+  55% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}

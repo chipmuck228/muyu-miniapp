@@ -1,0 +1,19 @@
+{
+  "name": "miniprogram-ts-quickstart",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "pack:npm": "node scripts/pack-miniprogram-npm.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "",
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "miniprogram-api-typings": "^2.8.3-1",
+    "terser": "^5.43.1",
+    "threejs-miniprogram-adapter": "github:Boen36/threejs-miniprogram-adapter"
+  }
+}

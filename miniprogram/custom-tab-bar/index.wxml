@@ -1,0 +1,17 @@
+<view class="tabbar" wx:if="{{!hidden}}" style="padding-bottom: {{safeBottom}}px;">
+  <view
+    wx:for="{{list}}"
+    wx:key="pagePath"
+    class="tab-item {{selected === index ? 'active' : ''}} {{index === 0 && homePulse ? 'home-pulse' : ''}}"
+    data-index="{{index}}"
+    bindtap="onTap"
+    hover-class="tab-hover"
+    hover-stay-time="80"
+  >
+    <view class="icon-wrap">
+      <text class="icon">{{item.icon}}</text>
+    </view>
+    <text class="label">{{item.text}}</text>
+    <view class="active-dot" wx:if="{{selected === index}}"></view>
+  </view>
+</view>

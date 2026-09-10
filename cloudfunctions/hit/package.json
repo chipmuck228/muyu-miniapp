@@ -1,0 +1,9 @@
+{
+  "name": "hit",
+  "version": "1.0.0",
+  "description": "敲击木鱼：功德、每日记录、心愿进度原子累加",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

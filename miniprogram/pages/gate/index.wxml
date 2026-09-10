@@ -1,0 +1,19 @@
+<!-- 入堂：冷启动全屏过渡，无 Tab、无配置文案 -->
+<view class="gate {{leaving ? 'leaving' : ''}}" bindtap="onEnter" catchtouchmove="noop">
+  <view class="gate-bg-wrap">
+    <image class="gate-bg" src="/assets/gate/hall.png" mode="aspectFill" />
+  </view>
+  <view class="gate-shade"></view>
+  <view class="gate-bloom"></view>
+
+  <view class="gate-brand">
+    <view class="lotus" aria-hidden="true">
+      <view class="lotus-petal a"></view>
+      <view class="lotus-petal b"></view>
+      <view class="lotus-petal c"></view>
+      <view class="lotus-core"></view>
+    </view>
+    <text class="gate-title">木 鱼</text>
+    <text class="gate-sub">轻叩一声 · 万缘放下</text>
+  </view>
+</view>

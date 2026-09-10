@@ -1,0 +1,59 @@
+{
+  "pages": [
+    "pages/gate/index",
+    "pages/lesson/index",
+    "pages/home/index",
+    "pages/wishes/index",
+    "pages/wish-form/index",
+    "pages/certificate/index",
+    "pages/profile/index",
+    "pages/wish-detail/index"
+  ],
+  "window": {
+    "navigationStyle": "custom",
+    "navigationBarTextStyle": "white",
+    "navigationBarBackgroundColor": "#16110d",
+    "backgroundColor": "#120e0a",
+    "backgroundColorTop": "#120e0a",
+    "backgroundColorBottom": "#120e0a"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#8a7a66",
+    "selectedColor": "#e0b577",
+    "backgroundColor": "#16110d",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "木鱼"
+      },
+      {
+        "pagePath": "pages/wishes/index",
+        "text": "心愿"
+      },
+      {
+        "pagePath": "pages/wish-form/index",
+        "text": "立愿"
+      },
+      {
+        "pagePath": "pages/certificate/index",
+        "text": "证书"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "修行"
+      }
+    ]
+  },
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents",
+  "subpackages": [
+    {
+      "root": "pkg-smoke",
+      "name": "smoke",
+      "pages": ["boot/index"]
+    }
+  ],
+  "sitemapLocation": "sitemap.json"
+}

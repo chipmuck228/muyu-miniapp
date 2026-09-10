@@ -1,0 +1,258 @@
+.home-page {
+  position: relative;
+  background: #0a0806;
+  overflow: hidden;
+}
+
+.enter-veil {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 80;
+  background: rgba(8, 6, 4, 0.86);
+  pointer-events: auto;
+}
+
+.phase-reveal .enter-veil {
+  animation: veil-out 0.48s ease forwards;
+}
+
+@keyframes veil-out {
+  to { opacity: 0; }
+}
+
+.phase-cover .enter-altar {
+  opacity: 0;
+}
+.phase-reveal .enter-altar {
+  animation: altar-in 0.56s ease 0.12s both;
+}
+.phase-done .enter-altar {
+  opacity: 1;
+}
+@keyframes altar-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.home-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  box-sizing: border-box;
+}
+.smoke-gl-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  display: block;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.void-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.void-fallback {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.void-fallback .ember {
+  position: absolute;
+  left: 50%;
+  top: 72%;
+  width: 18rpx;
+  height: 18rpx;
+  margin-left: -9rpx;
+  margin-top: -9rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ff5c2a 0%, rgba(120, 20, 0, 0) 70%);
+  animation: ember-breathe 3.6s ease-in-out infinite;
+}
+.void-fallback .puff {
+  position: absolute;
+  left: 50%;
+  top: 72%;
+  width: 4rpx;
+  height: 4rpx;
+  margin-left: -2rpx;
+  border-radius: 50%;
+  background: rgba(196, 222, 226, 0.62);
+  animation: puff-rise 9.2s linear infinite;
+}
+.void-fallback .puff.p0 { animation-delay: 0s; }
+.void-fallback .puff.p1 { animation-delay: 1.1s; }
+.void-fallback .puff.p2 { animation-delay: 2.2s; }
+.void-fallback .puff.p3 { animation-delay: 3.3s; }
+.void-fallback .puff.p4 { animation-delay: 4.4s; }
+.void-fallback .puff.p5 { animation-delay: 5.5s; }
+.void-fallback .puff.p6 { animation-delay: 6.6s; }
+.void-fallback .puff.p7 { animation-delay: 7.7s; }
+@keyframes ember-breathe {
+  0%, 100% { opacity: 0.65; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.18); }
+}
+@keyframes puff-rise {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.7;
+    filter: blur(0);
+  }
+  62% {
+    transform: translate3d(2rpx, -38vh, 0) scale(1.8);
+    opacity: 0.4;
+    filter: blur(1rpx);
+  }
+  68% {
+    transform: translate3d(4rpx, -40vh, 0) scale(2);
+    opacity: 0.36;
+    filter: blur(2rpx);
+  }
+  100% {
+    transform: translate3d(72rpx, -52vh, 0) scale(6);
+    opacity: 0;
+    filter: blur(8rpx);
+  }
+}
+
+.smoke-rev {
+  position: absolute;
+  left: 16rpx;
+  z-index: 6;
+  font-size: 18rpx;
+  letter-spacing: 0.04em;
+  color: rgba(224, 181, 119, 0.38);
+  pointer-events: none;
+}
+.altar-fill {
+  flex: 1;
+  min-height: 0;
+  pointer-events: none;
+}
+
+.knock-wrap {
+  position: relative;
+  flex-shrink: 0;
+  height: 320rpx;
+  z-index: 3;
+}
+
+.knock-pad {
+  position: absolute;
+  left: 50%;
+  bottom: 8rpx;
+  z-index: 3;
+  width: 280rpx;
+  height: 280rpx;
+  margin-left: -140rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(224, 181, 119, 0.06) 0%, rgba(224, 181, 119, 0) 72%);
+  box-shadow: inset 0 0 0 1rpx rgba(224, 181, 119, 0.16);
+}
+
+.knock-hover {
+  opacity: 0.85;
+}
+
+.knock-pad.pulsing {
+  animation: knock-bounce 0.22s ease-out;
+}
+
+@keyframes knock-bounce {
+  0% { transform: scale(0.92); }
+  45% { transform: scale(0.965); }
+  70% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+.ripple-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 4;
+  width: 160rpx;
+  height: 160rpx;
+  margin-left: -80rpx;
+  margin-top: -80rpx;
+  border-radius: 50%;
+  border: 6rpx solid rgba(255, 214, 140, 0.9);
+  opacity: 0;
+  pointer-events: none;
+}
+.ripple-ring.on {
+  animation: ripple 0.7s ease-out;
+}
+@keyframes ripple {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.8);
+  }
+}
+
+.floats-layer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.float-text {
+  position: absolute;
+  bottom: 40%;
+  font-size: 34rpx;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0;
+  animation: float-up 1s ease-out forwards;
+  text-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.6);
+}
+.float-text.score {
+  color: #ffd98a;
+}
+.float-text.chant {
+  color: #b7e8c8;
+}
+.float-text.celebrate {
+  color: #ff9d76;
+  font-size: 40rpx;
+}
+@keyframes float-up {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 10rpx) scale(0.6);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -30rpx) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -220rpx) scale(1);
+  }
+}

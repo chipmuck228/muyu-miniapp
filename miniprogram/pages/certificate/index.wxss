@@ -1,0 +1,79 @@
+.cert-page .empty {
+  padding-top: 160rpx;
+}
+.cert-page .empty-title {
+  margin-top: 0;
+  font-size: 28rpx;
+  letter-spacing: 10rpx;
+  font-weight: 400;
+  color: rgba(240, 230, 216, 0.55);
+}
+.cert-page .empty-sub {
+  margin-top: 16rpx;
+  font-size: 22rpx;
+  letter-spacing: 6rpx;
+  color: rgba(224, 181, 119, 0.42);
+}
+
+.congrats {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12rpx 0 36rpx;
+}
+.cong-title {
+  font-size: 28rpx;
+  letter-spacing: 16rpx;
+  padding-right: 16rpx;
+  color: rgba(232, 201, 138, 0.85);
+}
+.cong-sub {
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  letter-spacing: 4rpx;
+  color: rgba(240, 230, 216, 0.4);
+}
+
+.paper-frame {
+  padding: 0;
+  background: transparent;
+}
+.paper-img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.paper-placeholder {
+  height: 360rpx;
+  background: rgba(224, 181, 119, 0.04);
+}
+
+.actions {
+  margin-top: 48rpx;
+  display: flex;
+  justify-content: center;
+  gap: 64rpx;
+}
+.act {
+  font-size: 24rpx;
+  letter-spacing: 8rpx;
+  padding: 8rpx 4rpx 8rpx 12rpx;
+  color: rgba(224, 181, 119, 0.55);
+}
+.tip {
+  display: block;
+  text-align: center;
+  margin-top: 20rpx;
+  font-size: 20rpx;
+  letter-spacing: 4rpx;
+  color: rgba(240, 230, 216, 0.22);
+}
+
+.hidden-canvas {
+  position: fixed;
+  left: -2000px;
+  top: 0;
+  width: 400px;
+  height: 300px;
+  pointer-events: none;
+}

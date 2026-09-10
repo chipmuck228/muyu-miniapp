@@ -1,0 +1,14 @@
+{
+  "usingComponents": {
+    "hall-dock": "/components/hall-dock/index",
+    "smoke-gl": "/pkg-smoke/smoke-gl/index"
+  },
+  "componentPlaceholder": {
+    "smoke-gl": "view"
+  },
+  "disableScroll": true,
+  "backgroundColor": "#0a0806",
+  "backgroundColorTop": "#0a0806",
+  "backgroundColorBottom": "#0a0806",
+  "renderer": "webview"
+}

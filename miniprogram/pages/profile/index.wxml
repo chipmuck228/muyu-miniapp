@@ -1,0 +1,77 @@
+<!-- 修行 -->
+<view class="page wing-page profile-page">
+  <view class="wing-head" style="padding-top: {{statusBarHeight}}px;">
+    <text class="wing-title">修 行</text>
+  </view>
+
+  <scroll-view class="wing-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="wing-body">
+      <view class="stats-row">
+        <view class="stat">
+          <text class="st-num mono-num">{{totalText}}</text>
+          <text class="st-label">功德</text>
+        </view>
+        <view class="stat">
+          <text class="st-num mono-num">{{wishCount}}</text>
+          <text class="st-label">心愿</text>
+        </view>
+        <view class="stat">
+          <text class="st-num mono-num">{{streak}}</text>
+          <text class="st-label">天数</text>
+        </view>
+      </view>
+
+      <view class="rate-row">
+        <text class="rate-num mono-num">{{rate}}%</text>
+        <view class="wish-line">
+          <view class="wish-fill" style="width: {{rate}}%;"></view>
+        </view>
+      </view>
+
+      <view class="heat">
+        <view class="heat-head">
+          <text class="heat-title">三十日</text>
+          <text class="heat-today" wx:if="{{todayLabel}}">{{todayLabel}}</text>
+        </view>
+        <text class="heat-caption" wx:if="{{selText}}">{{selText}}</text>
+        <view class="heat-grid">
+          <view class="heat-row" wx:for="{{rows}}" wx:for-item="row" wx:key="index">
+            <view
+              wx:for="{{row}}"
+              wx:for-item="cell"
+              wx:key="key"
+              class="heat-cell l{{cell.level}} {{cell.isToday ? 'today' : ''}}"
+              data-date="{{cell.date}}"
+              data-count="{{cell.count}}"
+              bindtap="onPickCell"
+            ></view>
+          </view>
+          <view class="week-row">
+            <text class="week-label" wx:for="{{weekdayLabels}}" wx:key="*this">{{item}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="sets">
+        <view class="set-item">
+          <text class="set-name">音效</text>
+          <switch checked="{{soundOn}}" color="#c9a56a" bindchange="toggleSound" />
+        </view>
+        <view class="set-item">
+          <text class="set-name">震动</text>
+          <switch checked="{{vibrateOn}}" color="#c9a56a" bindchange="toggleVibrate" />
+        </view>
+        <view class="set-item">
+          <text class="set-name">自动敲击</text>
+          <switch checked="{{autoMode}}" color="#c9a56a" bindchange="toggleAuto" />
+        </view>
+        <view class="set-item last">
+          <text class="set-name">主题</text>
+          <text class="coming">敬请期待</text>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <hall-dock mode="wing" current="{{4}}" />
+</view>
