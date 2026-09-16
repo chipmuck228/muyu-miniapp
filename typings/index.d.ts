@@ -12,9 +12,13 @@ interface IAppOption {
     homeWillReenter?: boolean
     /** 入堂页离场后，首页跳过冷启动莲花遮罩 */
     fromGate?: boolean
-    /** 当次会话已在功课页选定心愿或随机功德 */
+    /** 当次会话已在功课页选定心愿或随机专注 */
     lessonChosen?: boolean
     knockMode?: 'wish' | 'random'
     knockWishId?: string | null
+    /** 今日功课标题：心愿名，或「随机专注」 */
+    knockWishName?: string | null
+    /** 扫码进入时的 scene，供首页首次触点归因 */
+    pendingChannelScene?: string | null
   }
 }

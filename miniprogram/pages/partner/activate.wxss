@@ -1,0 +1,96 @@
+.apply {
+  min-height: 100%;
+  box-sizing: border-box;
+  background: #0a0806;
+}
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 88rpx;
+  padding: 8rpx 32rpx 20rpx;
+  box-sizing: border-box;
+}
+.title {
+  font-size: 30rpx;
+  letter-spacing: 28rpx;
+  padding-right: 28rpx;
+  color: rgba(240, 230, 216, 0.82);
+}
+.kicker {
+  width: 88rpx;
+  font-size: 24rpx;
+  letter-spacing: 4rpx;
+  color: rgba(224, 181, 119, 0.55);
+}
+.kicker.ghost {
+  visibility: hidden;
+}
+.body {
+  padding: 8rpx 40rpx 80rpx;
+  box-sizing: border-box;
+}
+.label {
+  display: block;
+  margin-top: 48rpx;
+  font-size: 22rpx;
+  letter-spacing: 10rpx;
+  color: rgba(224, 181, 119, 0.5);
+}
+.input {
+  width: 100%;
+  height: 80rpx;
+  margin-top: 12rpx;
+  font-size: 30rpx;
+  color: #f0e6d8;
+  background: transparent;
+}
+.ph {
+  color: rgba(240, 230, 216, 0.22);
+}
+.submit {
+  margin-top: 72rpx;
+  text-align: center;
+  font-size: 30rpx;
+  letter-spacing: 16rpx;
+  padding: 24rpx 0;
+  color: #e8c98a;
+}
+.submit.off {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.ch-name {
+  display: block;
+  margin-top: 24rpx;
+  text-align: center;
+  font-size: 28rpx;
+  letter-spacing: 8rpx;
+  color: rgba(232, 201, 138, 0.8);
+}
+.qr {
+  display: block;
+  width: 360rpx;
+  height: 360rpx;
+  margin: 48rpx auto 0;
+}
+.code-txt {
+  display: block;
+  margin-top: 20rpx;
+  text-align: center;
+  font-size: 28rpx;
+  letter-spacing: 12rpx;
+  color: rgba(232, 201, 138, 0.7);
+}
+.hint {
+  display: block;
+  margin-top: 48rpx;
+  text-align: center;
+  font-size: 24rpx;
+  letter-spacing: 4rpx;
+  line-height: 1.7;
+  color: rgba(240, 230, 216, 0.38);
+}
+.hint.err {
+  color: rgba(224, 181, 119, 0.7);
+}

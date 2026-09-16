@@ -14,16 +14,20 @@
     bindrefresherrefresh="onRefresh"
   >
     <view class="wing-body">
+      <text class="list-hint" wx:if="{{wishes.length > 0}}">完成后另有惊喜</text>
       <block wx:if="{{wishes.length > 0}}">
         <view
           wx:for="{{wishes}}"
           wx:key="_id"
-          class="wish-row"
+          class="wish-row {{item.done ? 'done' : ''}}"
           hover-class="hover-dim"
           data-id="{{item._id}}"
           bindtap="openDetail"
         >
-          <text class="wish-name">{{item.name}}</text>
+          <view class="wish-top">
+            <text class="wish-name">{{item.name}}</text>
+            <text class="wish-mark">{{item.mark}}</text>
+          </view>
           <view class="wish-line">
             <view class="wish-fill" style="width: {{item.percent}}%;"></view>
           </view>
@@ -31,7 +35,7 @@
       </block>
       <view class="empty" wx:elif="{{!loading}}">
         <text class="empty-title">尚未立愿</text>
-        <text class="empty-sub">先许一心，再来叩击</text>
+        <text class="empty-sub">完成后另有惊喜</text>
       </view>
     </view>
   </scroll-view>

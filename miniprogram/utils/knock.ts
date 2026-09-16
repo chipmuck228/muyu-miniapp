@@ -1,114 +1,99 @@
-// 敲击音效：运行时合成一段「笃」的木鱼短音写入用户目录，再通过 InnerAudioContext 播放
-// 这样无需携带任何音频资源，主包更小
+// 敲击音效：云端短 MP3。空 fileID 时静默。iOS 静音拨片靠 setInnerAudioOption。
 
-const FILE_NAME = '/knock.wav'
-const SAMPLE_RATE = 22050
-const DURATION = 0.22 // 秒
+import { AUDIO_FILES } from './audioCatalog'
+import { resolveCloudFile } from './cloudFile'
 
-let audioCtx: any = null
-let ready = false
-let generating = false
+const POOL = 2
 
-function synthWav(): ArrayBuffer {
-  const n = Math.floor(SAMPLE_RATE * DURATION)
-  const data = new Float32Array(n)
-  for (let i = 0; i < n; i++) {
-    const t = i / SAMPLE_RATE
-    // 主频：木质高频叩击音 + 腔体共鸣 + 短促噪声，指数衰减
-    let s =
-      0.95 * Math.exp(-t * 46) * Math.sin(2 * Math.PI * 1180 * t) +
-      0.55 * Math.exp(-t * 26) * Math.sin(2 * Math.PI * 470 * t + 0.6) +
-      0.35 * Math.exp(-t * 30) * Math.sin(2 * Math.PI * 233 * t)
-    if (t < 0.008) {
-      s += (Math.random() * 2 - 1) * 0.5 * Math.exp(-t * 900)
-    }
-    data[i] = s
-  }
-  // 限幅
-  let peak = 0.001
-  for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(data[i]))
-  const norm = peak > 0.9 ? 0.9 / peak : 1
+let optionSet = false
+let knockPath = ''
+let loading = false
+const pool: any[] = []
+let cursor = 0
 
-  const bytesPerSample = 2
-  const dataSize = n * bytesPerSample
-  const buffer = new ArrayBuffer(44 + dataSize)
-  const view = new DataView(buffer)
-
-  const writeStr = (off: number, str: string) => {
-    for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i))
-  }
-  writeStr(0, 'RIFF')
-  view.setUint32(4, 36 + dataSize, true)
-  writeStr(8, 'WAVE')
-  writeStr(12, 'fmt ')
-  view.setUint32(16, 16, true)
-  view.setUint16(20, 1, true) // PCM
-  view.setUint16(22, 1, true) // mono
-  view.setUint32(24, SAMPLE_RATE, true)
-  view.setUint32(28, SAMPLE_RATE * bytesPerSample, true)
-  view.setUint16(32, bytesPerSample, true)
-  view.setUint16(34, 16, true)
-  writeStr(36, 'data')
-  view.setUint32(40, dataSize, true)
-  for (let i = 0; i < n; i++) {
-    const v = Math.max(-1, Math.min(1, data[i] * norm))
-    view.setInt16(44 + i * 2, Math.round(v * 32767), true)
-  }
-  return buffer
-}
-
-function initAudio(path: string) {
-  if (audioCtx) return
+export function applyAudioOption() {
+  if (optionSet) return
+  optionSet = true
   try {
-    audioCtx = wx.createInnerAudioContext()
-    audioCtx.src = path
-    audioCtx.volume = 1
-    audioCtx.obeyMuteSwitch = false
+    wx.setInnerAudioOption({
+      obeyMuteSwitch: false,
+      speakerOn: true,
+      mixWithOther: true,
+    })
   } catch {
-    audioCtx = null
+    optionSet = false
   }
 }
 
-/** 应用启动时预生成音效文件（幂等） */
-export function ensureKnock() {
-  if (ready || generating) return
-  if (!wx.getFileSystemManager) return
-  generating = true
-  const fs = wx.getFileSystemManager()
+function makeCtx(src: string) {
   const anyWx: any = wx
-  const path = anyWx.env.USER_DATA_PATH + FILE_NAME
+  let ctx: any = null
   try {
-    fs.accessSync(path)
-    ready = true
-    initAudio(path)
-    generating = false
+    ctx = anyWx.createInnerAudioContext({ useWebAudioImplement: true })
   } catch {
-    try {
-      const ab = synthWav()
-      fs.writeFileSync(path, ab)
-      ready = true
-      initAudio(path)
-    } catch {
-      // 合成失败时静默降级（无音效）
-    }
-    generating = false
+    ctx = wx.createInnerAudioContext()
   }
+  ctx.src = src
+  ctx.volume = 1
+  ctx.obeyMuteSwitch = false
+  return ctx
 }
 
-/** 播放敲击音（on 为当前用户音效开关） */
+function fillPool(path: string) {
+  knockPath = path
+  if (pool.length) {
+    pool.forEach((c) => {
+      try {
+        c.src = path
+      } catch {
+        // ignore
+      }
+    })
+    return
+  }
+  for (let i = 0; i < POOL; i++) pool.push(makeCtx(path))
+}
+
+export function ensureKnock() {
+  applyAudioOption()
+  const fileID = AUDIO_FILES.knock
+  if (!fileID || loading || knockPath) return
+  loading = true
+  resolveCloudFile(fileID)
+    .then((path) => {
+      fillPool(path)
+    })
+    .catch((e) => {
+      console.warn('knock load failed', e)
+    })
+    .then(() => {
+      loading = false
+    })
+}
+
 export function playKnock(on: boolean) {
   if (!on) return
-  ensureKnock()
-  if (!audioCtx) return
+  applyAudioOption()
+  if (!knockPath) {
+    ensureKnock()
+    return
+  }
+  const ctx = pool[cursor]
+  cursor = (cursor + 1) % pool.length
+  if (!ctx) return
   try {
-    audioCtx.stop()
-    audioCtx.play()
+    if (typeof ctx.seek === 'function') ctx.seek(0)
+    ctx.play()
   } catch {
-    // ignore
+    try {
+      ctx.stop()
+      ctx.play()
+    } catch {
+      // ignore
+    }
   }
 }
 
-/** 震动（on 为震动开关），type 兜底 */
 export function vibrate(on: boolean) {
   if (!on) return
   const anyWx: any = wx

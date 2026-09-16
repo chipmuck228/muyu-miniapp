@@ -1,4 +1,4 @@
-<!-- 今日功课：冷启动入堂之后，选心愿或随机功德，再进香案 -->
+<!-- 今日功课：冷启动入堂之后，选心愿或随机专注，再进香案 -->
 <view class="lesson" catchtouchmove="noop">
   <view class="lesson-brand">
     <text class="lesson-kicker">今日功课</text>
@@ -7,10 +7,10 @@
 
   <view class="paths">
     <view class="path {{wishOpen ? 'on' : ''}}" hover-class="path-hover" bindtap="onWishPath">
-      <text class="path-name">按照心愿单敲击木鱼</text>
+      <text class="path-name">按照心愿单轻叩</text>
     </view>
     <view class="path" hover-class="path-hover" bindtap="onRandom">
-      <text class="path-name">随机功德</text>
+      <text class="path-name">随机专注</text>
     </view>
   </view>
 

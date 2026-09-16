@@ -1,3 +1,10 @@
+.list-hint {
+  display: block;
+  margin-bottom: 12rpx;
+  font-size: 22rpx;
+  letter-spacing: 6rpx;
+  color: rgba(224, 181, 119, 0.38);
+}
 .wishes-page .empty {
   padding-top: 160rpx;
 }
@@ -16,17 +23,35 @@
 }
 
 .wish-row {
-  padding: 28rpx 0 24rpx;
+  padding: 32rpx 0 26rpx;
   border-bottom: 1rpx solid rgba(224, 181, 119, 0.08);
 }
+.wish-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
 .wish-name {
-  display: block;
+  flex: 1;
+  min-width: 0;
   font-size: 30rpx;
   letter-spacing: 4rpx;
   color: rgba(240, 230, 216, 0.88);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.wish-mark {
+  margin-left: 24rpx;
+  font-size: 22rpx;
+  letter-spacing: 4rpx;
+  color: rgba(224, 181, 119, 0.5);
+}
+.wish-row.done .wish-name {
+  color: rgba(240, 230, 216, 0.42);
+}
+.wish-row.done .wish-mark {
+  color: rgba(224, 181, 119, 0.32);
 }
 .wish-line {
   margin-top: 18rpx;

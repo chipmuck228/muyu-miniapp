@@ -1,10 +1,8 @@
 // 心愿详情
-import { fetchWishDetail, fulfillWish, Wish, settingsOf } from '../../utils/cloud'
+import { fetchWishDetail, fulfillWish, fetchPaperOrigin, Wish } from '../../utils/cloud'
 import { STATUS_TEXT, STATUS_CLS, percentOf } from '../../utils/constants'
 import { setFormState } from '../../utils/formState'
-import { fmtMD, todayStr, offsetDate, fmtInt, winInfo } from '../../utils/util'
-import { playKnock, vibrate } from '../../utils/knock'
-import { KnockQueue } from '../../utils/knockQueue'
+import { fmtMD, todayStr, offsetDate, fmtInt, winInfo, concealTabBar } from '../../utils/util'
 
 interface BarItem {
   key: string
@@ -94,17 +92,21 @@ Page({
     canKnock: false,
     canEdit: false,
     showFulfill: false,
+    canSave: false,
+    revealed: false,
+    thumbUrl: '',
+    revealOn: false,
+    savingPaper: false,
     localToday: 0,
   },
 
   _alive: false,
-  _queue: null as KnockQueue | null,
+  _revealTimer: 0 as any,
 
   onLoad(options: Record<string, string | undefined>) {
     const app = getApp<IAppOption>()
     this._alive = true
     const wishId = (options && options.id) || ''
-    // 底部安全区
     let safeBottom = 0
     try {
       const win: any = winInfo()
@@ -117,28 +119,14 @@ Page({
       safeBottom,
       wishId,
     })
-    this._queue = new KnockQueue(
-      () => {
-        const w = this.data.wish
-        return w && w.status === 'ongoing' ? w._id : null
-      },
-      (r) => {
-        if (r.completed) {
-          this.onCompleted()
-        }
-      },
-      () => {
-        if (this._alive) wx.showToast({ title: '功德未能上传，请重试', icon: 'none' })
-      }
-    )
     this.load()
   },
 
   onUnload() {
     this._alive = false
-    if (this._queue) {
-      this._queue.destroy()
-      this._queue = null
+    if (this._revealTimer) {
+      clearTimeout(this._revealTimer)
+      this._revealTimer = 0
     }
   },
 
@@ -160,8 +148,10 @@ Page({
         .map((h) => ({
           date: h.date,
           count: h.count || 0,
-          text: fmtMD(h.date) + ' · ' + (h.count || 0) + ' 次',
+          text: fmtMD(h.date),
         }))
+      const revealed = vm.status === 'completed' || vm.status === 'fulfilled'
+      const thumbUrl = (res.wish && res.wish.thumbUrl) || ''
       this.setData({
         loading: false,
         wish: vm,
@@ -170,8 +160,18 @@ Page({
         canKnock: vm.status === 'ongoing',
         canEdit: vm.status !== 'fulfilled',
         showFulfill: vm.status === 'completed',
+        canSave: revealed,
+        revealed,
+        thumbUrl,
+        revealOn: false,
         localToday: bars.filter((b) => b.isToday).reduce((s, b) => s + b.count, 0),
       })
+      if (revealed && thumbUrl) {
+        if (this._revealTimer) clearTimeout(this._revealTimer)
+        this._revealTimer = setTimeout(() => {
+          if (this._alive) this.setData({ revealOn: true })
+        }, 40)
+      }
     } catch (e: any) {
       if (!this._alive) return
       this.setData({ loading: false })
@@ -179,78 +179,101 @@ Page({
     }
   },
 
-  // ===== 敲击 =====
-  doKnock() {
-    if (!this._alive) return
-    const d = this.data
-    const w = d.wish
+  goAltar() {
+    const w = this.data.wish
     if (!w || w.status !== 'ongoing') return
     const app = getApp<IAppOption>()
-    const st = settingsOf(app.globalData.user)
-    playKnock(st.soundOn)
-    vibrate(st.vibrateOn)
-
-    const cur = Math.min(w.goal, w.current + 1)
-    const justDone = cur >= w.goal
-    const next: WishVM = {
-      ...w,
-      current: cur,
-      percent: percentOf(cur, w.goal),
-      status: justDone ? 'completed' : 'ongoing',
-      statusText: justDone ? '已圆满' : '进行中',
-      statusCls: justDone ? 'completed' : 'ongoing',
-      currentText: fmtInt(cur),
-    }
-    // 今日柱 +1
-    const bars = d.bars.map((b) =>
-      b.isToday ? { ...b, count: b.count + 1, ratio: Math.max(b.ratio, 8), hasValue: true } : b
-    )
-    this.setData({
-      wish: next,
-      bars,
-      localToday: d.localToday + 1,
-      canKnock: !justDone,
-      showFulfill: justDone,
-    })
-    if (this._queue) this._queue.tap(1)
-    if (justDone) {
-      wx.showToast({ title: '功德圆满，随喜赞叹', icon: 'none' })
-    }
+    app.globalData.lessonChosen = true
+    app.globalData.knockMode = 'wish'
+    app.globalData.knockWishId = w._id
+    app.globalData.knockWishName = w.name
+    app.globalData.homeEnterAnim = true
+    concealTabBar(this)
+    wx.switchTab({ url: '/pages/home/index' })
   },
 
-  onCompleted() {
-    // 云端确认后刷新权威数据
-    this.load()
-  },
-
-  // ===== 还愿 =====
   doFulfill() {
     const w = this.data.wish
     if (!w || w.status !== 'completed') return
     wx.showModal({
-      title: '还愿确认',
-      content: '心愿已成，是否正式还愿并生成功德证书？',
-      confirmText: '还愿',
+      title: '了结确认',
+      content: '心愿已成，是否正式了结并生成证书？',
+      confirmText: '了结',
       confirmColor: '#c0955f',
       success: async (res) => {
         if (!res.confirm) return
-        wx.showLoading({ title: '还愿中', mask: true })
+        wx.showLoading({ title: '了结中', mask: true })
         try {
           await fulfillWish(w._id)
           wx.hideLoading()
-          wx.showToast({ title: '还愿成功', icon: 'success' })
+          wx.showToast({ title: '已了结', icon: 'success' })
           setTimeout(() => {
             wx.switchTab({ url: '/pages/certificate/index' })
           }, 600)
         } catch (e: any) {
           wx.hideLoading()
-          wx.showToast({ title: (e && e.message) || '还愿失败', icon: 'none' })
+          wx.showToast({ title: (e && e.message) || '了结失败', icon: 'none' })
         }
       },
     })
   },
 
-  // ===== 修改 =====
+  savePaper() {
+    const w = this.data.wish
+    if (!w || this.data.savingPaper) return
+    if (w.status !== 'completed' && w.status !== 'fulfilled') return
+    this.setData({ savingPaper: true })
+    wx.showLoading({ title: '取图中', mask: true })
+    fetchPaperOrigin(w._id)
+      .then((r) => {
+        if (r.originFileId) {
+          return wx.cloud.downloadFile({ fileID: r.originFileId }).then((dl) => {
+            if (dl && dl.tempFilePath) return dl.tempFilePath
+            throw new Error('下载失败')
+          })
+        }
+        if (!r.originUrl) throw new Error('壁纸尚未就绪')
+        return new Promise<string>((resolve, reject) => {
+          wx.downloadFile({
+            url: r.originUrl,
+            success: (dl) => {
+              if (dl.statusCode === 200 && dl.tempFilePath) resolve(dl.tempFilePath)
+              else reject(new Error('下载失败'))
+            },
+            fail: () => reject(new Error('下载失败')),
+          })
+        })
+      })
+      .then((filePath) => {
+        wx.hideLoading()
+        wx.saveImageToPhotosAlbum({
+          filePath,
+          success: () => wx.showToast({ title: '已保存到相册', icon: 'success' }),
+          fail: (err: any) => {
+            if (err && err.errMsg && err.errMsg.indexOf('auth deny') >= 0) {
+              wx.showModal({
+                title: '需要相册权限',
+                content: '请在设置中开启「保存到相册」权限',
+                confirmText: '去设置',
+                success: (res) => {
+                  if (res.confirm) wx.openSetting()
+                },
+              })
+            } else {
+              wx.showToast({ title: '保存失败', icon: 'none' })
+            }
+          },
+        })
+      })
+      .catch((e: any) => {
+        wx.hideLoading()
+        wx.showToast({ title: (e && e.message) || '壁纸尚未就绪', icon: 'none' })
+      })
+      .then(() => {
+        if (this._alive) this.setData({ savingPaper: false })
+      })
+  },
+
   goEdit() {
     const w = this.data.wish
     if (!w || w.status === 'fulfilled') return

@@ -1,0 +1,9 @@
+{
+  "name": "initChannelDb",
+  "version": "1.0.0",
+  "description": "一次性创建渠道相关数据库集合",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

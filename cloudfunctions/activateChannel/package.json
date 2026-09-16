@@ -1,0 +1,9 @@
+{
+  "name": "activateChannel",
+  "version": "1.0.0",
+  "description": "渠道商首次激活",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

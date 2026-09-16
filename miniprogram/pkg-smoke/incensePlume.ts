@@ -2,29 +2,28 @@
 
 import { adaptForMiniProgram } from './threeAdapt'
 
-export const SMOKE_REV = 'v20260910v'
+export const SMOKE_REV = 'v20260910af'
 
 export interface VoidSmokeHandle {
   stop: () => void
 }
 
 export const CONFIG = {
-  strands: 3,
-  stemPts: 88,
-  vortexPts: 32,
+  strands: 1,
+  stemPts: 140,
+  vortexPts: 40,
   pixelRatio: 1.5,
-  riseSpeed: 0.3,
+  riseSpeed: 0.18,
   originYRatio: 0.86,
   curlFromTop: 1 / 3,
-  minWidth: 1.5,
-  stemWidth: 16,
-  vortexWidth: 22,
-  bottomAlpha: 0.62,
-  topAlpha: 0.34,
-  holdMs: 400,
-  scatterMs: 2800,
-  vortexTurns: 0.6,
-  vortexAmpRatio: 0.28,
+  minWidth: 2,
+  stemWidth: 9,
+  vortexWidth: 14,
+  bottomAlpha: 0.58,
+  topAlpha: 0.22,
+  holdMs: 280,
+  scatterMs: 2200,
+  vortexAmpRatio: 0.08,
 }
 
 const VERT = `
@@ -52,7 +51,7 @@ varying float vAlpha;
 varying float vSoft;
 varying float vV;
 void main() {
-  float inner = mix(0.55, 0.28, clamp(vSoft, 0.0, 1.0));
+  float inner = mix(0.18, 0.06, clamp(vSoft, 0.0, 1.0));
   float edge = 1.0 - smoothstep(inner, 1.0, abs(vV));
   float a = vAlpha * edge;
   if (a < 0.012) discard;
@@ -140,7 +139,13 @@ function linkProgram(gl: any): any {
   return prog
 }
 
-export function startIncensePlume(canvas: any, cssW: number, cssH: number, dpr: number): VoidSmokeHandle {
+export function startIncensePlume(
+  canvas: any,
+  cssW: number,
+  cssH: number,
+  dpr: number,
+  onRise?: () => void,
+): VoidSmokeHandle {
   console.log('[smoke]', SMOKE_REV, cssW, cssH)
   const pixelRatio = Math.max(1, Math.min(dpr || CONFIG.pixelRatio, CONFIG.pixelRatio))
   const pixelW = Math.max(1, Math.round(cssW * pixelRatio))
@@ -166,10 +171,8 @@ export function startIncensePlume(canvas: any, cssW: number, cssH: number, dpr: 
   const screenTop = cssH * 0.5
   const curlY = screenTop - cssH * CONFIG.curlFromTop
   const stemH = Math.max(1, curlY - originY)
-  const vortexAmp = cssW * CONFIG.vortexAmpRatio
   const growMs = (stemH / CONFIG.riseSpeed) * 16.67
   const vortexSpan = CONFIG.holdMs + CONFIG.scatterMs
-  const spinSign = [1, -1, 1]
   const strandN = CONFIG.strands
   const stemN = CONFIG.stemPts
   const vortexN = CONFIG.vortexPts
@@ -177,11 +180,14 @@ export function startIncensePlume(canvas: any, cssW: number, cssH: number, dpr: 
 
   const strandPhase: number[] = []
   const pointSeed: number[][] = []
+  const pointSeedB: number[][] = []
   for (let s = 0; s < strandN; s++) {
     strandPhase[s] = Math.random() * Math.PI * 2
     pointSeed[s] = new Array(maxPts)
+    pointSeedB[s] = new Array(maxPts)
     for (let i = 0; i < maxPts; i++) {
       pointSeed[s][i] = Math.random() * Math.PI * 2
+      pointSeedB[s][i] = Math.random() * Math.PI * 2
     }
   }
 
@@ -193,7 +199,7 @@ export function startIncensePlume(canvas: any, cssW: number, cssH: number, dpr: 
     }
   }
 
-  const vertsPerStrand = maxPts * 2
+  const vertsPerStrand = Math.max(6, (maxPts - 1) * 6)
   const pos = new Float32Array(vertsPerStrand * 2)
   const across = new Float32Array(vertsPerStrand)
   const alphas = new Float32Array(vertsPerStrand)
@@ -219,18 +225,45 @@ export function startIncensePlume(canvas: any, cssW: number, cssH: number, dpr: 
   gl.bindBuffer(gl.ARRAY_BUFFER, bufEmberS)
   gl.bufferData(gl.ARRAY_BUFFER, emberS, gl.STATIC_DRAW)
 
-  const drift = (t: number, seed: number, u: number): number => {
-    const slow = Math.sin(t * 0.00011 + seed) * 0.5
-    const mid = Math.sin(t * 0.00027 + seed * 1.63 + u * 2.8) * 0.35
-    const fine = Math.sin(t * 0.00062 + seed * 2.17 + u * 7.4) * 0.15
-    return slow + mid + fine
+  let ampScale = 1
+  let ampTarget = 1
+  let ampNextAt = Date.now() + 1600
+
+  const waveX = (t: number, u: number, phase: number): number => {
+    return (
+      Math.sin(u * Math.PI * 0.68 + t * 0.00015 + phase) * 0.78 +
+      Math.sin(u * Math.PI * 1.08 + t * 0.00021 + phase * 1.2) * 0.18 +
+      Math.sin(u * Math.PI * 0.32 + t * 0.00009 + phase * 0.7) * 0.04
+    )
+  }
+
+  const easeOut = (t: number): number => {
+    const x = clamp(t, 0, 1)
+    return x * x * (3 - 2 * x)
+  }
+
+  const smoothChain = (list: RibbonPoint[], from: number, to: number, passes: number, lockY: boolean) => {
+    for (let pass = 0; pass < passes; pass++) {
+      for (let i = from + 1; i < to - 1; i++) {
+        const a = list[i - 1]
+        const b = list[i]
+        const c = list[i + 1]
+        if (b.alpha <= 0.01 || a.alpha <= 0.01 || c.alpha <= 0.01) continue
+        b.x = a.x * 0.28 + b.x * 0.44 + c.x * 0.28
+        if (!lockY) b.y = a.y * 0.22 + b.y * 0.56 + c.y * 0.22
+      }
+    }
   }
 
   const fillStrand = (s: number, now: number, growU: number) => {
     const phase = strandPhase[s]
-    const sway = Math.sin(now * 0.00013 + phase) * 3.4
     const liveStem = Math.max(2, Math.ceil(growU * (stemN - 1)) + 1)
     const showVortex = growU >= 1
+    if (now >= ampNextAt) {
+      ampTarget = 0.78 + Math.random() * 0.5
+      ampNextAt = now + 2800 + Math.random() * 4200
+    }
+    ampScale += (ampTarget - ampScale) * 0.012
 
     for (let i = 0; i < stemN; i++) {
       const p = points[s][i]
@@ -238,14 +271,20 @@ export function startIncensePlume(canvas: any, cssW: number, cssH: number, dpr: 
         p.alpha = 0
         continue
       }
-      const stemU = clamp((i / Math.max(1, liveStem - 1)) * growU, 0, 1)
-      const amp = 1 + stemU * stemU * 13
-      p.x = sway + drift(now, pointSeed[s][i], stemU) * amp
+      const along = i / Math.max(1, liveStem - 1)
+      const stemU = clamp(along * growU, 0, 1)
+      const amp = (5 + stemU * 30) * ampScale
+      p.x = waveX(now, stemU, phase) * amp
       p.y = originY + stemU * stemH
-      p.w = CONFIG.minWidth + stemU * (CONFIG.stemWidth - CONFIG.minWidth)
-      p.soft = 0.12 + stemU * 0.55
-      p.alpha = CONFIG.bottomAlpha * (1 - stemU * 0.35)
-      if (i === liveStem - 1 && growU < 1) p.alpha *= 0.55
+      p.w = CONFIG.minWidth + Math.pow(stemU, 1.15) * (CONFIG.stemWidth - CONFIG.minWidth)
+      p.soft = 0.4 + stemU * 0.5
+      p.alpha = CONFIG.bottomAlpha * (1 - stemU * 0.55)
+      if (growU < 1) {
+        const tip = 0.62 + 0.38 * easeOut(clamp((1 - along) / 0.14, 0, 1))
+        p.w *= tip
+        p.alpha *= 0.55 + 0.45 * tip
+        p.soft = clamp(p.soft + (1 - tip) * 0.25, 0, 1)
+      }
     }
 
     for (let j = 0; j < vortexN; j++) {
@@ -255,64 +294,72 @@ export function startIncensePlume(canvas: any, cssW: number, cssH: number, dpr: 
         continue
       }
       const v = j / Math.max(1, vortexN - 1)
-      const age = v * vortexSpan
-      const seed = pointSeed[s][stemN + j]
-      const n = drift(now, seed, 1) * 3.2
-      if (age <= CONFIG.holdMs) {
-        const holdT = age / CONFIG.holdMs
-        p.x = sway + n * 0.4 + Math.cos(phase + holdT * 0.4) * (3 + holdT * 4)
-        p.y = curlY + Math.sin(phase * 0.7 + holdT) * 2
-        p.w = CONFIG.stemWidth
-        p.soft = 0.6
-        p.alpha = CONFIG.topAlpha
-      } else {
-        const scatterT = clamp((age - CONFIG.holdMs) / CONFIG.scatterMs, 0, 1)
-        const ang = phase + spinSign[s] * scatterT * CONFIG.vortexTurns * Math.PI * 2 + now * 0.00032
-        const rad = 10 + scatterT * vortexAmp
-        p.x = sway + Math.cos(ang) * rad + n
-        p.y = curlY + Math.sin(ang) * rad * 0.78 + n * 0.35
-        p.w = CONFIG.stemWidth + scatterT * (CONFIG.vortexWidth - CONFIG.stemWidth)
-        p.soft = 0.62 + scatterT * 0.38
-        p.alpha = scatterT < 0.65 ? CONFIG.topAlpha : CONFIG.topAlpha * (1 - (scatterT - 0.65) / 0.35)
-      }
+      const u = 1 + v * 0.22
+      const fade = easeOut(1 - v)
+      p.x = waveX(now, u, phase) * (5 + 30) * ampScale + Math.sin(now * 0.00012 + pointSeed[s][stemN + j]) * v * 5
+      p.y = curlY + v * 28
+      p.w = CONFIG.stemWidth + v * (CONFIG.vortexWidth - CONFIG.stemWidth)
+      p.soft = 0.82 + v * 0.18
+      p.alpha = CONFIG.topAlpha * fade
     }
+    if (showVortex) smoothChain(points[s], stemN - 1, stemN + vortexN, 2, false)
   }
 
-  const writeStrip = (strand: RibbonPoint[], count: number): number => {
-    if (count < 2) return 0
-    let n = 0
+  const writeStrip = (strand: RibbonPoint[], count: number, wMul = 1, aMul = 1, softAdd = 0): number => {
+    const live: RibbonPoint[] = []
     for (let i = 0; i < count; i++) {
-      const p = strand[i]
-      if (p.alpha <= 0.01) continue
-      let px = 0
-      let py = 0
-      if (i === 0) {
-        px = strand[1].x - p.x
-        py = strand[1].y - p.y
-      } else if (i === count - 1 || strand[i + 1].alpha <= 0.01) {
-        px = p.x - strand[i - 1].x
-        py = p.y - strand[i - 1].y
-      } else {
-        px = strand[i + 1].x - strand[i - 1].x
-        py = strand[i + 1].y - strand[i - 1].y
-      }
-      const len = Math.sqrt(px * px + py * py) || 1
-      const nx = -py / len
-      const ny = px / len
-      const hw = p.w * 0.5
-      const i0 = n
-      const i1 = n + 1
-      pos[i0 * 2] = p.x + nx * hw
-      pos[i0 * 2 + 1] = p.y + ny * hw
-      pos[i1 * 2] = p.x - nx * hw
-      pos[i1 * 2 + 1] = p.y - ny * hw
-      across[i0] = 1
-      across[i1] = -1
-      alphas[i0] = p.alpha
-      alphas[i1] = p.alpha
-      softs[i0] = p.soft
-      softs[i1] = p.soft
-      n += 2
+      if (strand[i].alpha > 0.01) live.push(strand[i])
+    }
+    if (live.length < 2) return 0
+    let n = 0
+    const vert = (x: number, y: number, v: number, alpha: number, soft: number) => {
+      if (n >= vertsPerStrand) return
+      pos[n * 2] = x
+      pos[n * 2 + 1] = y
+      across[n] = v
+      alphas[n] = alpha
+      softs[n] = soft
+      n += 1
+    }
+    const quad = (
+      x0: number,
+      y0: number,
+      w0: number,
+      a0: number,
+      s0: number,
+      x1: number,
+      y1: number,
+      w1: number,
+      a1: number,
+      s1: number,
+    ) => {
+      const l0x = x0 - w0 * 0.5
+      const r0x = x0 + w0 * 0.5
+      const l1x = x1 - w1 * 0.5
+      const r1x = x1 + w1 * 0.5
+      vert(l0x, y0, -1, a0, s0)
+      vert(r0x, y0, 1, a0, s0)
+      vert(l1x, y1, -1, a1, s1)
+      vert(r0x, y0, 1, a0, s0)
+      vert(r1x, y1, 1, a1, s1)
+      vert(l1x, y1, -1, a1, s1)
+    }
+    for (let i = 0; i < live.length - 1; i++) {
+      const a = live[i]
+      const b = live[i + 1]
+      if (Math.abs(b.y - a.y) < 0.15) continue
+      quad(
+        a.x,
+        a.y,
+        a.w * wMul,
+        a.alpha * aMul,
+        clamp(a.soft + softAdd, 0, 1),
+        b.x,
+        b.y,
+        b.w * wMul,
+        b.alpha * aMul,
+        clamp(b.soft + softAdd, 0, 1),
+      )
     }
     return n
   }
@@ -327,11 +374,23 @@ export function startIncensePlume(canvas: any, cssW: number, cssH: number, dpr: 
   const born = Date.now()
   let raf = 0
   let running = true
+  let risen = false
+  const riseAt = Math.min(growMs * 0.22, 4800)
 
   const tick = () => {
     if (!running) return
     const now = Date.now()
     const growU = clamp((now - born) / growMs, 0, 1)
+    if (!risen && now - born >= riseAt) {
+      risen = true
+      if (onRise) {
+        try {
+          onRise()
+        } catch {
+          // 标题回调失败不影响青烟
+        }
+      }
+    }
 
     gl.viewport(0, 0, pixelW, pixelH)
     gl.clearColor(0, 0, 0, 0)
@@ -357,18 +416,26 @@ export function startIncensePlume(canvas: any, cssW: number, cssH: number, dpr: 
     gl.vertexAttribPointer(aSoft, 1, gl.FLOAT, false, 0, 0)
     gl.drawArrays(gl.TRIANGLES, 0, 6)
 
-    gl.uniform3f(uColor, 0.74, 0.86, 0.88)
+    gl.uniform3f(uColor, 0.8, 0.82, 0.84)
     for (let s = 0; s < strandN; s++) {
       fillStrand(s, now, growU)
       const liveStem = Math.max(2, Math.ceil(growU * (stemN - 1)) + 1)
       const count = growU >= 1 ? maxPts : liveStem
-      const n = writeStrip(points[s], count)
-      if (n < 4) continue
+      const halo = writeStrip(points[s], count, 2.6, 0.22, 0.35)
+      if (halo >= 6) {
+        bindAttr(aPos, bufPos, 2, pos)
+        bindAttr(aV, bufV, 1, across)
+        bindAttr(aAlpha, bufAlpha, 1, alphas)
+        bindAttr(aSoft, bufSoft, 1, softs)
+        gl.drawArrays(gl.TRIANGLES, 0, halo)
+      }
+      const n = writeStrip(points[s], count, 1, 1, 0)
+      if (n < 6) continue
       bindAttr(aPos, bufPos, 2, pos)
       bindAttr(aV, bufV, 1, across)
       bindAttr(aAlpha, bufAlpha, 1, alphas)
       bindAttr(aSoft, bufSoft, 1, softs)
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, n)
+      gl.drawArrays(gl.TRIANGLES, 0, n)
     }
 
     raf = setTimeout(tick, 16) as unknown as number

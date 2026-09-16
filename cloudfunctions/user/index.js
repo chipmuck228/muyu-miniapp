@@ -3,12 +3,14 @@ const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 
-const DEFAULT_SETTINGS = { soundOn: true, vibrateOn: true, autoMode: false }
+const DEFAULT_SETTINGS = { soundOn: true, vibrateOn: true, autoMode: false, ambience: 'off' }
 
 // 更新用户设置（音效/震动/自动敲击开关）
 exports.main = async (event) => {
   const { OPENID } = cloud.getWXContext()
-  const patch = (event && event.settings) || {}
+  const patch = Object.assign({}, (event && event.settings) || {})
+  const allowed = { off: 1, rain: 1, noise: 1, bowl: 1 }
+  if (patch.ambience && !allowed[patch.ambience]) delete patch.ambience
   try {
     let settings = { ...DEFAULT_SETTINGS }
     try {
@@ -21,7 +23,8 @@ exports.main = async (event) => {
         data: {
           _id: OPENID,
           _openid: OPENID,
-          nickname: '禅心行者',
+          nickname: '静心的人',
+          wxMark: String(OPENID).slice(-8).toUpperCase(),
           totalMerit: 0,
           createdAt: new Date(),
           lastHitDate: null,

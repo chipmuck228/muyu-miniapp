@@ -1,5 +1,12 @@
-// 我的修行
-import { fetchProfile, updateSettings, UserSettings } from '../../utils/cloud'
+// 静心
+import {
+  fetchProfile,
+  updateSettings,
+  UserSettings,
+  settingsOf,
+  channelAdminCheck,
+} from '../../utils/cloud'
+import { AMBIENCE_OPTIONS, AmbienceId, parseAmbience } from '../../utils/audioCatalog'
 import { fmtInt, todayStr, offsetDate, weekdayMon0, fmtMD, concealTabBar } from '../../utils/util'
 
 interface HeatCell {
@@ -60,6 +67,9 @@ Page({
     soundOn: true,
     vibrateOn: true,
     autoMode: false,
+    ambience: 'off' as AmbienceId,
+    ambienceOptions: AMBIENCE_OPTIONS,
+    showAdmin: false,
   },
 
   _alive: false,
@@ -88,20 +98,23 @@ Page({
       const today = todayStr()
       const rows = buildHeat(res.map || {})
       const todayCount = res.todayCount || 0
+      const s = settingsOf(res.user)
       this.setData({
         loading: false,
         totalText: fmtInt(res.user.totalMerit || 0),
         wishCount: res.wishes.length,
         streak: res.streak,
         rate,
-        nickname: res.user.nickname || '禅心行者',
+        nickname: res.user.nickname || '静心的人',
         rows,
         todayLabel: todayCount > 0 ? String(todayCount) : '',
         selText: todayCount > 0 ? today + '  ·  ' + todayCount : today,
-        soundOn: !!(res.user.settings && res.user.settings.soundOn),
-        vibrateOn: !!(res.user.settings && res.user.settings.vibrateOn),
-        autoMode: !!(res.user.settings && res.user.settings.autoMode),
+        soundOn: s.soundOn,
+        vibrateOn: s.vibrateOn,
+        autoMode: s.autoMode,
+        ambience: s.ambience,
       })
+      this.loadChannelFlags()
     } catch (e: any) {
       if (!this._alive) return
       this.setData({ loading: false })
@@ -118,23 +131,48 @@ Page({
   },
 
   // ===== 设置 =====
-  toggleSound(e: any) {
-    this.saveSetting('soundOn', !!e.detail.value)
+  toggleSound() {
+    this.saveSetting({ soundOn: !this.data.soundOn })
   },
-  toggleVibrate(e: any) {
-    this.saveSetting('vibrateOn', !!e.detail.value)
+  toggleVibrate() {
+    this.saveSetting({ vibrateOn: !this.data.vibrateOn })
   },
-  toggleAuto(e: any) {
-    this.saveSetting('autoMode', !!e.detail.value)
+  toggleAuto() {
+    this.saveSetting({ autoMode: !this.data.autoMode })
   },
-  saveSetting(key: keyof UserSettings, v: boolean) {
-    const patch = { [key]: v } as Partial<UserSettings>
-    const data: any = {}
-    data[key] = v
-    this.setData(data)
+  onPickAmbience(e: any) {
+    const ambience = parseAmbience(e.currentTarget.dataset.id)
+    if (ambience === this.data.ambience) return
+    this.saveSetting({ ambience })
+  },
+  saveSetting(patch: Partial<UserSettings>) {
+    this.setData(patch)
     updateSettings(patch).catch(() => {
       wx.showToast({ title: '保存失败', icon: 'none' })
       this.load()
     })
+  },
+
+  async loadChannelFlags() {
+    try {
+      const admin = await channelAdminCheck().catch(() => ({
+        isAdmin: false,
+        needsBootstrap: false,
+      }))
+      if (!this._alive) return
+      this.setData({
+        showAdmin: !!(admin.isAdmin || admin.needsBootstrap),
+      })
+    } catch (e) {
+      // 入口保持隐藏
+    }
+  },
+
+  async openPartner() {
+    wx.navigateTo({ url: '/pages/partner/index' })
+  },
+
+  openAdmin() {
+    wx.navigateTo({ url: '/pages/partner/admin' })
   },
 })

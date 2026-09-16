@@ -1,0 +1,9 @@
+{
+  "name": "bindOperator",
+  "version": "1.0.0",
+  "description": "用绑定码绑定新操作员微信号",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

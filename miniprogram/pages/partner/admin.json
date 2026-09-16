@@ -1,0 +1,7 @@
+{
+  "disableScroll": true,
+  "backgroundColor": "#0a0806",
+  "backgroundColorTop": "#0a0806",
+  "backgroundColorBottom": "#0a0806",
+  "renderer": "webview"
+}

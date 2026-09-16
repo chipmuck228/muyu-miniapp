@@ -59,12 +59,23 @@
   color: rgba(224, 181, 119, 0.55);
 }
 
-.submit {
+.form-hint {
+  display: block;
   margin-top: 64rpx;
   text-align: center;
+  font-size: 22rpx;
+  letter-spacing: 6rpx;
+  color: rgba(224, 181, 119, 0.38);
+}
+.form-hint + .submit {
+  margin-top: 16rpx;
+}
+.submit {
+  margin-top: 80rpx;
+  text-align: center;
   font-size: 30rpx;
-  letter-spacing: 10rpx;
-  padding: 20rpx 0 20rpx 10rpx;
+  letter-spacing: 16rpx;
+  padding: 24rpx 0 24rpx 16rpx;
   color: #e8c98a;
 }
 .submit.off {

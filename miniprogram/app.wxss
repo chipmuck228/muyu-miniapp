@@ -24,7 +24,7 @@ page {
   overflow: hidden;
 }
 
-/* 侧殿：心愿 / 立愿 / 证书 / 修行 */
+/* 侧殿：心愿 / 立愿 / 证书 / 静心 */
 .wing-page {
   position: relative;
   background:
@@ -64,8 +64,16 @@ page {
   min-height: 0;
 }
 .wing-body {
-  padding: 8rpx 40rpx 48rpx;
+  padding: 8rpx 40rpx calc(280rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
+}
+.wing-title.slim {
+  max-width: 360rpx;
+  letter-spacing: 8rpx;
+  padding-right: 8rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 滚动内容区 */

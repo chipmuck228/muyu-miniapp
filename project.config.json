@@ -1,5 +1,6 @@
 {
-  "description": "项目配置文件",
+  "description": "小叩木鱼",
+  "projectname": "小叩木鱼",
   "miniprogramRoot": "miniprogram/",
   "cloudfunctionRoot": "cloudfunctions/",
   "compileType": "miniprogram",
@@ -49,9 +50,10 @@
   "packOptions": {
     "ignore": [
       { "type": "folder", "value": "pkg-smoke/models" },
-      { "type": "folder", "value": "pkg-smoke/incense-smoke" }
+      { "type": "folder", "value": "pkg-smoke/incense-smoke" },
+      { "type": "file", "value": "assets/home/dawn.png" }
     ],
     "include": []
   },
-  "appid": "wx7992d58229e38a82"
+  "appid": "wxce0b7164d52cc8b6"
 }

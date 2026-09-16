@@ -1,0 +1,83 @@
+<!-- 渠道管理：申请授权 / 解绑 -->
+<view class="page wing-page partner-page">
+  <view class="wing-head has-kicker" style="padding-top: {{statusBarHeight}}px;">
+    <text class="wing-kicker" hover-class="hover-dim" bindtap="goHall">回堂</text>
+    <text class="wing-title">管 理</text>
+    <text class="wing-kicker ghost"></text>
+  </view>
+  <scroll-view class="wing-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="wing-body" wx:if="{{ready}}">
+      <view class="block first">
+        <text class="block-label">绑定申请</text>
+        <text class="empty" wx:if="{{!bindApps.length}}">暂无申请</text>
+        <view class="row" wx:for="{{bindApps}}" wx:key="_id">
+          <view class="row-main">
+            <text class="row-name">{{item.name}}</text>
+            <text class="row-st">{{item.line}}</text>
+          </view>
+          <text class="row-act" hover-class="hover-dim" data-id="{{item._id}}" bindtap="authorize">授权</text>
+          <text class="row-act dim" hover-class="hover-dim" data-id="{{item._id}}" bindtap="reject">驳回</text>
+        </view>
+      </view>
+
+      <image wx:if="{{qrSrc}}" class="qr" src="{{qrSrc}}" mode="aspectFit" show-menu-by-longpress />
+      <text class="qr-cap" wx:if="{{qrSrc}}">{{qrTitle}} · {{qrCode}}</text>
+      <text class="hint" wx:if="{{qrSrc && qrExpire}}">{{qrExpire}}</text>
+      <text class="hint" wx:if="{{qrSrc}}">仅申请人可在有效期内激活</text>
+
+      <view class="block">
+        <text class="block-label">解绑申请</text>
+        <text class="empty" wx:if="{{!unbindApps.length}}">暂无申请</text>
+        <view class="row" wx:for="{{unbindApps}}" wx:key="_id">
+          <view class="row-main">
+            <text class="row-name">{{item.name}}</text>
+            <text class="row-st">{{item.line}}</text>
+          </view>
+          <text
+            class="row-act"
+            hover-class="hover-dim"
+            data-id="{{item._id}}"
+            data-name="{{item.name}}"
+            bindtap="approveUnbind"
+          >解绑</text>
+          <text class="row-act dim" hover-class="hover-dim" data-id="{{item._id}}" bindtap="reject">驳回</text>
+        </view>
+      </view>
+
+      <view class="block" wx:if="{{list.length}}">
+        <text class="block-label">渠道</text>
+        <view class="row" wx:for="{{list}}" wx:key="_id">
+          <view class="row-main">
+            <text class="row-name">{{item.name}}</text>
+            <text class="row-st">{{item.statusText}}</text>
+          </view>
+          <text
+            wx:if="{{item.pending}}"
+            class="row-act"
+            hover-class="hover-dim"
+            data-id="{{item._id}}"
+            data-name="{{item.name}}"
+            bindtap="viewQr"
+          >查看</text>
+          <text
+            wx:if="{{item.pending}}"
+            class="row-act"
+            hover-class="hover-dim"
+            data-id="{{item._id}}"
+            bindtap="refreshActivate"
+          >重发</text>
+          <text
+            wx:if="{{item.canUnbind}}"
+            class="row-act"
+            hover-class="hover-dim"
+            data-id="{{item._id}}"
+            data-name="{{item.name}}"
+            bindtap="unbind"
+          >解绑</text>
+        </view>
+      </view>
+
+      <text class="wipe" hover-class="hover-dim" bindtap="wipe">清空记录</text>
+    </view>
+  </scroll-view>
+</view>

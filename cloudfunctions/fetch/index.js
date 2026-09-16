@@ -1,10 +1,11 @@
 const cloud = require('wx-server-sdk')
+const { pickPaper, publicWish, publicWishDetail } = require('./papers')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const _ = db.command
 
-const DEFAULT_SETTINGS = { soundOn: true, vibrateOn: true, autoMode: false }
+const DEFAULT_SETTINGS = { soundOn: true, vibrateOn: true, autoMode: false, ambience: 'off' }
 
 function normalizeUser(u) {
   if (!u) return u
@@ -24,7 +25,8 @@ async function ensureUser(openid) {
     const doc = {
       _id: openid,
       _openid: openid,
-      nickname: '禅心行者',
+      nickname: '静心的人',
+      wxMark: String(openid).slice(-8).toUpperCase(),
       totalMerit: 0,
       createdAt: new Date(),
       lastHitDate: null,
@@ -42,7 +44,22 @@ async function fetchWishes(openid) {
     .orderBy('createdAt', 'desc')
     .limit(100)
     .get()
-  return r.data
+  const list = r.data || []
+  for (let i = 0; i < list.length; i++) {
+    list[i] = await ensurePaper(list[i])
+  }
+  return list
+}
+
+async function ensurePaper(w) {
+  if (!w || w.paperId) return w
+  const paper = pickPaper(w.goal)
+  try {
+    await db.collection('wishes').doc(w._id).update({ data: paper })
+  } catch (e) {
+    // 补抽失败仍继续返回
+  }
+  return Object.assign({}, w, paper)
 }
 
 // 统计连续敲击天数：今日或昨日为起点向前回溯
@@ -93,7 +110,8 @@ exports.main = async (event) => {
   try {
     if (action === 'home') {
       const user = await ensureUser(OPENID)
-      const wishes = await fetchWishes(OPENID)
+      const raw = await fetchWishes(OPENID)
+      const wishes = raw.map(publicWish)
       const start = new Date(today + 'T00:00:00')
       start.setDate(start.getDate() - 59)
       const dailyRows = await readDaily(OPENID, start.toISOString().slice(0, 10))
@@ -112,7 +130,7 @@ exports.main = async (event) => {
 
     if (action === 'wishes') {
       const user = await ensureUser(OPENID)
-      const wishes = await fetchWishes(OPENID)
+      const wishes = (await fetchWishes(OPENID)).map(publicWish)
       return { ok: true, user, wishes }
     }
 
@@ -120,14 +138,15 @@ exports.main = async (event) => {
       const wishId = event && event.wishId
       if (!wishId) return { ok: false, msg: '缺少心愿 id' }
       const r = await db.collection('wishes').doc(wishId).get().catch(() => null)
-      const wish = r && r.data && r.data._openid === OPENID ? r.data : null
-      if (!wish) return { ok: false, msg: '心愿不存在' }
+      const raw = r && r.data && r.data._openid === OPENID ? r.data : null
+      if (!raw) return { ok: false, msg: '心愿不存在' }
+      const wish = await publicWishDetail(cloud, await ensurePaper(raw))
       return { ok: true, wish }
     }
 
     if (action === 'profile') {
       const user = await ensureUser(OPENID)
-      const wishes = await fetchWishes(OPENID)
+      const wishes = (await fetchWishes(OPENID)).map(publicWish)
       const start = new Date(today + 'T00:00:00')
       start.setDate(start.getDate() - 60)
       const dailyRows = await readDaily(OPENID, start.toISOString().slice(0, 10))

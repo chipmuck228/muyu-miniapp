@@ -3,7 +3,7 @@ const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 
-const DEFAULT_SETTINGS = { soundOn: true, vibrateOn: true, autoMode: false }
+const DEFAULT_SETTINGS = { soundOn: true, vibrateOn: true, autoMode: false, ambience: 'off' }
 
 function serverDateStr() {
   return new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10)
@@ -46,7 +46,8 @@ exports.main = async (event) => {
       const doc = {
         _id: OPENID,
         _openid: OPENID,
-        nickname: '禅心行者',
+        nickname: '静心的人',
+        wxMark: String(OPENID).slice(-8).toUpperCase(),
         totalMerit: 0,
         createdAt: new Date(),
         lastHitDate: null,

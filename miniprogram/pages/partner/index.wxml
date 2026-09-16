@@ -1,0 +1,135 @@
+<!-- 渠道合作：申请 / 记录 / 推广 -->
+<view class="page wing-page partner-page">
+  <view class="wing-head has-kicker" style="padding-top: {{statusBarHeight}}px;">
+    <text class="wing-kicker" hover-class="hover-dim" bindtap="goHall">回堂</text>
+    <text class="wing-title">合 作</text>
+    <text class="wing-kicker ghost"></text>
+  </view>
+  <scroll-view class="wing-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="wing-body" wx:if="{{ready}}">
+      <view class="block first" wx:if="{{needActivate}}">
+        <text class="block-label">待激活</text>
+        <text class="ch-name" wx:if="{{activateName}}">{{activateName}}</text>
+        <image wx:if="{{activateQrSrc}}" class="qr" src="{{activateQrSrc}}" mode="aspectFit" show-menu-by-longpress />
+        <text class="qr-hint" wx:if="{{activateCode}}">{{activateCode}}</text>
+        <text class="qr-hint" wx:if="{{activateExpireText}}">{{activateExpireText}}</text>
+        <text class="hint" wx:if="{{activateExpired}}">激活码已过期，请联系管理员重发</text>
+        <view wx:elif="{{!activateExpired}}" class="submit" hover-class="hover-dim" bindtap="doActivate">激 活</view>
+      </view>
+      <view class="block first" wx:elif="{{canApplyBind}}">
+        <text class="block-label">渠道商申请</text>
+        <text class="label">名称</text>
+        <input
+          class="input"
+          maxlength="20"
+          placeholder="管理员用于辨认的名称"
+          placeholder-class="ph"
+          adjust-position="{{false}}"
+          hold-keyboard
+          bindinput="onName"
+        />
+        <text class="label">联系</text>
+        <input
+          class="input"
+          maxlength="40"
+          placeholder="选填"
+          placeholder-class="ph"
+          adjust-position="{{false}}"
+          hold-keyboard
+          bindinput="onContact"
+        />
+        <view class="submit" hover-class="hover-dim" bindtap="doApply">提交申请</view>
+      </view>
+      <text class="hint" wx:elif="{{pendingBind}}">绑定申请已提交，等待管理员授权</text>
+
+      <view class="block" wx:if="{{canApplyUnbind}}">
+        <text class="row-act lone" hover-class="hover-dim" bindtap="applyUnbind">申请解绑</text>
+      </view>
+      <text class="hint" wx:elif="{{pendingUnbind}}">解绑申请已提交，等待管理员处理</text>
+
+      <view class="block">
+        <text class="block-label">申请记录</text>
+        <text class="empty" wx:if="{{!applications.length}}">暂无记录</text>
+        <view class="row" wx:for="{{applications}}" wx:key="_id">
+          <view class="row-main">
+            <text class="row-name">{{item.title}}</text>
+            <text class="row-st">{{item.timeText}}</text>
+            <text class="row-st" wx:if="{{item.extraText}}">{{item.extraText}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="block">
+        <text class="block-label">我的推广</text>
+        <text class="empty" wx:if="{{!tenures.length}}">暂无推广</text>
+        <view
+          class="row {{item.on ? 'on' : ''}}"
+          wx:for="{{tenures}}"
+          wx:key="key"
+          data-id="{{item.channelId}}"
+          bindtap="pickTenure"
+        >
+          <view class="row-main">
+            <text class="row-name">{{item.name}}</text>
+            <text class="row-st">{{item.statusText}}{{item.timeText ? ' · ' + item.timeText : ''}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{selectedId}}">
+        <text class="ch-name">{{name}}</text>
+        <view class="stats-row">
+          <view class="stat">
+            <text class="st-num">{{userCount}}</text>
+            <text class="st-label">用户</text>
+          </view>
+          <view class="stat">
+            <text class="st-num">{{paidCount}}</text>
+            <text class="st-label">付费</text>
+          </view>
+          <view class="stat">
+            <text class="st-num">{{totalText}}</text>
+            <text class="st-label">佣金</text>
+          </view>
+          <view class="stat">
+            <text class="st-num">{{pendingText}}</text>
+            <text class="st-label">待结</text>
+          </view>
+        </view>
+
+        <view class="block" wx:if="{{isActive}}">
+          <text class="block-label">我的推广码</text>
+          <image wx:if="{{qrSrc}}" class="qr" src="{{qrSrc}}" mode="aspectFit" show-menu-by-longpress />
+          <text class="qr-hint" wx:if="{{qrSrc}}">长按可保存</text>
+        </view>
+
+        <view class="block">
+          <text class="block-label">推广用户</text>
+          <view class="search">
+            <input
+              class="input"
+              maxlength="40"
+              placeholder="按微信号搜索"
+              placeholder-class="ph"
+              value="{{userQuery}}"
+              adjust-position="{{false}}"
+              hold-keyboard
+              bindinput="onUserQ"
+              bindconfirm="searchUsers"
+            />
+            <text class="search-btn" hover-class="hover-dim" bindtap="searchUsers">搜索</text>
+          </view>
+          <picker mode="selector" range="{{months}}" range-key="label" value="{{monthIndex}}" bindchange="onMonth">
+            <text class="filter">{{months[monthIndex].label}}</text>
+          </picker>
+          <text class="empty" wx:if="{{!users.length}}">暂无用户</text>
+          <view class="user-row" wx:for="{{users}}" wx:key="id">
+            <text class="user-id">{{item.wechatId}}</text>
+            <text class="user-meta">{{item.timeText}}</text>
+            <text class="user-pay">{{item.paidText}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

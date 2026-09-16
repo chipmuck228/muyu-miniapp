@@ -7,7 +7,10 @@
     "pages/wish-form/index",
     "pages/certificate/index",
     "pages/profile/index",
-    "pages/wish-detail/index"
+    "pages/wish-detail/index",
+    "pages/partner/activate",
+    "pages/partner/index",
+    "pages/partner/admin"
   ],
   "window": {
     "navigationStyle": "custom",
@@ -42,7 +45,7 @@
       },
       {
         "pagePath": "pages/profile/index",
-        "text": "修行"
+        "text": "静心"
       }
     ]
   },

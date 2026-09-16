@@ -21,7 +21,7 @@
       </view>
 
       <view class="field">
-        <text class="field-label">功德</text>
+        <text class="field-label">专注</text>
         <view class="goal-grid">
           <view
             wx:for="{{goalOptions}}"
@@ -51,11 +51,12 @@
         </picker>
       </view>
 
+      <text class="form-hint" wx:if="{{!isEdit}}">完成后另有惊喜</text>
       <view
         class="submit {{submitting ? 'off' : ''}}"
         hover-class="hover-dim"
         bindtap="doSubmit"
-      >{{isEdit ? '保存' : '立下心愿'}}</view>
+      >{{isEdit ? '保 存' : '立 愿'}}</view>
     </view>
   </scroll-view>
 

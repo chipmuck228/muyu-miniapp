@@ -3,7 +3,7 @@ const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 
-const DEFAULT_SETTINGS = { soundOn: true, vibrateOn: true, autoMode: false }
+const DEFAULT_SETTINGS = { soundOn: true, vibrateOn: true, autoMode: false, ambience: 'off' }
 
 function normalizeUser(u) {
   if (!u) return u
@@ -28,7 +28,8 @@ exports.main = async () => {
       const doc = {
         _id: OPENID,
         _openid: OPENID,
-        nickname: '禅心行者',
+        nickname: '静心的人',
+        wxMark: String(OPENID).slice(-8).toUpperCase(),
         totalMerit: 0,
         createdAt: new Date(),
         lastHitDate: null,
@@ -36,6 +37,10 @@ exports.main = async () => {
       }
       await db.collection('users').add({ data: doc })
       user = doc
+    } else if (!user.wxMark) {
+      const wxMark = String(OPENID).slice(-8).toUpperCase()
+      await db.collection('users').doc(OPENID).update({ data: { wxMark } })
+      user.wxMark = wxMark
     }
     return { ok: true, openid: OPENID, user: normalizeUser(user) }
   } catch (e) {

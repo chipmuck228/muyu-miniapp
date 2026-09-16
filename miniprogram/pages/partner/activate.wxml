@@ -1,0 +1,19 @@
+<!-- 旧版激活码扫入；新申请请走渠道合作页 -->
+<view class="apply" style="padding-top: {{statusBarHeight}}px;">
+  <view class="bar">
+    <text class="kicker" hover-class="hover-dim" bindtap="goHall">回堂</text>
+    <text class="title">渠 道</text>
+    <text class="kicker ghost"></text>
+  </view>
+
+  <view wx:if="{{phase === 'authorized'}}" class="body">
+    <text class="ch-name" wx:if="{{name}}">{{name}}</text>
+    <image wx:if="{{qrSrc}}" class="qr" src="{{qrSrc}}" mode="aspectFit" show-menu-by-longpress />
+    <text class="code-txt" wx:if="{{code}}">{{code}}</text>
+    <view class="submit {{busy ? 'off' : ''}}" hover-class="hover-dim" bindtap="doActivate">激 活</view>
+  </view>
+
+  <view wx:elif="{{phase === 'error'}}" class="body">
+    <text class="hint err">{{err || '请稍后再试'}}</text>
+  </view>
+</view>

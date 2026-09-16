@@ -1,0 +1,9 @@
+{
+  "name": "channelAdmin",
+  "version": "1.0.0",
+  "description": "管理员：处理绑定/解绑申请、解绑渠道",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

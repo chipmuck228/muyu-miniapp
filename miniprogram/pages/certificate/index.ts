@@ -1,9 +1,9 @@
-// 功德证书（Canvas 绘制，保存相册 / 转发）
+// 心愿证书（Canvas 绘制，保存相册 / 转发）
 import { fetchWishes } from '../../utils/cloud'
 import { fmtInt, fmtFullCN, winInfo, concealTabBar } from '../../utils/util'
 
 const CW = 400
-const CH = 300
+const CH = 560
 
 interface CertInfo {
   _id: string
@@ -12,11 +12,21 @@ interface CertInfo {
   dateText: string
 }
 
+function toCert(w: { _id: string; name: string; current: number; fulfilledDate?: string; completedDate?: string }): CertInfo {
+  return {
+    _id: w._id,
+    name: w.name,
+    totalText: fmtInt(w.current),
+    dateText: fmtFullCN(w.fulfilledDate || w.completedDate || ''),
+  }
+}
+
 Page({
   data: {
     statusBarHeight: 20,
     loading: true,
     hasCert: false,
+    certs: [] as CertInfo[],
     cert: null as CertInfo | null,
     certPath: '',
     drawing: false,
@@ -38,26 +48,31 @@ Page({
       const list = res.wishes
       const fulfilled = list.filter((w) => w.status === 'fulfilled')
       const completed = list.filter((w) => w.status === 'completed')
-      const pick = fulfilled[0] || completed[0] || null
+      const certs = fulfilled.concat(completed).map(toCert)
+      const keepId = this.data.cert && this.data.cert._id
+      const pick = certs.find((c) => c._id === keepId) || certs[0] || null
       if (!pick) {
-        this.setData({ loading: false, hasCert: false, cert: null, certPath: '' })
+        this.setData({ loading: false, hasCert: false, certs: [], cert: null, certPath: '' })
         return
       }
-      const info: CertInfo = {
-        _id: pick._id,
-        name: pick.name,
-        totalText: fmtInt(pick.current),
-        dateText: fmtFullCN(pick.fulfilledDate || pick.completedDate || ''),
-      }
-      this.setData({ loading: false, hasCert: true, cert: info, certPath: '' })
-      // 等 canvas 渲染后绘制
+      this.setData({ loading: false, hasCert: true, certs, cert: pick, certPath: '' })
       wx.nextTick(() => {
-        setTimeout(() => this.drawCert(info), 60)
+        setTimeout(() => this.drawCert(pick), 60)
       })
     } catch (e: any) {
       this.setData({ loading: false })
       wx.showToast({ title: (e && e.message) || '加载失败', icon: 'none' })
     }
+  },
+
+  pickCert(e: any) {
+    const id = (e.currentTarget.dataset.id as string) || ''
+    const pick = this.data.certs.find((c) => c._id === id)
+    if (!pick || (this.data.cert && pick._id === this.data.cert._id)) return
+    this.setData({ cert: pick, certPath: '' })
+    wx.nextTick(() => {
+      setTimeout(() => this.drawCert(pick), 60)
+    })
   },
 
   drawCert(info: CertInfo) {
@@ -97,122 +112,159 @@ Page({
   paintCert(ctx: any, info: CertInfo) {
     const w = CW
     const h = CH
-    // 背景：古纸米黄渐变
-    const bg = ctx.createLinearGradient(0, 0, 0, h)
-    bg.addColorStop(0, '#f5e6d3')
-    bg.addColorStop(1, '#e8d5c0')
-    ctx.fillStyle = bg
+
+    const ivory = ctx.createLinearGradient(0, 0, 0, h)
+    ivory.addColorStop(0, '#f4ead8')
+    ivory.addColorStop(0.45, '#efe2cc')
+    ivory.addColorStop(1, '#e6d4b8')
+    ctx.fillStyle = ivory
     ctx.fillRect(0, 0, w, h)
 
-    // 水印
-    ctx.save()
-    ctx.globalAlpha = 0.05
-    ctx.fillStyle = '#8B6B4A'
-    ctx.font = '64px sans-serif'
+    this.paintGrain(ctx, w, h)
+    this.paintVignette(ctx, w, h)
+
+    const gold = 'rgba(168, 132, 78, 0.85)'
+    const ink = '#5c4630'
+    const mute = '#8a7358'
+    const inkDeep = '#3f2e1c'
+
+    ctx.strokeStyle = gold
+    ctx.lineWidth = 1.2
+    ctx.strokeRect(18, 18, w - 36, h - 36)
+    ctx.lineWidth = 0.6
+    ctx.strokeRect(24, 24, w - 48, h - 48)
+
+    const b = 32
+    const len = 18
+    ctx.lineWidth = 1.4
+    ctx.strokeStyle = 'rgba(154, 118, 64, 0.9)'
+    this.cornerMark(ctx, b, b, 1, 1, len)
+    this.cornerMark(ctx, w - b, b, -1, 1, len)
+    this.cornerMark(ctx, b, h - b, 1, -1, len)
+    this.cornerMark(ctx, w - b, h - b, -1, -1, len)
+
+    ctx.fillStyle = inkDeep
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText('◈', w / 2, h / 2 + 6)
-    ctx.restore()
+    ctx.font = '22px "Songti SC", "STSong", "PingFang SC", serif'
+    this.fillTracked(ctx, '心愿证书', w / 2, 78, 14)
 
-    // 边框
-    ctx.lineWidth = 3
-    ctx.strokeStyle = '#c9a96e'
-    ctx.strokeRect(6, 6, w - 12, h - 12)
-    ctx.lineWidth = 1
-    ctx.strokeStyle = '#d4a574'
-    ctx.strokeRect(11, 11, w - 22, h - 22)
-
-    // 四角装饰：顶部两侧与底部两侧的小圆弧
-    ctx.save()
-    ctx.strokeStyle = '#c9a96e'
-    ctx.lineWidth = 2
-    const cx = w / 2
-    const yTop = 24
-    const yBottom = h - 24
-    this.cornerArc(ctx, cx - 80, yTop, 0, Math.PI)
-    this.cornerArc(ctx, cx + 80, yTop, 0, Math.PI)
-    this.cornerArc(ctx, cx - 80, yBottom, Math.PI, 2 * Math.PI)
-    this.cornerArc(ctx, cx + 80, yBottom, Math.PI, 2 * Math.PI)
-    ctx.restore()
-
-    // 标题
-    ctx.fillStyle = '#8B6B4A'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'alphabetic'
-    ctx.font = 'bold 30px "PingFang SC", sans-serif'
-    ctx.fillText('功 德 证 书', w / 2, 66)
-
-    // 副标题线
-    ctx.strokeStyle = '#d4a574'
-    ctx.lineWidth = 1
+    ctx.strokeStyle = 'rgba(168, 132, 78, 0.55)'
+    ctx.lineWidth = 0.7
     ctx.beginPath()
-    ctx.moveTo(w / 2 - 70, 82)
-    ctx.lineTo(w / 2 + 70, 82)
+    ctx.moveTo(w / 2 - 48, 102)
+    ctx.lineTo(w / 2 + 48, 102)
     ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(w / 2, 102, 1.6, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(168, 132, 78, 0.7)'
+    ctx.fill()
 
-    // 正文
-    ctx.fillStyle = '#6b4a2c'
+    ctx.fillStyle = mute
     ctx.font = '13px "PingFang SC", sans-serif'
-    ctx.fillText('兹  证  明', w / 2, 122)
+    this.fillTracked(ctx, '兹证明', w / 2, 148, 10)
 
-    // 心愿名
-    let name = info.name
-    if (name.length > 12) name = name.slice(0, 11) + '…'
-    ctx.fillStyle = '#a05a24'
-    ctx.font = 'bold 22px "PingFang SC", sans-serif'
-    ctx.fillText('「 ' + name + ' 」', w / 2, 165)
+    let name = (info.name || '').trim()
+    if (name.length > 16) name = name.slice(0, 15) + '…'
+    ctx.fillStyle = inkDeep
+    ctx.font = '28px "Songti SC", "STSong", "PingFang SC", serif'
+    ctx.fillText(name, w / 2, 208)
 
-    ctx.fillStyle = '#7a5a38'
+    ctx.strokeStyle = 'rgba(168, 132, 78, 0.28)'
+    ctx.lineWidth = 0.6
+    ctx.beginPath()
+    ctx.moveTo(w / 2 - 90, 236)
+    ctx.lineTo(w / 2 + 90, 236)
+    ctx.stroke()
+
+    ctx.fillStyle = ink
+    ctx.font = '14px "PingFang SC", sans-serif'
+    ctx.fillText('于专注之中', w / 2, 286)
+    ctx.fillText('诚心所至，如愿以偿', w / 2, 312)
+
+    ctx.fillStyle = mute
+    ctx.font = '13px "PingFang SC", sans-serif'
+    this.fillTracked(ctx, '共积专注  ' + info.totalText, w / 2, 368, 3)
+
+    ctx.textAlign = 'left'
+    ctx.fillStyle = mute
     ctx.font = '12px "PingFang SC", sans-serif'
-    ctx.fillText('于禅心修行中，诚心所至，如愿圆满', w / 2, 196)
+    ctx.fillText(info.dateText, 48, h - 58)
 
-    // 功德数与日期
-    ctx.font = 'bold 14px "PingFang SC", sans-serif'
-    ctx.fillStyle = '#8a3a1a'
-    ctx.fillText('共 积 功 德 ' + info.totalText, w / 2, 232)
-
-    ctx.font = '12px "PingFang SC", sans-serif'
-    ctx.fillStyle = '#7a5a38'
-    ctx.fillText(info.dateText + ' 圆满', w / 2, 254)
-
-    // 印章
-    this.paintSeal(ctx, w - 66, h - 62, 26)
+    this.paintSeal(ctx, w - 78, h - 86, 34)
   },
 
-  cornerArc(ctx: any, x: number, y: number, s: number, e: number) {
+  paintGrain(ctx: any, w: number, h: number) {
+    ctx.save()
+    ctx.globalAlpha = 0.035
+    ctx.fillStyle = '#6b542e'
+    for (let i = 0; i < 420; i++) {
+      const x = (i * 73) % w
+      const y = (i * 137) % h
+      ctx.fillRect(x, y, 1.2, 1.2)
+    }
+    ctx.globalAlpha = 0.02
+    ctx.fillStyle = '#fff8ec'
+    for (let i = 0; i < 180; i++) {
+      const x = (i * 97) % w
+      const y = (i * 53) % h
+      ctx.fillRect(x, y, 1.4, 1)
+    }
+    ctx.restore()
+  },
+
+  paintVignette(ctx: any, w: number, h: number) {
+    const g = ctx.createRadialGradient(w / 2, h / 2, h * 0.22, w / 2, h / 2, h * 0.72)
+    g.addColorStop(0, 'rgba(80, 52, 24, 0)')
+    g.addColorStop(1, 'rgba(80, 52, 24, 0.08)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, w, h)
+  },
+
+  fillTracked(ctx: any, text: string, cx: number, y: number, gap: number) {
+    const chars = text.split('')
+    const widths = chars.map((c) => ctx.measureText(c).width)
+    let total = gap * Math.max(0, chars.length - 1)
+    widths.forEach((n) => {
+      total += n
+    })
+    let x = cx - total / 2
+    const prev = ctx.textAlign
+    ctx.textAlign = 'left'
+    chars.forEach((c, i) => {
+      ctx.fillText(c, x, y)
+      x += widths[i] + gap
+    })
+    ctx.textAlign = prev
+  },
+
+  cornerMark(ctx: any, x: number, y: number, dx: number, dy: number, len: number) {
     ctx.beginPath()
-    ctx.arc(x, y, 26, s, e)
+    ctx.moveTo(x + dx * len, y)
+    ctx.lineTo(x, y)
+    ctx.lineTo(x, y + dy * len)
     ctx.stroke()
   },
 
-  paintSeal(ctx: any, x: number, y: number, r: number) {
+  paintSeal(ctx: any, x: number, y: number, size: number) {
     ctx.save()
     ctx.translate(x, y)
-    ctx.rotate(-0.18)
-    // 外圈
-    ctx.strokeStyle = 'rgba(176,58,46,0.9)'
-    ctx.lineWidth = 3
-    ctx.beginPath()
-    ctx.arc(0, 0, r, 0, Math.PI * 2)
-    ctx.stroke()
-    // 齿轮边小刻线（示意）
-    ctx.lineWidth = 1.5
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * Math.PI * 2
-      ctx.beginPath()
-      ctx.moveTo(Math.cos(a) * (r - 4), Math.sin(a) * (r - 4))
-      ctx.lineTo(Math.cos(a) * (r - 1), Math.sin(a) * (r - 1))
-      ctx.stroke()
-    }
-    // 文字 禅心 / 印证
-    ctx.fillStyle = 'rgba(176,58,46,0.92)'
-    ctx.font = 'bold 11px "PingFang SC", sans-serif'
+    ctx.rotate(-0.12)
+    const half = size / 2
+    ctx.strokeStyle = 'rgba(166, 48, 38, 0.88)'
+    ctx.lineWidth = 2.2
+    ctx.strokeRect(-half, -half, size, size)
+    ctx.lineWidth = 0.8
+    ctx.strokeRect(-half + 3.5, -half + 3.5, size - 7, size - 7)
+    ctx.fillStyle = 'rgba(166, 48, 38, 0.9)'
+    ctx.font = '12px "Songti SC", "STSong", "PingFang SC", serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText('禅', -5.5, -6)
-    ctx.fillText('印', 6.5, -6)
-    ctx.fillText('心', -5.5, 7)
-    ctx.fillText('证', 6.5, 7)
+    const g = size * 0.2
+    ctx.fillText('静', -g, -g)
+    ctx.fillText('心', g, -g)
+    ctx.fillText('印', -g, g)
+    ctx.fillText('证', g, g)
     ctx.restore()
   },
 
@@ -251,7 +303,7 @@ Page({
     if (anyWx.shareFileMessage) {
       anyWx.shareFileMessage({
         filePath: this.data.certPath,
-        fileName: '功德证书.png',
+        fileName: '心愿证书.png',
         fail: () => {
           wx.showToast({ title: '暂不支持，可截图分享', icon: 'none' })
         },

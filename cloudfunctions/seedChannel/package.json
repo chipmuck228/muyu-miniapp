@@ -1,0 +1,9 @@
+{
+  "name": "seedChannel",
+  "version": "1.0.0",
+  "description": "写入一条待激活渠道商（控制台 JSON 容易插失败时用）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

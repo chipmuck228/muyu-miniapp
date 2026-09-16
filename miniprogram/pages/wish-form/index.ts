@@ -35,6 +35,7 @@ Page({
 
   onShow() {
     concealTabBar(this)
+    if (this.data.submitting) this.setData({ submitting: false })
     const st = getFormState()
     const editing = !!(st && st.mode === 'edit' && st.wish)
     if (editing && st && st.wish) {
@@ -74,6 +75,7 @@ Page({
       selectedGoal: 0,
       customGoal: '',
       deadline: '',
+      submitting: false,
     })
   },
 
@@ -135,7 +137,7 @@ Page({
       goal = parseInt(this.data.customGoal, 10)
     }
     if (!goal || goal < 1 || !/^\d+$/.test(String(goal))) {
-      wx.showToast({ title: '功德目标需为不小于 1 的整数', icon: 'none' })
+      wx.showToast({ title: '专注目标需为不小于 1 的整数', icon: 'none' })
       return
     }
     const deadline = this.data.deadline
@@ -152,9 +154,10 @@ Page({
         wx.showToast({ title: '已保存修改', icon: 'success' })
       } else {
         await createWish(name, goal, deadline || null)
-        wx.showToast({ title: '心愿已立下', icon: 'success' })
+        wx.showToast({ title: '心愿已立 · 完成后另有惊喜', icon: 'none' })
       }
       this.clearState()
+      this.resetForm()
       setTimeout(() => {
         wx.switchTab({ url: '/pages/wishes/index' })
       }, 500)

@@ -1,0 +1,9 @@
+{
+  "name": "checkChannelAuth",
+  "version": "1.0.0",
+  "description": "验证当前用户是否为渠道商操作员",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

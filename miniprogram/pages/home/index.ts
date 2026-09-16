@@ -1,9 +1,12 @@
 // 木鱼香案：选完今日功课后敲击；从其他 Tab 切回时播放短暗幕
-import { fetchHome, UserRecord } from '../../utils/cloud'
+import { fetchHome, fetchWishDetail, UserRecord, settingsOf, bindChannelByScene, normalizeChannelScene } from '../../utils/cloud'
 import { CHANTS } from '../../utils/constants'
-import { playKnock, vibrate } from '../../utils/knock'
+import { playKnock, vibrate, ensureKnock } from '../../utils/knock'
 import { KnockQueue } from '../../utils/knockQueue'
-import { concealTabBar } from '../../utils/util'
+import { concealTabBar, winInfo } from '../../utils/util'
+import { DAWN_FILE_ID, resolveCloudFile } from '../../utils/cloudFile'
+import { startAmbience, stopAmbience } from '../../utils/ambience'
+import { AmbienceId } from '../../utils/audioCatalog'
 
 interface FloatItem {
   key: number
@@ -21,6 +24,50 @@ function bindWishId(): string | null {
   return null
 }
 
+const LESSON_TITLE_MAX = 8
+const RANDOM_GOAL = 10
+const TITLE_WHITE = { r: 255, g: 255, b: 255 }
+const TITLE_GOLD = { r: 232, g: 201, b: 138 }
+
+function progressT(cur: number, goal: number): number {
+  return goal > 0 ? Math.max(0, Math.min(1, cur / goal)) : 0
+}
+
+function mixTitleColor(cur: number, goal: number): string {
+  const t = progressT(cur, goal)
+  const r = Math.round(TITLE_WHITE.r + (TITLE_GOLD.r - TITLE_WHITE.r) * t)
+  const g = Math.round(TITLE_WHITE.g + (TITLE_GOLD.g - TITLE_WHITE.g) * t)
+  const b = Math.round(TITLE_WHITE.b + (TITLE_GOLD.b - TITLE_WHITE.b) * t)
+  return 'rgb(' + r + ',' + g + ',' + b + ')'
+}
+
+function scenePatch(cur: number, goal: number) {
+  const t = progressT(cur, goal)
+  return {
+    lessonColor: mixTitleColor(cur, goal),
+    dawnSky: Number(t.toFixed(3)),
+    smokeFade: Number((1 - t * 0.92).toFixed(3)),
+  }
+}
+
+function lessonTitleOf(): string {
+  const app = getApp<IAppOption>()
+  if (app.globalData.knockMode === 'wish' && app.globalData.knockWishId) {
+    return app.globalData.knockWishName || '心愿'
+  }
+  return '随机专注'
+}
+
+function lessonCharsOf(name: string): string[] {
+  const s = (name || '').trim()
+  if (s.length <= LESSON_TITLE_MAX) return s.split('')
+  return s.slice(0, LESSON_TITLE_MAX - 1).split('').concat('…')
+}
+
+function lessonTitlePatch(name: string): { lessonTitle: string; lessonChars: string[] } {
+  return { lessonTitle: name, lessonChars: lessonCharsOf(name) }
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -31,11 +78,19 @@ Page({
     soundOn: true,
     vibrateOn: true,
     autoMode: false,
+    ambience: 'off' as AmbienceId,
     floats: [] as FloatItem[],
     rippleOn: false,
     pulsing: false,
     enterPhase: 'done' as EnterPhase,
     enterKind: 'first' as EnterKind,
+    lessonTitle: '',
+    lessonChars: [] as string[],
+    lessonTitleOn: false,
+    lessonColor: mixTitleColor(0, 1),
+    dawnSky: 0,
+    smokeFade: 1,
+    dawnSrc: '',
   },
 
   _floatSeq: 0,
@@ -47,12 +102,33 @@ Page({
   _alive: false,
   _hasEntered: false,
   _openingLesson: false,
-  onLoad() {
+  _titleTimer: 0,
+  _titleCurrent: 0,
+  _titleGoal: RANDOM_GOAL,
+  _randomHits: 0,
+  _lessonKind: '' as '' | 'wish' | 'random',
+  _titleCanvas: null as any,
+  _titleCtx: null as any,
+  _titleCssW: 0,
+  _titleCssH: 0,
+  onLoad(options: Record<string, string | undefined>) {
     const app = getApp<IAppOption>()
-    this.setData({
-      statusBarHeight: app.globalData.statusBarHeight || 20,
-      readyToKnock: !!app.globalData.lessonChosen,
-    })
+    const scene =
+      normalizeChannelScene(String((options && (options.scene || options.ch)) || '')) ||
+      normalizeChannelScene(String(app.globalData.pendingChannelScene || ''))
+    if (scene) {
+      app.globalData.pendingChannelScene = scene
+      bindChannelByScene(scene).catch(() => {})
+    }
+    this.setData(
+      Object.assign(
+        {
+          statusBarHeight: app.globalData.statusBarHeight || 20,
+          readyToKnock: !!app.globalData.lessonChosen,
+        },
+        app.globalData.lessonChosen ? lessonTitlePatch(lessonTitleOf()) : {}
+      )
+    )
     this._alive = true
     this._queue = new KnockQueue(
       () => this._wishId,
@@ -61,16 +137,37 @@ Page({
         if (r.completed) {
           this._wishId = null
           app.globalData.knockWishId = null
-          wx.showToast({ title: '心愿圆满，随喜赞叹', icon: 'none' })
+          app.globalData.knockMode = 'random'
+          app.globalData.knockWishName = '随机专注'
+          this._lessonKind = 'random'
+          this._randomHits = 0
+          this._titleCurrent = 0
+          this._titleGoal = RANDOM_GOAL
+          this.setData(
+            Object.assign(lessonTitlePatch('随机专注'), { lessonTitleOn: true }, scenePatch(0, RANDOM_GOAL))
+          )
+          this.drawLessonTitle()
+          wx.showToast({ title: '心愿已成 · 惊喜已启', icon: 'none' })
         }
         this.setData(this.levelPatch(r.totalMerit, r.todayCount))
       },
       () => {
         if (this._alive) {
-          wx.showToast({ title: '功德未能上传，请重试', icon: 'none' })
+          wx.showToast({ title: '专注未能上传，请重试', icon: 'none' })
         }
       }
     )
+    this.loadDawn()
+  },
+
+  loadDawn() {
+    resolveCloudFile(DAWN_FILE_ID)
+      .then((src) => {
+        if (this._alive) this.setData({ dawnSrc: src })
+      })
+      .catch((e) => {
+        console.warn('dawn load failed', e)
+      })
   },
 
   onShow() {
@@ -81,6 +178,10 @@ Page({
     }
     this._wishId = bindWishId()
     this.setData({ readyToKnock: true })
+    if (!this.data.dawnSrc) this.loadDawn()
+    ensureKnock()
+    startAmbience(this.data.ambience)
+    this.armLessonTitle()
     concealTabBar(this)
     this.refresh()
     this.tryEnter()
@@ -88,7 +189,14 @@ Page({
 
   onHide() {
     this.stopAuto()
+    stopAmbience()
     this.clearEnterTimer()
+    this.clearTitleTimer()
+    this._titleCtx = null
+    this._titleCanvas = null
+    this._titleCssW = 0
+    this._titleCssH = 0
+    this.setData({ lessonTitleOn: false })
     const app = getApp<IAppOption>()
     if (app.globalData.homeWillReenter) {
       this.setData({
@@ -104,7 +212,9 @@ Page({
   onUnload() {
     this._alive = false
     this.stopAuto()
+    stopAmbience()
     this.clearEnterTimer()
+    this.clearTitleTimer()
     if (this._queue) {
       this._queue.destroy()
       this._queue = null
@@ -176,6 +286,122 @@ Page({
     }
   },
 
+  clearTitleTimer() {
+    if (this._titleTimer) {
+      clearTimeout(this._titleTimer)
+      this._titleTimer = 0
+    }
+  },
+
+  titleColorPatch() {
+    return scenePatch(this._titleCurrent, this._titleGoal)
+  },
+
+  applyTitleProgress() {
+    if (!this._alive) return
+    this.setData(this.titleColorPatch())
+    this.drawLessonTitle()
+  },
+
+  armLessonTitle() {
+    this.clearTitleTimer()
+    this.setData(Object.assign(lessonTitlePatch(lessonTitleOf()), { lessonTitleOn: false }, this.titleColorPatch()))
+    this.syncTitleProgress()
+    this._titleTimer = setTimeout(() => {
+      this._titleTimer = 0
+      if (!this._alive) return
+      this.setData({ lessonTitleOn: true })
+      this.drawLessonTitle()
+    }, 1200)
+  },
+
+  async syncTitleProgress() {
+    const app = getApp<IAppOption>()
+    const id = app.globalData.knockWishId
+    if (app.globalData.knockMode === 'wish' && id) {
+      this._lessonKind = 'wish'
+      try {
+        const res = await fetchWishDetail(id)
+        if (!this._alive || !res.wish) return
+        const name = res.wish.name || '心愿'
+        app.globalData.knockWishName = name
+        this._titleGoal = Math.max(1, res.wish.goal || 1)
+        this._titleCurrent = Math.max(0, Math.min(this._titleGoal, res.wish.current || 0))
+        this.setData(Object.assign(lessonTitlePatch(name), this.titleColorPatch()))
+        this.drawLessonTitle()
+      } catch {
+        this.applyTitleProgress()
+      }
+      return
+    }
+    if (this._lessonKind !== 'random') this._randomHits = 0
+    this._lessonKind = 'random'
+    this._titleGoal = RANDOM_GOAL
+    this._titleCurrent = this._randomHits
+    this.setData(Object.assign(lessonTitlePatch(lessonTitleOf()), this.titleColorPatch()))
+    this.drawLessonTitle()
+  },
+
+  onSmokeRisen() {
+    this.clearTitleTimer()
+    if (!this._alive) return
+    this.setData({ lessonTitleOn: true })
+    this.drawLessonTitle()
+  },
+
+  paintLessonTitle(ctx: any, w: number, h: number) {
+    const chars = this.data.lessonChars || []
+    ctx.clearRect(0, 0, w, h)
+    if (!this.data.lessonTitleOn || !chars.length) return
+    ctx.fillStyle = this.data.lessonColor || mixTitleColor(this._titleCurrent, this._titleGoal)
+    ctx.font = '15px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    const line = 22
+    const total = chars.length * line
+    let y = (h - total) / 2 + line / 2
+    for (let i = 0; i < chars.length; i++) {
+      ctx.fillText(chars[i], w / 2, y)
+      y += line
+    }
+  },
+
+  drawLessonTitle() {
+    wx.nextTick(() => {
+      if (!this._alive) return
+      if (this._titleCtx && this._titleCssW) {
+        this.paintLessonTitle(this._titleCtx, this._titleCssW, this._titleCssH)
+        return
+      }
+      const q: any = wx.createSelectorQuery().in(this)
+      q.select('#lessonTitleCanvas')
+        .fields({ node: true, size: true })
+        .exec((res: any[]) => {
+          const item = res && res[0]
+          if (!item || !item.node || !item.width || !item.height) return
+          const canvas = item.node
+          const ctx = canvas.getContext('2d')
+          if (!ctx) return
+          let dpr = 2
+          try {
+            dpr = Math.max(1, Math.min(Number(winInfo().pixelRatio) || 2, 2))
+          } catch {
+            dpr = 2
+          }
+          const w = item.width
+          const h = item.height
+          canvas.width = Math.round(w * dpr)
+          canvas.height = Math.round(h * dpr)
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+          this._titleCanvas = canvas
+          this._titleCtx = ctx
+          this._titleCssW = w
+          this._titleCssH = h
+          this.paintLessonTitle(ctx, w, h)
+        })
+    })
+  },
+
   entering(): boolean {
     return this.data.enterPhase !== 'done'
   },
@@ -203,20 +429,22 @@ Page({
 
   applyHome(user: UserRecord, todayCount: number) {
     this._wishId = bindWishId()
-    const autoMode = !!(user.settings && user.settings.autoMode)
+    const s = settingsOf(user)
     this.setData(
       Object.assign(
         {
           loading: false,
-          soundOn: !!(user.settings && user.settings.soundOn),
-          vibrateOn: !!(user.settings && user.settings.vibrateOn),
-          autoMode,
+          soundOn: s.soundOn,
+          vibrateOn: s.vibrateOn,
+          autoMode: s.autoMode,
+          ambience: s.ambience,
         },
         this.levelPatch(user.totalMerit || 0, todayCount)
       )
     )
-    if (autoMode && !this.entering()) this.startAuto()
-    else if (!autoMode) this.stopAuto()
+    if (s.autoMode && !this.entering()) this.startAuto()
+    else if (!s.autoMode) this.stopAuto()
+    startAmbience(s.ambience)
   },
 
   onKnockTap() {
@@ -233,7 +461,10 @@ Page({
     this.ripple()
 
     const nextTotal = d.totalMerit + 1
-    this.setData(this.levelPatch(nextTotal, d.todayCount + 1))
+    this._titleCurrent = Math.min(this._titleGoal, this._titleCurrent + 1)
+    if (this._lessonKind === 'random') this._randomHits = this._titleCurrent
+    this.setData(Object.assign(this.levelPatch(nextTotal, d.todayCount + 1), this.titleColorPatch()))
+    this.drawLessonTitle()
     if (this._queue) this._queue.tap(1)
   },
 
@@ -253,7 +484,7 @@ Page({
   spawnFloat() {
     const texts: string[] = []
     if (Math.random() < 0.55) {
-      texts.push('功德 +1')
+      texts.push('专注 +1')
     } else {
       texts.push(CHANTS[Math.floor(Math.random() * CHANTS.length)])
     }

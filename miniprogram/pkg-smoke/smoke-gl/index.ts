@@ -84,6 +84,7 @@ Component({
                 }, 80)
               } else {
                 this.setData({ smokeFallback: true, smokeRev: 'fallback-canvas' })
+                this.triggerEvent('risen')
               }
               return
             }
@@ -95,7 +96,9 @@ Component({
               dpr = 2
             }
             try {
-              this._smoke = startIncensePlume(item.node, item.width, item.height, dpr)
+              this._smoke = startIncensePlume(item.node, item.width, item.height, dpr, () => {
+                if (this._alive) this.triggerEvent('risen')
+              })
               this._booting = false
               this.setData({
                 smokeFallback: false,
@@ -105,6 +108,7 @@ Component({
               this._booting = false
               console.error('[smoke] start failed', e)
               this.setData({ smokeFallback: true, smokeRev: 'e:' + errText(e) })
+              this.triggerEvent('risen')
             }
           })
       })

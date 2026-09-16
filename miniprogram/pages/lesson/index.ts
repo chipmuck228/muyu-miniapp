@@ -6,11 +6,12 @@ interface WishRow {
   mark: string
 }
 
-function enterAltar(mode: 'wish' | 'random', wishId: string | null) {
+function enterAltar(mode: 'wish' | 'random', wishId: string | null, name?: string) {
   const app = getApp<IAppOption>()
   app.globalData.lessonChosen = true
   app.globalData.knockMode = mode
   app.globalData.knockWishId = wishId
+  app.globalData.knockWishName = mode === 'random' ? '随机专注' : (name || '心愿')
   app.globalData.fromGate = true
   wx.switchTab({ url: '/pages/home/index' })
 }
@@ -74,7 +75,8 @@ Page({
   onPickWish(e: any) {
     const id = (e.currentTarget.dataset.id as string) || ''
     if (!id) return
-    enterAltar('wish', id)
+    const row = this.data.wishes.find((w) => w._id === id)
+    enterAltar('wish', id, row && row.name)
   },
 
   onRandom() {

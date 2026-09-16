@@ -7,13 +7,19 @@ interface WishVM {
   _id: string
   name: string
   percent: number
+  mark: string
+  done: boolean
 }
 
 function build(w: Wish): WishVM {
+  const percent = percentOf(w.current, w.goal)
+  const done = w.status !== 'ongoing'
   return {
     _id: w._id,
     name: w.name,
-    percent: percentOf(w.current, w.goal),
+    percent,
+    mark: w.status === 'fulfilled' ? '已了结' : w.status === 'completed' ? '已成' : percent + '%',
+    done,
   }
 }
 

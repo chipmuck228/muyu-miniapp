@@ -18,7 +18,7 @@ Component({
       { pagePath: '/pages/wishes/index', text: '心愿', icon: '❤️' },
       { pagePath: '/pages/wish-form/index', text: '立愿', icon: '✚' },
       { pagePath: '/pages/certificate/index', text: '证书', icon: '📜' },
-      { pagePath: '/pages/profile/index', text: '修行', icon: '👤' },
+      { pagePath: '/pages/profile/index', text: '静心', icon: '👤' },
     ] as TabItem[],
   },
 

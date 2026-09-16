@@ -1,16 +1,30 @@
 // app.ts
 import { ensureKnock } from './utils/knock'
 import { ensureSmokeTexture } from './utils/smoke'
-import { loginUser } from './utils/cloud'
+import { loginUser, bindChannelByScene, normalizeChannelScene } from './utils/cloud'
 import { winInfo } from './utils/util'
+
+// 云开发环境 ID（如需切换环境，改这里即可）
+const CLOUD_ENV = 'cloud1-d5gcfyv8v980774aa'
+
+function pickChannelScene(opt: any): string {
+  if (!opt) return ''
+  const q = opt.query || {}
+  let s = String(q.scene || q.ch || '')
+  if (!s && typeof opt.scene === 'string') s = opt.scene
+  return normalizeChannelScene(s)
+}
 
 App<IAppOption>({
   globalData: {
     statusBarHeight: 20,
     user: null,
+    pendingChannelScene: null as string | null,
   },
 
-  onLaunch() {
+  onLaunch(opt: any) {
+    const scene = pickChannelScene(opt)
+    if (scene.indexOf('ch_') === 0) this.globalData.pendingChannelScene = scene
     // 状态栏高度（自定义导航栏适配）
     try {
       const win: any = winInfo()
@@ -19,11 +33,10 @@ App<IAppOption>({
       this.globalData.statusBarHeight = 20
     }
 
-    // 初始化云开发（使用当前环境）
+    // 初始化云开发（显式指定环境，避免多环境时跑错）
     if (wx.cloud) {
       try {
-        const cloudAny: any = wx.cloud
-        wx.cloud.init({ env: cloudAny.DYNAMIC_CURRENT_ENV || undefined, traceUser: true })
+        wx.cloud.init({ env: CLOUD_ENV, traceUser: true })
       } catch (e) {
         console.warn('cloud init failed', e)
       }
@@ -55,6 +68,17 @@ App<IAppOption>({
         .catch((e) => {
           console.warn('login failed', e)
         })
+    }
+    if (this.globalData.pendingChannelScene) {
+      bindChannelByScene(this.globalData.pendingChannelScene).catch(() => {})
+    }
+  },
+
+  onShow(opt: any) {
+    const scene = pickChannelScene(opt)
+    if (scene.indexOf('ch_') === 0) {
+      this.globalData.pendingChannelScene = scene
+      bindChannelByScene(scene).catch(() => {})
     }
   },
 })

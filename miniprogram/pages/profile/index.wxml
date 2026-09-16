@@ -1,7 +1,7 @@
-<!-- 修行 -->
+<!-- 静心 -->
 <view class="page wing-page profile-page">
   <view class="wing-head" style="padding-top: {{statusBarHeight}}px;">
-    <text class="wing-title">修 行</text>
+    <text class="wing-title">静 心</text>
   </view>
 
   <scroll-view class="wing-scroll" scroll-y enhanced show-scrollbar="{{false}}">
@@ -9,7 +9,7 @@
       <view class="stats-row">
         <view class="stat">
           <text class="st-num mono-num">{{totalText}}</text>
-          <text class="st-label">功德</text>
+          <text class="st-label">专注</text>
         </view>
         <view class="stat">
           <text class="st-num mono-num">{{wishCount}}</text>
@@ -55,21 +55,42 @@
       <view class="sets">
         <view class="set-item">
           <text class="set-name">音效</text>
-          <switch checked="{{soundOn}}" color="#c9a56a" bindchange="toggleSound" />
+          <view class="tog {{soundOn ? 'on' : ''}}" hover-class="hover-dim" bindtap="toggleSound">
+            <view class="tog-knob"></view>
+          </view>
         </view>
         <view class="set-item">
           <text class="set-name">震动</text>
-          <switch checked="{{vibrateOn}}" color="#c9a56a" bindchange="toggleVibrate" />
+          <view class="tog {{vibrateOn ? 'on' : ''}}" hover-class="hover-dim" bindtap="toggleVibrate">
+            <view class="tog-knob"></view>
+          </view>
         </view>
         <view class="set-item">
           <text class="set-name">自动敲击</text>
-          <switch checked="{{autoMode}}" color="#c9a56a" bindchange="toggleAuto" />
+          <view class="tog {{autoMode ? 'on' : ''}}" hover-class="hover-dim" bindtap="toggleAuto">
+            <view class="tog-knob"></view>
+          </view>
+        </view>
+        <view class="set-item ambi-item">
+          <text class="set-name">氛围</text>
+          <view class="ambi-row">
+            <text
+              wx:for="{{ambienceOptions}}"
+              wx:key="id"
+              class="ambi-opt {{ambience === item.id ? 'on' : ''}}"
+              hover-class="hover-dim"
+              data-id="{{item.id}}"
+              bindtap="onPickAmbience"
+            >{{item.name}}</text>
+          </view>
         </view>
         <view class="set-item last">
           <text class="set-name">主题</text>
           <text class="coming">敬请期待</text>
         </view>
       </view>
+      <text class="partner-entry" hover-class="hover-dim" bindtap="openPartner">渠道合作</text>
+      <text class="partner-entry" wx:if="{{showAdmin}}" hover-class="hover-dim" bindtap="openAdmin">渠道管理</text>
     </view>
   </scroll-view>
 
