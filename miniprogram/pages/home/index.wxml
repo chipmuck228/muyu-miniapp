@@ -1,5 +1,5 @@
 <!-- 木鱼香案：暂隐 3D 模型，只留金线上方的敲击热区 -->
-<view class="page home-page phase-{{enterPhase}} kind-{{enterKind}}">
+<view class="page home-page theme-{{theme}} phase-{{enterPhase}} kind-{{enterKind}}">
   <view class="enter-veil" wx:if="{{enterPhase !== 'done'}}" catchtouchmove="noop"></view>
 
   <block wx:if="{{readyToKnock}}">
@@ -7,7 +7,7 @@
       <view class="dawn">
         <image wx:if="{{dawnSrc}}" class="dawn-paper" src="{{dawnSrc}}" mode="aspectFill" style="opacity: {{dawnSky}};" />
       </view>
-      <smoke-gl class="smoke-gl-fill" style="opacity: {{smokeFade}};" bind:risen="onSmokeRisen" />
+      <smoke-gl class="smoke-gl-fill" theme="{{theme}}" style="opacity: {{smokeFade}};" bind:risen="onSmokeRisen" />
 
       <view class="altar-fill enter-altar"></view>
       <view class="lesson-title {{lessonTitleOn ? 'on' : ''}}">

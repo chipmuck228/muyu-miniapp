@@ -49,6 +49,18 @@
 .void-fallback .puff.p2 { animation-delay: 3.6s; }
 .void-fallback .puff.p3 { animation-delay: 5.4s; }
 .void-fallback .puff.p4 { animation-delay: 7.2s; }
+.theme-night .ember {
+  background: radial-gradient(circle, #7aa4cc 0%, rgba(20, 40, 70, 0) 70%);
+}
+.theme-night .puff { background: rgba(176, 198, 214, 0.55); }
+.theme-ink .ember {
+  background: radial-gradient(circle, #c8c4bc 0%, rgba(40, 40, 40, 0) 70%);
+}
+.theme-ink .puff { background: rgba(210, 208, 202, 0.45); }
+.theme-dusk .ember {
+  background: radial-gradient(circle, #ff8a3d 0%, rgba(120, 40, 0, 0) 70%);
+}
+.theme-dusk .puff { background: rgba(232, 186, 160, 0.55); }
 .smoke-rev {
   position: absolute;
   left: 16rpx;

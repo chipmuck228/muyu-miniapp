@@ -4,7 +4,13 @@ import { adaptForMiniProgram } from './threeAdapt'
 
 export const SMOKE_REV = 'v20260910af'
 
+export interface SmokeTint {
+  ember: [number, number, number]
+  plume: [number, number, number]
+}
+
 export interface VoidSmokeHandle {
+  setTint: (tint: SmokeTint) => void
   stop: () => void
 }
 
@@ -145,6 +151,7 @@ export function startIncensePlume(
   cssH: number,
   dpr: number,
   onRise?: () => void,
+  tint?: SmokeTint,
 ): VoidSmokeHandle {
   console.log('[smoke]', SMOKE_REV, cssW, cssH)
   const pixelRatio = Math.max(1, Math.min(dpr || CONFIG.pixelRatio, CONFIG.pixelRatio))
@@ -166,6 +173,16 @@ export function startIncensePlume(
   const uProj = gl.getUniformLocation(prog, 'uProj')
   const uColor = gl.getUniformLocation(prog, 'uColor')
   const proj = ortho(cssW, cssH)
+  const color = {
+    ember: [1, 0.36, 0.16] as [number, number, number],
+    plume: [0.8, 0.82, 0.84] as [number, number, number],
+  }
+  const useTint = (next?: SmokeTint) => {
+    if (!next || !next.ember || !next.plume) return
+    color.ember = [next.ember[0], next.ember[1], next.ember[2]]
+    color.plume = [next.plume[0], next.plume[1], next.plume[2]]
+  }
+  useTint(tint)
 
   const originY = cssH * (0.5 - CONFIG.originYRatio)
   const screenTop = cssH * 0.5
@@ -403,7 +420,7 @@ export function startIncensePlume(
 
     const pulse = 0.74 + Math.sin(now * 0.001) * 0.14
     for (let i = 0; i < 6; i++) emberA[i] = 0.55 * pulse
-    gl.uniform3f(uColor, 1, 0.36, 0.16)
+    gl.uniform3f(uColor, color.ember[0], color.ember[1], color.ember[2])
     gl.bindBuffer(gl.ARRAY_BUFFER, bufEmberPos)
     gl.enableVertexAttribArray(aPos)
     gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0)
@@ -416,7 +433,7 @@ export function startIncensePlume(
     gl.vertexAttribPointer(aSoft, 1, gl.FLOAT, false, 0, 0)
     gl.drawArrays(gl.TRIANGLES, 0, 6)
 
-    gl.uniform3f(uColor, 0.8, 0.82, 0.84)
+    gl.uniform3f(uColor, color.plume[0], color.plume[1], color.plume[2])
     for (let s = 0; s < strandN; s++) {
       fillStrand(s, now, growU)
       const liveStem = Math.max(2, Math.ceil(growU * (stemN - 1)) + 1)
@@ -444,6 +461,9 @@ export function startIncensePlume(
   tick()
 
   return {
+    setTint(next: SmokeTint) {
+      useTint(next)
+    },
     stop() {
       running = false
       if (raf) clearTimeout(raf)

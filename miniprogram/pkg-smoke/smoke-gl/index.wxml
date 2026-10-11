@@ -1,4 +1,4 @@
-<view class="smoke-root">
+<view class="smoke-root theme-{{theme}}">
   <canvas wx:if="{{canvasOn}}" type="webgl" id="smokeCanvas" class="void-canvas" />
   <view class="void-fallback" wx:if="{{smokeFallback}}">
     <view class="ember"></view>

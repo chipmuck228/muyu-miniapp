@@ -7,6 +7,7 @@ import { concealTabBar, winInfo } from '../../utils/util'
 import { DAWN_FILE_ID, resolveCloudFile } from '../../utils/cloudFile'
 import { startAmbience, stopAmbience } from '../../utils/ambience'
 import { AmbienceId } from '../../utils/audioCatalog'
+import { parseTheme, themeEnds, ThemeId } from '../../utils/theme'
 
 interface FloatItem {
   key: number
@@ -26,25 +27,23 @@ function bindWishId(): string | null {
 
 const LESSON_TITLE_MAX = 8
 const RANDOM_GOAL = 10
-const TITLE_WHITE = { r: 255, g: 255, b: 255 }
-const TITLE_GOLD = { r: 232, g: 201, b: 138 }
-
 function progressT(cur: number, goal: number): number {
   return goal > 0 ? Math.max(0, Math.min(1, cur / goal)) : 0
 }
 
-function mixTitleColor(cur: number, goal: number): string {
+function mixTitleColor(cur: number, goal: number, theme?: ThemeId): string {
+  const ends = themeEnds(theme || 'dawn')
   const t = progressT(cur, goal)
-  const r = Math.round(TITLE_WHITE.r + (TITLE_GOLD.r - TITLE_WHITE.r) * t)
-  const g = Math.round(TITLE_WHITE.g + (TITLE_GOLD.g - TITLE_WHITE.g) * t)
-  const b = Math.round(TITLE_WHITE.b + (TITLE_GOLD.b - TITLE_WHITE.b) * t)
+  const r = Math.round(ends.from.r + (ends.to.r - ends.from.r) * t)
+  const g = Math.round(ends.from.g + (ends.to.g - ends.from.g) * t)
+  const b = Math.round(ends.from.b + (ends.to.b - ends.from.b) * t)
   return 'rgb(' + r + ',' + g + ',' + b + ')'
 }
 
-function scenePatch(cur: number, goal: number) {
+function scenePatch(cur: number, goal: number, theme?: ThemeId) {
   const t = progressT(cur, goal)
   return {
-    lessonColor: mixTitleColor(cur, goal),
+    lessonColor: mixTitleColor(cur, goal, theme),
     dawnSky: Number(t.toFixed(3)),
     smokeFade: Number((1 - t * 0.92).toFixed(3)),
   }
@@ -79,6 +78,7 @@ Page({
     vibrateOn: true,
     autoMode: false,
     ambience: 'off' as AmbienceId,
+    theme: 'dawn' as ThemeId,
     floats: [] as FloatItem[],
     rippleOn: false,
     pulsing: false,
@@ -87,7 +87,7 @@ Page({
     lessonTitle: '',
     lessonChars: [] as string[],
     lessonTitleOn: false,
-    lessonColor: mixTitleColor(0, 1),
+    lessonColor: mixTitleColor(0, 1, 'dawn'),
     dawnSky: 0,
     smokeFade: 1,
     dawnSrc: '',
@@ -120,11 +120,15 @@ Page({
       app.globalData.pendingChannelScene = scene
       bindChannelByScene(scene).catch(() => {})
     }
+    const cached = settingsOf(app.globalData.user)
     this.setData(
       Object.assign(
         {
           statusBarHeight: app.globalData.statusBarHeight || 20,
           readyToKnock: !!app.globalData.lessonChosen,
+          ambience: cached.ambience,
+          theme: cached.theme,
+          lessonColor: mixTitleColor(0, 1, cached.theme),
         },
         app.globalData.lessonChosen ? lessonTitlePatch(lessonTitleOf()) : {}
       )
@@ -144,7 +148,11 @@ Page({
           this._titleCurrent = 0
           this._titleGoal = RANDOM_GOAL
           this.setData(
-            Object.assign(lessonTitlePatch('随机专注'), { lessonTitleOn: true }, scenePatch(0, RANDOM_GOAL))
+            Object.assign(
+              lessonTitlePatch('随机专注'),
+              { lessonTitleOn: true },
+              scenePatch(0, RANDOM_GOAL, parseTheme(this.data.theme))
+            )
           )
           this.drawLessonTitle()
           wx.showToast({ title: '心愿已成 · 惊喜已启', icon: 'none' })
@@ -294,7 +302,7 @@ Page({
   },
 
   titleColorPatch() {
-    return scenePatch(this._titleCurrent, this._titleGoal)
+    return scenePatch(this._titleCurrent, this._titleGoal, parseTheme(this.data.theme))
   },
 
   applyTitleProgress() {
@@ -353,7 +361,7 @@ Page({
     const chars = this.data.lessonChars || []
     ctx.clearRect(0, 0, w, h)
     if (!this.data.lessonTitleOn || !chars.length) return
-    ctx.fillStyle = this.data.lessonColor || mixTitleColor(this._titleCurrent, this._titleGoal)
+    ctx.fillStyle = this.data.lessonColor || mixTitleColor(this._titleCurrent, this._titleGoal, parseTheme(this.data.theme))
     ctx.font = '15px sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -438,10 +446,13 @@ Page({
           vibrateOn: s.vibrateOn,
           autoMode: s.autoMode,
           ambience: s.ambience,
+          theme: s.theme,
         },
-        this.levelPatch(user.totalMerit || 0, todayCount)
+        this.levelPatch(user.totalMerit || 0, todayCount),
+        scenePatch(this._titleCurrent, this._titleGoal, s.theme)
       )
     )
+    this.drawLessonTitle()
     if (s.autoMode && !this.entering()) this.startAuto()
     else if (!s.autoMode) this.stopAuto()
     startAmbience(s.ambience)

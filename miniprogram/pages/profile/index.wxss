@@ -148,15 +148,13 @@
 .ambi-opt.on {
   color: #e8c98a;
 }
+.ambi-opt.locked {
+  color: rgba(240, 230, 216, 0.22);
+}
 .set-name {
   font-size: 28rpx;
   letter-spacing: 6rpx;
   color: rgba(240, 230, 216, 0.72);
-}
-.coming {
-  font-size: 22rpx;
-  letter-spacing: 4rpx;
-  color: rgba(240, 230, 216, 0.22);
 }
 .partner-entry {
   display: block;

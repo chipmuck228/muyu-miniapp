@@ -3,6 +3,51 @@
   background: #0a0806;
   overflow: hidden;
 }
+.home-page.theme-night {
+  background: #07090e;
+}
+.home-page.theme-ink {
+  background: #0c0c0c;
+}
+.home-page.theme-dusk {
+  background: #120c09;
+}
+.theme-night .dawn-paper {
+  filter: brightness(0.42) saturate(0.55) hue-rotate(200deg);
+}
+.theme-ink .dawn-paper {
+  filter: grayscale(1) brightness(0.5) contrast(1.08);
+}
+.theme-dusk .dawn-paper {
+  filter: sepia(0.45) saturate(1.35) brightness(0.62) hue-rotate(-12deg);
+}
+.theme-night .knock-pad {
+  background: radial-gradient(circle, rgba(150, 186, 214, 0.07) 0%, rgba(150, 186, 214, 0) 72%);
+  box-shadow: inset 0 0 0 1rpx rgba(168, 196, 220, 0.22);
+}
+.theme-ink .knock-pad {
+  background: radial-gradient(circle, rgba(220, 220, 216, 0.05) 0%, rgba(220, 220, 216, 0) 72%);
+  box-shadow: inset 0 0 0 1rpx rgba(220, 220, 216, 0.18);
+}
+.theme-dusk .knock-pad {
+  background: radial-gradient(circle, rgba(232, 150, 96, 0.08) 0%, rgba(232, 150, 96, 0) 72%);
+  box-shadow: inset 0 0 0 1rpx rgba(232, 150, 96, 0.28);
+}
+.theme-night .ripple-ring {
+  border-color: rgba(186, 214, 232, 0.88);
+}
+.theme-ink .ripple-ring {
+  border-color: rgba(232, 232, 228, 0.75);
+}
+.theme-dusk .ripple-ring {
+  border-color: rgba(240, 168, 112, 0.9);
+}
+.theme-night .float-text.score { color: #d5e6f4; }
+.theme-night .float-text.chant { color: #b7c9dc; }
+.theme-ink .float-text.score { color: #e6e4de; }
+.theme-ink .float-text.chant { color: #bdb9b0; }
+.theme-dusk .float-text.score { color: #ffc49a; }
+.theme-dusk .float-text.chant { color: #f0d2bc; }
 
 .enter-veil {
   position: absolute;

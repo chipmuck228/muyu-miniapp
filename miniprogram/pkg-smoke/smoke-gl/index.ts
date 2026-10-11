@@ -1,4 +1,5 @@
 import { winInfo } from '../../utils/util'
+import { tintOf } from '../../utils/theme'
 import { startIncensePlume, SMOKE_REV } from '../incensePlume'
 
 function errText(e: any): string {
@@ -7,10 +8,25 @@ function errText(e: any): string {
 }
 
 Component({
+  properties: {
+    theme: {
+      type: String,
+      value: 'dawn',
+    },
+  },
+
   data: {
     smokeFallback: false,
     smokeRev: '',
     canvasOn: true,
+  },
+
+  observers: {
+    theme(id: string) {
+      if (this._smoke && typeof this._smoke.setTint === 'function') {
+        this._smoke.setTint(tintOf(id))
+      }
+    },
   },
 
   lifetimes: {
@@ -96,9 +112,16 @@ Component({
               dpr = 2
             }
             try {
-              this._smoke = startIncensePlume(item.node, item.width, item.height, dpr, () => {
-                if (this._alive) this.triggerEvent('risen')
-              })
+              this._smoke = startIncensePlume(
+                item.node,
+                item.width,
+                item.height,
+                dpr,
+                () => {
+                  if (this._alive) this.triggerEvent('risen')
+                },
+                tintOf(this.data.theme)
+              )
               this._booting = false
               this.setData({
                 smokeFallback: false,

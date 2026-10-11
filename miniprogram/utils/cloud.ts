@@ -1,5 +1,6 @@
 // 云开发数据访问层（所有读写都经由云函数，避免依赖集合权限配置）
-import { parseAmbience } from './audioCatalog'
+import { isPremiumAmbience, parseAmbience } from './audioCatalog'
+import { isPremiumTheme, parseTheme, ThemeId } from './theme'
 
 export interface WishHit {
   date: string
@@ -30,12 +31,15 @@ export interface UserSettings {
   vibrateOn: boolean
   autoMode: boolean
   ambience: AmbienceId
+  theme: ThemeId
 }
 
 export interface UserRecord {
   _id?: string
   nickname: string
   totalMerit: number
+  /** 一次开启后为 true。只应由支付结果写入，不进 settings */
+  premium?: boolean
   createdAt?: number | Date
   lastHitDate?: string | null
   settings?: UserSettings
@@ -58,17 +62,24 @@ export interface ProfilePayload {
 }
 
 export function settingsOf(u?: UserRecord | null): UserSettings {
-  const d: UserSettings = { soundOn: true, vibrateOn: true, autoMode: false, ambience: 'off' }
+  const d: UserSettings = { soundOn: true, vibrateOn: true, autoMode: false, ambience: 'off', theme: 'dawn' }
   const s: any = (u && u.settings) || {}
+  let ambience = parseAmbience(s.ambience)
+  let theme = parseTheme(s.theme)
+  if (!u || u.premium !== true) {
+    if (isPremiumAmbience(ambience)) ambience = 'off'
+    if (isPremiumTheme(theme)) theme = 'dawn'
+  }
   return {
     soundOn: typeof s.soundOn === 'boolean' ? s.soundOn : d.soundOn,
     vibrateOn: typeof s.vibrateOn === 'boolean' ? s.vibrateOn : d.vibrateOn,
     autoMode: typeof s.autoMode === 'boolean' ? s.autoMode : d.autoMode,
-    ambience: parseAmbience(s.ambience),
+    ambience,
+    theme,
   }
 }
 
-type CloudResult<T> = { ok: boolean; msg?: string } & T
+type CloudResult<T> = { ok: boolean; msg?: string; code?: string } & T
 
 function callCloud<T>(name: string, data: Record<string, any> = {}): Promise<CloudResult<T>> {
   return wx.cloud
@@ -76,11 +87,14 @@ function callCloud<T>(name: string, data: Record<string, any> = {}): Promise<Clo
     .then((res) => {
       const r = res.result as CloudResult<T>
       if (!r || r.ok === false) {
-        throw new Error((r && r.msg) || '操作失败')
+        const err: any = new Error((r && r.msg) || '操作失败')
+        if (r && r.code) err.code = r.code
+        throw err
       }
       return r
     })
-    .catch((e) => {
+    .catch((e: any) => {
+      if (e && e.code) throw e
       throw new Error((e && e.message) || '网络异常，请稍后再试')
     })
 }
@@ -137,6 +151,25 @@ export function removeWish(wishId: string): Promise<void> {
 
 export function updateSettings(patch: Partial<UserSettings>): Promise<{ settings: UserSettings }> {
   return callCloud('user', { settings: patch })
+}
+
+export interface PremiumPayParams {
+  premium: boolean
+  already?: boolean
+  mode?: string
+  signData?: string
+  paySig?: string
+  signature?: string
+  outTradeNo?: string
+  goodsPrice?: number
+}
+
+export function preparePremiumPay(code: string): Promise<PremiumPayParams> {
+  return callCloud<PremiumPayParams>('pay', { action: 'prepare', code })
+}
+
+export function confirmPremiumPay(outTradeNo: string): Promise<{ premium: boolean }> {
+  return callCloud('pay', { action: 'confirm', outTradeNo })
 }
 
 export function normalizeChannelScene(raw: string): string {

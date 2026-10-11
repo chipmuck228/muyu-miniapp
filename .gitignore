@@ -6,3 +6,4 @@ project.private.config.json
 *.log
 .idea/
 .vscode/
+cloudfunctions/pay/secrets.js

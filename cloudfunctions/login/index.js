@@ -3,15 +3,32 @@ const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 
-const DEFAULT_SETTINGS = { soundOn: true, vibrateOn: true, autoMode: false, ambience: 'off' }
+const DEFAULT_SETTINGS = { soundOn: true, vibrateOn: true, autoMode: false, ambience: 'off', theme: 'dawn' }
+const FREE_AMBIENCE = { off: 1, rain: 1, bowl: 1 }
+const PREMIUM_AMBIENCE = { noise: 1, stream: 1, pine: 1, fire: 1 }
+const FREE_THEME = { dawn: 1 }
+const PREMIUM_THEME = { night: 1, ink: 1, dusk: 1 }
+
+function dressSettings(raw, premium) {
+  const s = Object.assign({}, DEFAULT_SETTINGS, raw || {})
+  const ambienceOk = FREE_AMBIENCE[s.ambience] || (premium && PREMIUM_AMBIENCE[s.ambience])
+  const themeOk = FREE_THEME[s.theme] || (premium && PREMIUM_THEME[s.theme])
+  return {
+    soundOn: typeof s.soundOn === 'boolean' ? s.soundOn : true,
+    vibrateOn: typeof s.vibrateOn === 'boolean' ? s.vibrateOn : true,
+    autoMode: s.autoMode === true,
+    ambience: ambienceOk ? s.ambience : 'off',
+    theme: themeOk ? s.theme : 'dawn',
+  }
+}
 
 function normalizeUser(u) {
   if (!u) return u
+  const premium = u.premium === true
   return {
     ...u,
-    settings: u.settings && typeof u.settings === 'object'
-      ? { ...DEFAULT_SETTINGS, ...u.settings }
-      : { ...DEFAULT_SETTINGS },
+    premium,
+    settings: dressSettings(u.settings, premium),
   }
 }
 
@@ -31,6 +48,7 @@ exports.main = async () => {
         nickname: '静心的人',
         wxMark: String(OPENID).slice(-8).toUpperCase(),
         totalMerit: 0,
+        premium: false,
         createdAt: new Date(),
         lastHitDate: null,
         settings: { ...DEFAULT_SETTINGS },
