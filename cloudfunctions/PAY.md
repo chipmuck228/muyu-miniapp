@@ -7,7 +7,7 @@
 1. 公众平台已开通虚拟支付，拿到 **OfferID**、现网 **AppKey**。
 2. 同一小程序的 **AppSecret**（开发管理 → 开发设置；签名用户态需要，云调用不支持 `auth.code2Session`）。
 3. 在 **虚拟支付 → 道具管理** 新建道具并发布到现网：
-   - 建议道具 ID：`premium_unlock`（须与下面 `productId` 一致）
+   - 道具 ID：现网实际用的是 `Premium`（须与下面 `productId` **完全一致、区分大小写**）
    - 价格：后台填元，`secrets.js` 里填**分**（例如 6 元 → `600`）
    - **iOS / 苹果支付最低 1 元**（`goodsPrice >= 100`）。现在若是几分钱，安卓或可过，iPhone 会报 `INVALID_PLATFORM` / 参数错误
    - 开发者工具会报 `INVALID_PLATFORM`，请用**安卓真机**预览；iPhone 还须在虚拟支付里开通苹果支付并配置小程序简称
@@ -26,7 +26,7 @@ module.exports = {
   offerId: '你的OfferID',
   appKey: '你的现网AppKey',
   appSecret: '小程序AppSecret',
-  productId: 'premium_unlock',
+  productId: 'Premium', // 与「道具管理」里的 ID 完全一致，区分大小写
   goodsPrice: 600, // 分，必须与道具现网价格一致
   env: 0,          // 0 现网；沙箱才用 1，并换沙箱 AppKey
 }
@@ -66,7 +66,7 @@ module.exports = {
 1. 真机预览（开发者工具里虚拟支付能力有限）。
 2. 静心 → 点灰色的氛围或主题 → 确认金额 → 付款。
 3. 云函数日志应出现 `xpayNotify`；数据库 `users.premium === true`，`premium_orders` 状态为 `delivered`。
-4. 未配置推送时，前端会提示「支付成功，请稍后刷新」；配好推送后会自动变成「已开启」。
+4. 已付款但尚未收到发货时，前端会持续轮询 `confirm`（约 25s），并把单号记在本地；重开小程序后会自动续查同一单，**不会再让用户二次付费**。
 
 ## 流程摘要
 

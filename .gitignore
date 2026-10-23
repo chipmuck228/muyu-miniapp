@@ -7,3 +7,4 @@ project.private.config.json
 .idea/
 .vscode/
 cloudfunctions/pay/secrets.js
+cloudfunctions/wxpay/secrets.js

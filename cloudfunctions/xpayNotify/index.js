@@ -122,8 +122,10 @@ async function onDeliver(event) {
   const order = await orderByNo(outTradeNo)
   if (order && order.status === 'delivered') return OK
   if (order && order._openid && openid && order._openid !== openid) {
-    console.error('openid mismatch', outTradeNo, order._openid, openid)
-    return { ErrCode: -1, ErrMsg: 'openid mismatch' }
+    // 返回错误会让微信按 15s/30s/3m/… 无限重投，而 openid 不一致是重投也修不好的。
+    // 这里按“已收下”应答止血，同时把异常留痕供人工处理。
+    console.error('openid mismatch, stop retrying', outTradeNo, order._openid, openid)
+    return OK
   }
   const uid = openid || (order && order._openid) || ''
   if (!uid) {

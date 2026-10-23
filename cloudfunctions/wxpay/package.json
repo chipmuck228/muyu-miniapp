@@ -1,0 +1,9 @@
+{
+  "name": "wxpay",
+  "version": "1.0.0",
+  "description": "普通微信支付（商户平台 JSAPI）：下单、查单、开通高级功能",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

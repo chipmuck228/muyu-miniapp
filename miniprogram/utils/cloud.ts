@@ -94,8 +94,17 @@ function callCloud<T>(name: string, data: Record<string, any> = {}): Promise<Clo
       return r
     })
     .catch((e: any) => {
-      if (e && e.code) throw e
-      throw new Error((e && e.message) || '网络异常，请稍后再试')
+      if (e && e.code && e.message && e.message !== 'cloud.callFunction:ok') throw e
+      const raw = String((e && (e.errMsg || e.message)) || '')
+      let msg = raw
+        .replace(/^cloud\.callFunction:fail\s*/i, '')
+        .replace(/^Error:\s*/i, '')
+        .trim()
+      if (!msg || msg === 'cloud.callFunction:ok') msg = '网络异常，请稍后再试'
+      if (/timeout|超时/i.test(msg)) msg = '云函数超时，请稍后重试'
+      const err: any = new Error(msg.slice(0, 40))
+      if (e && e.code) err.code = e.code
+      throw err
     })
 }
 
@@ -153,23 +162,30 @@ export function updateSettings(patch: Partial<UserSettings>): Promise<{ settings
   return callCloud('user', { settings: patch })
 }
 
+// 普通微信支付（商户平台 JSAPI）：参数由服务端签好名后下发，前端直接调 wx.requestPayment
 export interface PremiumPayParams {
   premium: boolean
   already?: boolean
-  mode?: string
-  signData?: string
-  paySig?: string
-  signature?: string
   outTradeNo?: string
   goodsPrice?: number
+  timeStamp?: string
+  nonceStr?: string
+  package?: string
+  signType?: 'RSA'
+  paySign?: string
 }
 
-export function preparePremiumPay(code: string): Promise<PremiumPayParams> {
-  return callCloud<PremiumPayParams>('pay', { action: 'prepare', code })
+export function preparePremiumPay(): Promise<PremiumPayParams> {
+  return callCloud<PremiumPayParams>('wxpay', { action: 'prepay' })
 }
 
 export function confirmPremiumPay(outTradeNo: string): Promise<{ premium: boolean }> {
-  return callCloud('pay', { action: 'confirm', outTradeNo })
+  return callCloud('wxpay', { action: 'query', outTradeNo })
+}
+
+// 退款复核：商户平台退款后，微信侧订单会变成 REFUND，这里确认是否要收回权益
+export function verifyPremium(): Promise<{ premium: boolean; refunded: boolean }> {
+  return callCloud('wxpay', { action: 'verify' })
 }
 
 export function normalizeChannelScene(raw: string): string {

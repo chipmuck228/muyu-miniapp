@@ -4,6 +4,7 @@ import {
   updateSettings,
   preparePremiumPay,
   confirmPremiumPay,
+  verifyPremium,
   UserSettings,
   settingsOf,
   channelAdminCheck,
@@ -36,20 +37,42 @@ function dressList(list: { id: string; name: string; premium?: boolean }[], prem
   }))
 }
 
-function wxLoginCode(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    wx.login({
-      success: (r) => {
-        if (r && r.code) resolve(r.code)
-        else reject(new Error('登录失败'))
-      },
-      fail: () => reject(new Error('登录失败')),
-    })
-  })
-}
-
+// 普通微信支付走 JSAPI，openid 由云函数从 getWXContext() 直接拿到，
+// 不再需要 wx.login 换 session_key（那是虚拟支付做用户态签名才要的）。
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+// 已付款、但还没确认发货的单号。必须落盘：页面重载或切 tab 后仍能续查，
+// 否则页面状态会被服务端值覆盖回“未开通”，用户就会被再次引导去付费。
+const PAY_PENDING_KEY = 'premium_pending_order'
+const PAY_PENDING_TTL = 7 * 24 * 60 * 60 * 1000
+
+function readPending(): string {
+  try {
+    const raw = wx.getStorageSync(PAY_PENDING_KEY)
+    if (!raw) return ''
+    const obj = typeof raw === 'string' ? JSON.parse(raw) : raw
+    const no = String((obj && obj.no) || '')
+    const at = Number((obj && obj.at) || 0)
+    if (!no || !at) return ''
+    if (Date.now() - at > PAY_PENDING_TTL) {
+      wx.removeStorageSync(PAY_PENDING_KEY)
+      return ''
+    }
+    return no
+  } catch (e) {
+    return ''
+  }
+}
+
+function writePending(no: string) {
+  try {
+    if (!no) wx.removeStorageSync(PAY_PENDING_KEY)
+    else wx.setStorageSync(PAY_PENDING_KEY, JSON.stringify({ no, at: Date.now() }))
+  } catch (e) {
+    // 存储不可用时退化为仅本次会话有效
+  }
 }
 
 function devicePlatform(): string {
@@ -69,59 +92,36 @@ function devicePlatform(): string {
   }
 }
 
-function payUnsupportedReason(): string {
-  const p = devicePlatform()
-  if (p === 'devtools') {
-    return '请用手机微信打开（开发者工具不支持虚拟支付）'
-  }
-  return ''
-}
-
-function payFailHint(errMsg: string, errCode?: number): string {
-  const msg = String(errMsg || '')
-  const p = devicePlatform()
-  if (msg.indexOf('INVALID_PLATFORM') >= 0 || errCode === -15001) {
-    if (p === 'ios') {
-      return '当前 iPhone 未能拉起苹果支付，请确认微信≥8.0.68、系统≥iOS15、大陆 App Store 账号'
-    }
-    return '当前环境无法支付，请用手机微信打开'
-  }
-  return msg.replace(/^requestVirtualPayment:fail\s*/i, '') || '支付失败'
-}
-
-function requestVirtualPay(p: {
-  mode: string
-  signData: string
-  paySig: string
-  signature: string
+// 普通微信支付（商户号收款）：iOS / Android 完全一致，不经过苹果 App 内支付。
+// 参数由 wxpay 云函数用商户私钥签好后下发，前端不参与签名。
+function requestPayment(p: {
+  timeStamp: string
+  nonceStr: string
+  package: string
+  signType: string
+  paySign: string
 }): Promise<void> {
   return new Promise((resolve, reject) => {
-    const blocked = payUnsupportedReason()
-    if (blocked) {
-      reject(new Error(blocked))
+    if (devicePlatform() === 'devtools') {
+      reject(new Error('请用手机微信打开（开发者工具不支持支付）'))
       return
     }
-    const anyWx: any = wx
-    if (typeof anyWx.requestVirtualPayment !== 'function') {
-      reject(new Error('当前微信版本不支持虚拟支付'))
-      return
-    }
-    anyWx.requestVirtualPayment({
-      mode: p.mode,
-      signData: p.signData,
-      paySig: p.paySig,
-      signature: p.signature,
+    wx.requestPayment({
+      timeStamp: p.timeStamp,
+      nonceStr: p.nonceStr,
+      package: p.package,
+      signType: p.signType as 'RSA',
+      paySign: p.paySign,
       success: () => resolve(),
       fail: (e: any) => {
-        const code = e && e.errCode
         const msg = String((e && (e.errMsg || e.message)) || '')
-        if (code === -2 || code === 1 || msg.indexOf('cancel') >= 0 || msg.indexOf('取消') >= 0) {
+        if (msg.indexOf('cancel') >= 0 || msg.indexOf('取消') >= 0) {
           const err: any = new Error('已取消')
           err.code = 'cancel'
           reject(err)
           return
         }
-        reject(new Error(payFailHint(msg, code)))
+        reject(new Error(msg.replace(/^requestPayment:fail\s*/i, '') || '支付失败'))
       },
     })
   })
@@ -191,6 +191,8 @@ Page({
 
   _alive: false,
   _paying: false,
+  _resuming: false,
+  _verified: false,
 
   onLoad() {
     const app = getApp<IAppOption>()
@@ -202,10 +204,58 @@ Page({
   onShow() {
     concealTabBar(this)
     this.load()
+    this.resumePending()
+    this.verifyRefund()
   },
 
   onUnload() {
     this._alive = false
+  },
+
+  // 上一笔付款没能当场确认发货时的续查。每次回到本页都继续追，直到开启或过期，
+  // 避免用户在发货到达前被要求再次付费。
+  async resumePending() {
+    if (this._paying || this._resuming) return
+    const no = readPending()
+    if (!no) return
+    this._resuming = true
+    try {
+      for (let i = 0; i < 12; i++) {
+        if (!this._alive || this.data.premium) return
+        const r = await confirmPremiumPay(no)
+        if (r.premium) {
+          writePending('')
+          this.markPremium()
+          wx.showToast({ title: '已开启', icon: 'none' })
+          return
+        }
+        await sleep(i < 6 ? 1000 : 2000)
+      }
+    } catch (e) {
+      // 保留挂起状态，下次进入页面再试
+    } finally {
+      this._resuming = false
+    }
+  },
+
+  // 退款复核：在商户平台给用户退款后，微信侧订单会变成 REFUND。
+  // 我们没接异步回调，所以每次进本页主动问一次微信；确认已退款就收回权益。
+  // 每次页面实例只查一次，避免切 tab 时反复请求。
+  async verifyRefund() {
+    if (this._verified || this._paying || this._resuming) return
+    this._verified = true
+    try {
+      if (!this.data.premium) return
+      const r = await verifyPremium()
+      if (!this._alive) return
+      if (r.refunded) {
+        writePending('')
+        wx.showToast({ title: '已退款，高级功能已关闭', icon: 'none' })
+        this.load()
+      }
+    } catch (e) {
+      // 复核失败不收回权益：网络抖动不应误伤付费用户
+    }
   },
 
   async load() {
@@ -219,6 +269,7 @@ Page({
       const todayCount = res.todayCount || 0
       const s = settingsOf(res.user)
       const premium = res.user.premium === true
+      if (premium) writePending('')
       this.setData({
         loading: false,
         totalText: fmtInt(res.user.totalMerit || 0),
@@ -294,12 +345,16 @@ Page({
     })
   },
 
+  // 轮询确认发货。wx.requestVirtualPayment 的 success 只代表支付流程结束，
+  // 微信的发货推送首推通常在 15s 左右，原来的 7s 窗口几乎必然错过。
+  // 这里改为退避轮询，覆盖到约 25s。
   async waitDelivered(outTradeNo: string): Promise<boolean> {
-    for (let i = 0; i < 10; i++) {
+    if (!outTradeNo) return false
+    for (let i = 0; i < 20; i++) {
       if (!this._alive) return false
       const r = await confirmPremiumPay(outTradeNo)
       if (r.premium) return true
-      await sleep(700)
+      await sleep(i < 8 ? 800 : 1500)
     }
     return false
   },
@@ -309,17 +364,34 @@ Page({
     this._paying = true
     wx.showLoading({ title: '准备中', mask: true })
     try {
-      const code = await wxLoginCode()
-      const prep = await preparePremiumPay(code)
+      const prep = await preparePremiumPay()
       if (!this._alive) return
       if (prep.premium || prep.already) {
         wx.hideLoading()
+        writePending('')
         this.markPremium()
         wx.showToast({ title: '已开启', icon: 'none' })
         return
       }
-      if (!prep.signData || !prep.paySig || !prep.signature || !prep.mode) {
+      if (!prep.timeStamp || !prep.nonceStr || !prep.package || !prep.paySign) {
         throw new Error('支付参数不完整')
+      }
+      // 关键防重复扣费：本单已经付过款、只是尚未确认发货。
+      // 此时 prepare 会复用同一个 outTradeNo，这里必须直接跳到轮询，绝不能再拉起支付。
+      if (prep.outTradeNo && readPending() === prep.outTradeNo) {
+        wx.hideLoading()
+        wx.showLoading({ title: '发放中', mask: true })
+        const settled = await this.waitDelivered(prep.outTradeNo)
+        wx.hideLoading()
+        if (!this._alive) return
+        if (settled) {
+          writePending('')
+          this.markPremium()
+          wx.showToast({ title: '已开启', icon: 'none' })
+        } else {
+          wx.showToast({ title: '付款已收到，正在开启', icon: 'none' })
+        }
+        return
       }
       const price = yuanText(prep.goodsPrice || 0)
       wx.hideLoading()
@@ -337,22 +409,27 @@ Page({
         })
         if (!go) return
       }
-      await requestVirtualPay({
-        mode: prep.mode,
-        signData: prep.signData,
-        paySig: prep.paySig,
-        signature: prep.signature,
+      await requestPayment({
+        timeStamp: prep.timeStamp || '',
+        nonceStr: prep.nonceStr || '',
+        package: prep.package || '',
+        signType: prep.signType || 'RSA',
+        paySign: prep.paySign || '',
       })
       if (!this._alive) return
+      // 记账：这笔已付款。之后即使页面被重载，也只能续查这一单，不能让 prepare 再开新单。
+      writePending(prep.outTradeNo || '')
       wx.showLoading({ title: '发放中', mask: true })
       const ok = await this.waitDelivered(prep.outTradeNo || '')
       wx.hideLoading()
       if (!this._alive) return
       if (ok) {
+        writePending('')
         this.markPremium()
         wx.showToast({ title: '已开启', icon: 'none' })
       } else {
-        wx.showToast({ title: '支付成功，请稍后刷新', icon: 'none' })
+        // 不要提示“刷新”：用户在回到本页时会由 resumePending 自动续查
+        wx.showToast({ title: '付款已收到，正在开启', icon: 'none' })
       }
     } catch (e: any) {
       wx.hideLoading()
