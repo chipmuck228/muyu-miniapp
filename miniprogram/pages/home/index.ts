@@ -40,6 +40,26 @@ function bindWishId(): string | null {
   return null
 }
 
+// 3D 木鱼舞台尺寸（rpx），需和 .muyu-stage 一致
+const MUYU_W_RPX = 520
+const MUYU_H_RPX = 480
+
+/** XR-Frame 组件要显式给出 样式尺寸(px) 和 渲染尺寸(px × dpr) */
+function muyuSize() {
+  let ww = 375
+  let dpr = 2
+  try {
+    const win: any = winInfo()
+    ww = Number(win.windowWidth) || 375
+    dpr = Math.max(1, Math.min(Number(win.pixelRatio) || 2, 2))
+  } catch {
+    // 用默认值
+  }
+  const w = Math.round((MUYU_W_RPX * ww) / 750)
+  const h = Math.round((MUYU_H_RPX * ww) / 750)
+  return { muyuW: w, muyuH: h, muyuRW: Math.round(w * dpr), muyuRH: Math.round(h * dpr) }
+}
+
 const LESSON_TITLE_MAX = 8
 const RANDOM_GOAL = 10
 function progressT(cur: number, goal: number): number {
@@ -116,6 +136,10 @@ Page({
     celebrate: null as CelebrateInfo | null,
     /** 圆满后切到下一个功课时，顶部短暂提示 */
     switchHint: '',
+    muyuW: 260,
+    muyuH: 240,
+    muyuRW: 520,
+    muyuRH: 480,
   },
 
   _floatSeq: 0,
@@ -153,6 +177,7 @@ Page({
       Object.assign(
         {
           statusBarHeight: app.globalData.statusBarHeight || 20,
+          ...muyuSize(),
           readyToKnock: !!app.globalData.lessonChosen,
           ambience: cached.ambience,
           theme: cached.theme,

@@ -49,8 +49,9 @@
   "libVersion": "trial",
   "packOptions": {
     "ignore": [
-      { "type": "folder", "value": "pkg-smoke/models" },
-      { "type": "folder", "value": "pkg-smoke/incense-smoke" },
+      { "type": "file", "value": "pkg-smoke/models/muyu-jade.glb" },
+      { "type": "file", "value": "pkg-smoke/models/muyu-liuli.glb" },
+      { "type": "file", "value": "pkg-smoke/models/muyu-zitan.glb" },
       { "type": "file", "value": "assets/home/dawn.png" }
     ],
     "include": []
