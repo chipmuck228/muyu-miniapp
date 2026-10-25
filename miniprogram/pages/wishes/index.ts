@@ -26,6 +26,11 @@ function build(w: Wish): WishVM {
   }
 }
 
+// 未成的在上，已成 / 已了结的沉到下面；各组内保持云端的新→旧顺序
+function ongoingFirst(list: WishVM[]): WishVM[] {
+  return list.filter((w) => !w.done).concat(list.filter((w) => w.done))
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -63,7 +68,7 @@ Page({
       this.setData({
         loading: false,
         refreshing: false,
-        wishes: res.wishes.map(build),
+        wishes: ongoingFirst(res.wishes.map(build)),
       })
     } catch (e: any) {
       if (!this._alive) return
