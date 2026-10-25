@@ -1,7 +1,7 @@
 .ch-name {
   display: block;
   margin-top: 36rpx;
-  font-size: 28rpx;
+  font-size: 32rpx;
   letter-spacing: 8rpx;
   color: rgba(232, 201, 138, 0.8);
 }
@@ -16,12 +16,12 @@
   align-items: center;
 }
 .st-num {
-  font-size: 30rpx;
+  font-size: 34rpx;
   color: #e8c98a;
 }
 .st-label {
   margin-top: 8rpx;
-  font-size: 20rpx;
+  font-size: 24rpx;
   letter-spacing: 6rpx;
   color: rgba(240, 230, 216, 0.35);
 }
@@ -35,7 +35,7 @@
   display: block;
   margin-top: 16rpx;
   text-align: center;
-  font-size: 22rpx;
+  font-size: 26rpx;
   letter-spacing: 4rpx;
   color: rgba(240, 230, 216, 0.32);
 }
@@ -52,14 +52,14 @@
 .block-label {
   display: block;
   margin-bottom: 16rpx;
-  font-size: 22rpx;
+  font-size: 26rpx;
   letter-spacing: 10rpx;
   color: rgba(224, 181, 119, 0.5);
 }
 .row-txt {
   display: block;
   padding: 12rpx 0;
-  font-size: 24rpx;
+  font-size: 28rpx;
   color: rgba(240, 230, 216, 0.5);
 }
 .pay-row {
@@ -68,17 +68,17 @@
   padding: 14rpx 0;
 }
 .pay-title {
-  font-size: 24rpx;
+  font-size: 28rpx;
   color: rgba(240, 230, 216, 0.5);
 }
 .pay-amt {
-  font-size: 24rpx;
+  font-size: 28rpx;
   color: rgba(224, 181, 119, 0.7);
 }
 .label {
   display: block;
   margin-top: 36rpx;
-  font-size: 22rpx;
+  font-size: 26rpx;
   letter-spacing: 10rpx;
   color: rgba(224, 181, 119, 0.5);
 }
@@ -86,7 +86,7 @@
   width: 100%;
   height: 72rpx;
   margin-top: 8rpx;
-  font-size: 28rpx;
+  font-size: 32rpx;
   color: #f0e6d8;
   background: transparent;
 }
@@ -96,7 +96,7 @@
 .submit {
   margin-top: 40rpx;
   text-align: center;
-  font-size: 28rpx;
+  font-size: 32rpx;
   letter-spacing: 16rpx;
   padding: 16rpx 0;
   color: #e8c98a;
@@ -104,14 +104,14 @@
 .hint {
   display: block;
   margin-top: 24rpx;
-  font-size: 24rpx;
+  font-size: 28rpx;
   letter-spacing: 4rpx;
   color: rgba(240, 230, 216, 0.38);
 }
 .empty {
   display: block;
   padding: 20rpx 0;
-  font-size: 24rpx;
+  font-size: 28rpx;
   letter-spacing: 4rpx;
   color: rgba(240, 230, 216, 0.28);
 }
@@ -130,17 +130,17 @@
   flex-direction: column;
 }
 .row-name {
-  font-size: 26rpx;
+  font-size: 30rpx;
   color: rgba(240, 230, 216, 0.72);
 }
 .row-st {
   margin-top: 6rpx;
-  font-size: 20rpx;
+  font-size: 24rpx;
   letter-spacing: 2rpx;
   color: rgba(240, 230, 216, 0.32);
 }
 .row-act {
-  font-size: 22rpx;
+  font-size: 26rpx;
   letter-spacing: 4rpx;
   color: #e8c98a;
 }
@@ -159,14 +159,14 @@
 }
 .search-btn {
   margin-left: 20rpx;
-  font-size: 22rpx;
+  font-size: 26rpx;
   letter-spacing: 4rpx;
   color: #e8c98a;
 }
 .filter {
   display: block;
   margin: 16rpx 0 8rpx;
-  font-size: 22rpx;
+  font-size: 26rpx;
   letter-spacing: 4rpx;
   color: rgba(232, 201, 138, 0.7);
 }
@@ -178,17 +178,17 @@
 .user-id {
   flex: 1;
   min-width: 0;
-  font-size: 24rpx;
+  font-size: 28rpx;
   color: rgba(240, 230, 216, 0.62);
 }
 .user-meta {
   margin-left: 16rpx;
-  font-size: 20rpx;
+  font-size: 24rpx;
   color: rgba(240, 230, 216, 0.32);
 }
 .user-pay {
   margin-left: 16rpx;
-  font-size: 20rpx;
+  font-size: 24rpx;
   letter-spacing: 2rpx;
   color: rgba(224, 181, 119, 0.7);
 }

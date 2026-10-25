@@ -397,10 +397,10 @@ Page({
     // 画布会盖在普通视图之上：圆满弹窗打开时先擦掉竖排标题，否则会叠在弹窗文字上
     if (!this.data.lessonTitleOn || this.data.celebrateOn || !chars.length) return
     ctx.fillStyle = this.data.lessonColor || mixTitleColor(this._titleCurrent, this._titleGoal, parseTheme(this.data.theme))
-    ctx.font = '15px sans-serif'
+    ctx.font = '17px sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    const line = 22
+    const line = 24
     const total = chars.length * line
     let y = (h - total) / 2 + line / 2
     for (let i = 0; i < chars.length; i++) {

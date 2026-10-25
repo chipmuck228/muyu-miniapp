@@ -109,7 +109,7 @@
 }
 
 .gate-title {
-  font-size: 56rpx;
+  font-size: 60rpx;
   font-weight: 500;
   letter-spacing: 28rpx;
   padding-left: 28rpx;
@@ -120,7 +120,7 @@
 
 .gate-sub {
   margin-top: 22rpx;
-  font-size: 22rpx;
+  font-size: 26rpx;
   letter-spacing: 8rpx;
   color: rgba(224, 181, 119, 0.72);
   opacity: 0;

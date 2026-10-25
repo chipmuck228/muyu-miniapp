@@ -4,7 +4,7 @@
 }
 .field-label {
   display: block;
-  font-size: 22rpx;
+  font-size: 26rpx;
   letter-spacing: 10rpx;
   color: rgba(224, 181, 119, 0.5);
 }
@@ -12,7 +12,7 @@
   width: 100%;
   height: 72rpx;
   padding: 0;
-  font-size: 30rpx;
+  font-size: 34rpx;
   color: #f0e6d8;
   background: transparent;
   box-sizing: border-box;
@@ -32,7 +32,7 @@
   padding: 10rpx 0;
   width: calc((100% - 48rpx) / 3);
   text-align: center;
-  font-size: 26rpx;
+  font-size: 30rpx;
   letter-spacing: 2rpx;
   color: rgba(240, 230, 216, 0.45);
   border-bottom: 1rpx solid rgba(224, 181, 119, 0.14);
@@ -50,11 +50,11 @@
   justify-content: space-between;
 }
 .dl-text {
-  font-size: 30rpx;
+  font-size: 34rpx;
   color: #f0e6d8;
 }
 .dl-clear {
-  font-size: 22rpx;
+  font-size: 26rpx;
   letter-spacing: 4rpx;
   color: rgba(224, 181, 119, 0.55);
 }
@@ -63,7 +63,7 @@
   display: block;
   margin-top: 64rpx;
   text-align: center;
-  font-size: 22rpx;
+  font-size: 26rpx;
   letter-spacing: 6rpx;
   color: rgba(224, 181, 119, 0.38);
 }
@@ -73,7 +73,7 @@
 .submit {
   margin-top: 80rpx;
   text-align: center;
-  font-size: 30rpx;
+  font-size: 34rpx;
   letter-spacing: 16rpx;
   padding: 24rpx 0 24rpx 16rpx;
   color: #e8c98a;
