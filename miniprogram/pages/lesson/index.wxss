@@ -21,11 +21,11 @@
 }
 
 .lesson-kicker {
-  font-size: 36rpx;
-  font-weight: 400;
-  letter-spacing: 24rpx;
-  padding-left: 24rpx;
-  color: rgba(240, 230, 216, 0.82);
+  font-size: 48rpx;
+  font-weight: 600;
+  letter-spacing: 16rpx;
+  padding-left: 16rpx;
+  color: rgba(243, 234, 220, 0.92);
 }
 
 .lesson-sub {

@@ -78,3 +78,23 @@
   letter-spacing: 8rpx;
   color: #e0b577;
 }
+
+/* 轻触整行回堂敲击；右侧「详情」看记录、改愿、存壁纸 */
+.wish-foot {
+  margin-top: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.wish-go {
+  font-size: 24rpx;
+  letter-spacing: 4rpx;
+  color: rgba(224, 181, 119, 0.5);
+}
+.wish-detail {
+  margin-left: auto;
+  padding: 8rpx 0 8rpx 32rpx;
+  font-size: 26rpx;
+  letter-spacing: 4rpx;
+  color: rgba(224, 181, 119, 0.8);
+}

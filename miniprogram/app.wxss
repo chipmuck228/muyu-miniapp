@@ -36,19 +36,19 @@ page {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 88rpx;
-  padding: 8rpx 32rpx 20rpx;
+  min-height: 104rpx;
+  padding: 8rpx 32rpx 24rpx;
   box-sizing: border-box;
 }
 .wing-head.has-kicker {
   justify-content: space-between;
 }
 .wing-title {
-  font-size: 34rpx;
-  letter-spacing: 28rpx;
-  padding-right: 28rpx;
-  color: rgba(240, 230, 216, 0.82);
-  font-weight: 400;
+  font-size: 44rpx;
+  letter-spacing: 16rpx;
+  padding-right: 16rpx;
+  color: rgba(243, 234, 220, 0.92);
+  font-weight: 600;
 }
 .wing-kicker {
   width: 88rpx;
@@ -68,7 +68,8 @@ page {
   box-sizing: border-box;
 }
 .wing-title.slim {
-  max-width: 360rpx;
+  max-width: 400rpx;
+  font-size: 40rpx;
   letter-spacing: 8rpx;
   padding-right: 8rpx;
   overflow: hidden;

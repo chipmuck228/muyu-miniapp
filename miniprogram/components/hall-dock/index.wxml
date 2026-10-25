@@ -13,8 +13,8 @@
       >{{item.name}}</text>
     </view>
     <view class="exit-hair" hover-class="exit-hair-hover" catchtap="onHair" catchtouchmove="onNoop">
-      <view wx:if="{{mode === 'hall'}}" class="exit-chevron"></view>
-      <view wx:else class="exit-hair-line"></view>
+      <view class="exit-chevron"></view>
+      <text wx:if="{{mode === 'wing'}}" class="exit-label">回堂</text>
     </view>
   </view>
 </view>
