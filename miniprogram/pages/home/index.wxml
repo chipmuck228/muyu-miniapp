@@ -7,7 +7,7 @@
       <view class="dawn">
         <image wx:if="{{dawnSrc}}" class="dawn-paper" src="{{dawnSrc}}" mode="aspectFill" style="opacity: {{dawnSky}};" />
       </view>
-      <smoke-gl class="smoke-gl-fill" theme="{{theme}}" style="opacity: {{smokeFade}};" bind:risen="onSmokeRisen" />
+      <smoke-gl class="smoke-gl-fill" theme="{{theme}}" style="opacity: {{celebrateOn ? 0 : smokeFade}};" bind:risen="onSmokeRisen" />
 
       <view
         class="lesson-head enter-altar"
@@ -29,7 +29,7 @@
       </view>
 
       <view class="altar-fill enter-altar"></view>
-      <view class="lesson-title {{lessonTitleOn ? 'on' : ''}}">
+      <view class="lesson-title {{lessonTitleOn && !celebrateOn ? 'on' : ''}}">
         <text wx:for="{{lessonChars}}" wx:for-item="ch" wx:for-index="ci" wx:key="ci" class="lesson-ch" style="color: {{lessonColor}};">{{ch}}</text>
       </view>
       <canvas type="2d" id="lessonTitleCanvas" class="lesson-title-canvas"></canvas>
