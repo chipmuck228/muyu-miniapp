@@ -1,12 +1,10 @@
 {
   "usingComponents": {
     "hall-dock": "/components/hall-dock/index",
-    "smoke-gl": "/pkg-smoke/smoke-gl/index",
-    "muyu-3d": "/pkg-smoke/incense-smoke/index"
+    "smoke-gl": "/pkg-smoke/smoke-gl/index"
   },
   "componentPlaceholder": {
-    "smoke-gl": "view",
-    "muyu-3d": "view"
+    "smoke-gl": "view"
   },
   "disableScroll": true,
   "backgroundColor": "#0a0806",

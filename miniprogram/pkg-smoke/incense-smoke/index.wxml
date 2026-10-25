@@ -1,4 +1,4 @@
-<!-- 香案 XR：黄花梨木鱼（首页 muyu-3d）。青烟由 smoke-gl 画布绘制，此处不挂粒子。 -->
+<!-- 香案 XR：黄花梨木鱼。青烟改由页面 canvas 绘制，此处不再挂粒子。 -->
 <xr-scene id="xr-scene" render-system="alpha:true" bind:ready="onSceneReady">
   <xr-assets>
     <xr-asset-load type="gltf" asset-id="muyu-wood" src="/pkg-smoke/models/muyu.glb" />

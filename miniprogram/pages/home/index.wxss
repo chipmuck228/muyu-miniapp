@@ -542,38 +542,3 @@
   0%, 100% { color: rgba(243, 234, 220, 0.88); }
   50% { color: #ffd98a; text-shadow: 0 0 16rpx rgba(255, 217, 138, 0.55); }
 }
-
-/* 3D 木鱼：放在敲击热区正下方，热区透明盖在上面接收点击 */
-.knock-wrap {
-  height: 480rpx;
-}
-.muyu-stage {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  z-index: 2;
-  width: 520rpx;
-  height: 480rpx;
-  margin-left: -260rpx;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
-}
-.muyu-3d {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-.knock-pad {
-  bottom: 40rpx;
-  width: 400rpx;
-  height: 400rpx;
-  margin-left: -200rpx;
-  background: transparent;
-  box-shadow: none;
-}
-.theme-night .knock-pad,
-.theme-ink .knock-pad,
-.theme-dusk .knock-pad {
-  background: transparent;
-  box-shadow: none;
-}
