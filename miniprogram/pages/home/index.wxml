@@ -5,6 +5,9 @@
   <block wx:if="{{readyToKnock}}">
     <view class="home-stage">
       <view class="dawn">
+        <!-- 主题天色：常驻，不随进度变；进度推进时天空图再叠上来 -->
+        <view class="theme-sky"></view>
+        <view class="theme-glow"></view>
         <image wx:if="{{dawnSrc}}" class="dawn-paper" src="{{dawnSrc}}" mode="aspectFill" style="opacity: {{dawnSky}};" />
       </view>
       <smoke-gl class="smoke-gl-fill" theme="{{theme}}" style="opacity: {{celebrateOn || sheetOn ? 0 : smokeFade}};" bind:risen="onSmokeRisen" />

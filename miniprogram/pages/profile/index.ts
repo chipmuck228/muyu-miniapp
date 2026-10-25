@@ -27,13 +27,19 @@ interface DressOption {
   id: string
   name: string
   locked: boolean
+  /** 主题色块的背景样式；氛围没有 */
+  swatch: string
 }
 
-function dressList(list: { id: string; name: string; premium?: boolean }[], premium: boolean): DressOption[] {
+function dressList(
+  list: { id: string; name: string; premium?: boolean; swatch?: [string, string] }[],
+  premium: boolean
+): DressOption[] {
   return list.map((item) => ({
     id: item.id,
     name: item.name,
     locked: !!item.premium && !premium,
+    swatch: item.swatch ? 'background: linear-gradient(180deg, ' + item.swatch[0] + ' 0%, ' + item.swatch[1] + ' 100%);' : '',
   }))
 }
 

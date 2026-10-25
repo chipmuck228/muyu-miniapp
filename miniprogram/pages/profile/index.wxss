@@ -151,6 +151,26 @@
 .ambi-opt.locked {
   color: rgba(240, 230, 216, 0.22);
 }
+.theme-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-left: 24rpx;
+}
+.theme-swatch {
+  width: 56rpx;
+  height: 56rpx;
+  margin-bottom: 8rpx;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 2rpx solid rgba(240, 230, 216, 0.12);
+}
+.theme-opt.on .theme-swatch {
+  border: 4rpx solid #e8c98a;
+}
+.theme-opt.locked .theme-swatch {
+  opacity: 0.45;
+}
 .set-name {
   font-size: 32rpx;
   letter-spacing: 6rpx;
