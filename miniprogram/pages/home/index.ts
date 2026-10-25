@@ -116,6 +116,8 @@ Page({
     celebrate: null as CelebrateInfo | null,
     /** 圆满后切到下一个功课时，顶部短暂提示 */
     switchHint: '',
+    /** 每敲一下 +1，驱动 3D 木鱼回弹 */
+    strikeSeq: 0,
   },
 
   _floatSeq: 0,
@@ -510,7 +512,9 @@ Page({
     const nextTotal = d.totalMerit + 1
     this._titleCurrent = Math.min(this._titleGoal, this._titleCurrent + 1)
     if (this._lessonKind === 'random') this._randomHits = this._titleCurrent
-    this.setData(Object.assign(this.levelPatch(nextTotal, d.todayCount + 1), this.titleColorPatch()))
+    this.setData(
+      Object.assign(this.levelPatch(nextTotal, d.todayCount + 1), this.titleColorPatch(), { strikeSeq: d.strikeSeq + 1 })
+    )
     this.drawLessonTitle()
     if (this._queue) this._queue.tap(1)
   },
