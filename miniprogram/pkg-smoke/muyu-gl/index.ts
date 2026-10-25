@@ -125,7 +125,17 @@ Component({
               dpr = 2
             }
             try {
-              self._fish = startMuyuFish(item.node, item.width, item.height, dpr, this.data.material as MuyuMaterial)
+              console.log('[muyu] canvas', item.width, item.height)
+              self._fish = startMuyuFish(
+                item.node,
+                item.width,
+                item.height,
+                dpr,
+                this.data.material as MuyuMaterial,
+                () => {
+                  if (self._alive) this.setData({ fallback: true, canvasOn: false })
+                }
+              )
               if (this.data.paused) self._fish.setPaused(true)
               if (this.data.fallback) this.setData({ fallback: false })
             } catch (e) {

@@ -377,7 +377,9 @@ export function startMuyuFish(
   cssH: number,
   dpr: number,
   material: MuyuMaterial = 'zitan',
+  onError?: (e: any) => void,
 ): MuyuFishHandle {
+  console.log('[muyu] start', cssW, cssH, dpr, material)
   const ratio = Math.max(1, Math.min(dpr || 2, 2))
   const pixelW = Math.max(1, Math.round(cssW * ratio))
   const pixelH = Math.max(1, Math.round(cssH * ratio))
@@ -558,7 +560,15 @@ export function startMuyuFish(
   const tick = () => {
     timer = 0
     if (!running || paused) return
-    draw()
+    try {
+      draw()
+    } catch (e) {
+      // 帧里出错时循环会悄悄停掉、画面全空；报出来并交给组件切兜底
+      running = false
+      console.error('[muyu] draw failed', e)
+      if (onError) onError(e)
+      return
+    }
     timer = raf(tick)
   }
   tick()
