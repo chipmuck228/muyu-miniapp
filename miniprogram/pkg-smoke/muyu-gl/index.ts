@@ -15,6 +15,11 @@ Component({
       type: String,
       value: 'zitan',
     },
+    /** 暂停并清空画布（圆满弹窗打开时） */
+    paused: {
+      type: Boolean,
+      value: false,
+    },
   },
 
   data: {
@@ -30,6 +35,10 @@ Component({
     material(m: string) {
       const fish: MuyuFishHandle | null = (this as any)._fish
       if (fish) fish.setMaterial(m as MuyuMaterial)
+    },
+    paused(on: boolean) {
+      const fish: MuyuFishHandle | null = (this as any)._fish
+      if (fish) fish.setPaused(on)
     },
   },
 
@@ -63,6 +72,17 @@ Component({
   },
 
   methods: {
+    /** 页面转发的拖动增量（像素） */
+    rotateBy(dx: number, dy: number) {
+      const fish: MuyuFishHandle | null = (this as any)._fish
+      if (fish) fish.rotateBy(dx, dy)
+    },
+
+    setDragging(on: boolean) {
+      const fish: MuyuFishHandle | null = (this as any)._fish
+      if (fish) fish.setDragging(on)
+    },
+
     teardown() {
       const self: any = this
       self._booting = false
@@ -106,6 +126,7 @@ Component({
             }
             try {
               self._fish = startMuyuFish(item.node, item.width, item.height, dpr, this.data.material as MuyuMaterial)
+              if (this.data.paused) self._fish.setPaused(true)
               if (this.data.fallback) this.setData({ fallback: false })
             } catch (e) {
               console.error('[muyu] start failed', e)

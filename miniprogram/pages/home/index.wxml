@@ -38,15 +38,31 @@
       <view class="knock-wrap enter-altar">
         <!-- 木鱼只负责显示，不接收点击；圆满弹窗打开时隐去，免得画布盖在弹窗上 -->
         <view class="muyu-stage" style="opacity: {{celebrateOn ? 0 : 1}};">
-          <muyu-gl class="muyu-gl" strike="{{strikeSeq}}" />
+          <muyu-gl id="muyu" class="muyu-gl" strike="{{strikeSeq}}" material="{{material}}" paused="{{celebrateOn}}" />
         </view>
         <view
           class="knock-pad {{pulsing ? 'pulsing' : ''}}"
           hover-class="knock-hover"
           hover-stay-time="60"
           bindtap="onKnockTap"
+          bindtouchstart="onPadTouchStart"
+          bindtouchmove="onPadTouchMove"
+          bindtouchend="onPadTouchEnd"
+          bindtouchcancel="onPadTouchEnd"
         >
           <view class="ripple-ring {{rippleOn ? 'on' : ''}}"></view>
+        </view>
+        <!-- 木鱼材质：紫檀 / 黄花梨 / 琉璃 / 玉 -->
+        <view class="mat-dots">
+          <view
+            wx:for="{{materials}}"
+            wx:key="id"
+            class="mat-dot {{material === item.id ? 'on' : ''}}"
+            style="background: {{item.dot}};"
+            hover-class="mat-dot-hover"
+            data-id="{{item.id}}"
+            catchtap="onPickMaterial"
+          ></view>
         </view>
         <view class="floats-layer">
           <view

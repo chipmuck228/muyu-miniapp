@@ -30,6 +30,27 @@ interface CelebrateInfo {
 
 const SWITCH_HINT_MS = 2600
 
+// 木鱼材质（渲染参数在 pkg-smoke/muyuFish.ts；分包代码主包不能同步引用，这里只放名字和色点）
+const MATERIAL_KEY = 'muyu_material'
+const MATERIALS = [
+  { id: 'zitan', name: '紫檀', dot: 'radial-gradient(circle at 34% 26%, #a55014, #3d1a06)' },
+  { id: 'huali', name: '黄花梨', dot: 'radial-gradient(circle at 34% 26%, #e0a35a, #6b3d12)' },
+  { id: 'liuli', name: '琉璃', dot: 'radial-gradient(circle at 34% 26%, #8fd3ff, #0b4f8a)' },
+  { id: 'yu', name: '玉', dot: 'radial-gradient(circle at 34% 26%, #b8f0d0, #2f7a5c)' },
+]
+/** 手指移动超过这个距离（px）就算拖动，不算敲击 */
+const DRAG_SLOP = 6
+
+function savedMaterial(): string {
+  try {
+    const v = wx.getStorageSync(MATERIAL_KEY)
+    if (MATERIALS.some((m) => m.id === v)) return v
+  } catch {
+    // 用默认
+  }
+  return 'zitan'
+}
+
 function nextTextOf(p: LessonPick): string {
   return p.mode === 'wish' ? '接下来专注：' + p.name : '心愿都已圆满，接下来随机专注'
 }
@@ -118,6 +139,8 @@ Page({
     switchHint: '',
     /** 每敲一下 +1，驱动 3D 木鱼回弹 */
     strikeSeq: 0,
+    materials: MATERIALS,
+    material: savedMaterial(),
   },
 
   _floatSeq: 0,
@@ -141,6 +164,10 @@ Page({
   _celebrateId: '' as string,
   _nextPick: null as Promise<LessonPick> | null,
   _hintTimer: 0,
+  _touchX: 0,
+  _touchY: 0,
+  _touchMoved: 0,
+  _dragging: false,
   onLoad(options: Record<string, string | undefined>) {
     const app = getApp<IAppOption>()
     const scene =
@@ -497,7 +524,65 @@ Page({
   },
 
   onKnockTap() {
+    // 刚拖过木鱼：这次松手不算敲击
+    if (this._dragging) {
+      this._dragging = false
+      return
+    }
     this.knock()
+  },
+
+  muyuComp(): any {
+    const c: any = this.selectComponent('#muyu')
+    // 分包还没加载完时是占位 view，没有这些方法
+    return c && typeof c.rotateBy === 'function' ? c : null
+  },
+
+  onPadTouchStart(e: any) {
+    const t = e.touches && e.touches[0]
+    if (!t) return
+    this._touchX = t.clientX
+    this._touchY = t.clientY
+    this._touchMoved = 0
+    this._dragging = false
+  },
+
+  onPadTouchMove(e: any) {
+    const t = e.touches && e.touches[0]
+    if (!t) return
+    const dx = t.clientX - this._touchX
+    const dy = t.clientY - this._touchY
+    this._touchX = t.clientX
+    this._touchY = t.clientY
+    this._touchMoved += Math.abs(dx) + Math.abs(dy)
+    if (!this._dragging && this._touchMoved < DRAG_SLOP) return
+    const comp = this.muyuComp()
+    if (!comp) return
+    if (!this._dragging) {
+      this._dragging = true
+      comp.setDragging(true)
+    }
+    comp.rotateBy(dx, dy)
+  },
+
+  onPadTouchEnd() {
+    if (!this._dragging) return
+    const comp = this.muyuComp()
+    if (comp) comp.setDragging(false)
+    // 有的机型拖完不触发 tap，下次按下时会重置
+  },
+
+  onPickMaterial(e: any) {
+    const id = (e.currentTarget.dataset.id as string) || ''
+    const m = MATERIALS.find((x) => x.id === id)
+    if (!m || m.id === this.data.material) return
+    this.setData({ material: m.id })
+    try {
+      wx.setStorageSync(MATERIAL_KEY, m.id)
+    } catch {
+      // 下次启动回到默认材质
+    }
+    wx.showToast({ title: m.name, icon: 'none', duration: 900 })
   },
 
   knock() {

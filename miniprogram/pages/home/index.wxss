@@ -581,3 +581,29 @@
 .float-text {
   bottom: 72%;
 }
+
+/* 木鱼材质色点：竖排在左侧，避开中间的敲击热区 */
+.mat-dots {
+  position: absolute;
+  left: 40rpx;
+  bottom: 40rpx;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.mat-dot {
+  width: 40rpx;
+  height: 40rpx;
+  margin-top: 24rpx;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2rpx rgba(255, 255, 255, 0.18);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.mat-dot.on {
+  box-shadow: 0 0 0 2rpx #e0b577, 0 0 0 8rpx rgba(224, 181, 119, 0.2);
+  transform: scale(1.1);
+}
+.mat-dot-hover {
+  opacity: 0.75;
+}

@@ -3,12 +3,18 @@
 
 import { adaptForMiniProgram } from './threeAdapt'
 
-export type MuyuMaterial = 'zitan' | 'liuli' | 'yu'
+export type MuyuMaterial = 'zitan' | 'huali' | 'liuli' | 'yu'
 
 export interface MuyuFishHandle {
   /** 敲一下：下压回弹 + 轻微晃动 */
   strike: () => void
   setMaterial: (m: MuyuMaterial) => void
+  /** 拖动旋转（像素增量） */
+  rotateBy: (dx: number, dy: number) => void
+  /** 拖动中暂停自动摆动 */
+  setDragging: (on: boolean) => void
+  /** 暂停：停掉循环并清空画布（弹窗打开时用，画布是原生层，透明度压不住） */
+  setPaused: (on: boolean) => void
   stop: () => void
 }
 
@@ -17,15 +23,22 @@ interface MatPreset {
   emissive: number
   spec: number
   shininess: number
-  grain: number
+  /** 0 无纹理，1 木纹，2 玉絮 */
+  pattern: number
+  /** < 1 时半透明（琉璃） */
+  opacity: number
+  /** 边缘透光强度 */
+  rimGlow: number
 }
 
-// 颜色取自原型；没有透射，琉璃 / 玉靠高光和自发光近似
-const MATS: Record<MuyuMaterial, MatPreset> = {
-  zitan: { color: 0x7a3a10, emissive: 0x1a0800, spec: 0.35, shininess: 36, grain: 1 },
-  liuli: { color: 0x1f7fc4, emissive: 0x001a33, spec: 0.9, shininess: 90, grain: 0 },
-  yu: { color: 0x5fbf95, emissive: 0x02170f, spec: 0.6, shininess: 60, grain: 0 },
+// 颜色取自原型；WebGL1 没有透射，琉璃靠半透明 + 边缘光，玉靠絮状纹 + 柔光近似
+export const MUYU_MATS: Record<MuyuMaterial, MatPreset & { name: string }> = {
+  zitan: { name: '紫檀', color: 0x7a3a10, emissive: 0x1a0800, spec: 0.35, shininess: 36, pattern: 1, opacity: 1, rimGlow: 0.25 },
+  huali: { name: '黄花梨', color: 0xb07434, emissive: 0x1f1000, spec: 0.3, shininess: 30, pattern: 1, opacity: 1, rimGlow: 0.25 },
+  liuli: { name: '琉璃', color: 0x2a8fd6, emissive: 0x002244, spec: 1.1, shininess: 110, pattern: 0, opacity: 0.72, rimGlow: 1.2 },
+  yu: { name: '玉', color: 0x6fc9a0, emissive: 0x05241a, spec: 0.55, shininess: 50, pattern: 2, opacity: 1, rimGlow: 0.7 },
 }
+const MATS = MUYU_MATS
 
 const DARK_MOUTH = 0x120802
 const CUSHION = 0x1c1611
@@ -58,6 +71,8 @@ uniform vec3 uEmissive;
 uniform float uSpec;
 uniform float uShine;
 uniform float uGrain;
+uniform float uOpacity;
+uniform float uRimGlow;
 uniform vec3 uEye;
 uniform vec3 uKeyDir;
 uniform vec3 uKeyCol;
@@ -71,7 +86,11 @@ void main() {
   if (!gl_FrontFacing) n = -n;
   vec3 v = normalize(uEye - vW);
   vec3 base = uColor;
-  if (uGrain > 0.5) {
+  if (uGrain > 1.5) {
+    // 玉：低频絮状明暗
+    float c = sin(vL.x * 3.1 + sin(vL.y * 4.3) * 1.7) * sin(vL.z * 2.7 + sin(vL.x * 3.9) * 1.3);
+    base *= mix(0.82, 1.12, c * 0.5 + 0.5);
+  } else if (uGrain > 0.5) {
     float g = sin(vL.y * 34.0 + sin(vL.x * 2.3 + vL.z * 1.7) * 3.0 + sin(vL.z * 5.0) * 0.6);
     base *= mix(0.9, 1.05, g * 0.5 + 0.5);
   }
@@ -85,10 +104,12 @@ void main() {
   col += uSpec * (uKeyCol * sk + uRimCol * sr * 0.6);
   // 边缘一点暖光，像原型的 clearcoat
   float fres = pow(1.0 - max(dot(n, v), 0.0), 3.0);
-  col += uSpec * 0.25 * fres * uRimCol;
+  col += uRimGlow * fres * (uRimCol * 0.6 + base * 1.2);
   col += uEmissive * 0.6;
   col = col / (col + vec3(0.9)) * 1.5;
-  gl_FragColor = vec4(pow(clamp(col, 0.0, 1.0), vec3(1.0 / 2.2)), 1.0);
+  // 半透明时边缘更实，中间更透
+  float a = mix(uOpacity, 1.0, fres * (1.0 - uOpacity) * 1.6);
+  gl_FragColor = vec4(pow(clamp(col, 0.0, 1.0), vec3(1.0 / 2.2)), clamp(a, 0.0, 1.0));
 }
 `
 
@@ -376,7 +397,7 @@ export function startMuyuFish(
   const aNor = gl.getAttribLocation(prog, 'aNor')
   const U: Record<string, any> = {}
   ;[
-    'uMvp', 'uModel', 'uNormal', 'uColor', 'uEmissive', 'uSpec', 'uShine', 'uGrain', 'uEye',
+    'uMvp', 'uModel', 'uNormal', 'uColor', 'uEmissive', 'uSpec', 'uShine', 'uGrain', 'uOpacity', 'uRimGlow', 'uEye',
     'uKeyDir', 'uKeyCol', 'uRimDir', 'uRimCol', 'uFillDir', 'uFillCol', 'uAmb',
   ].forEach((n) => {
     U[n] = gl.getUniformLocation(prog, n)
@@ -405,7 +426,8 @@ export function startMuyuFish(
     },
     {
       buf: upload(capsule(0.11, 1.5, 16, 8)),
-      local: compose([0, 0.6, 0.28], [0, 0.07, Math.PI / 2], [1, 1, 1]),
+      // 原型 y=0.6 时口缝只在两端露头，俯视像两个黑点；抬到 0.66 露出完整一道
+      local: compose([0, 0.66, 0.28], [0, 0.07, Math.PI / 2], [1, 1, 1]),
       kind: 'fixed',
       color: DARK_MOUTH,
     },
@@ -417,8 +439,9 @@ export function startMuyuFish(
     },
   ]
 
-  const eye = [0, 1.9, 7.9]
-  const view = lookAt(eye, [0, -0.15, 0])
+  // 斜上方俯视，能看到顶上的口缝和唇沿（原型是 0, 1.9, 7.9 近乎平视）
+  const eye = [0, 4.6, 6.6]
+  const view = lookAt(eye, [0, -0.3, 0])
   const proj = perspective(34, cssW / cssH, 0.1, 100)
   const vp = mul(proj, view)
 
@@ -437,6 +460,12 @@ export function startMuyuFish(
   gl.uniform3fv(U.uAmb, scaleCol(0xffe6bd, 0.22))
 
   let mat: MatPreset = MATS[material] || MATS.zitan
+  let userYaw = 0
+  let userPitch = 0
+  let dragging = false
+  let paused = false
+  let swayT = 0
+  let lastT = 0
 
   gl.viewport(0, 0, pixelW, pixelH)
   gl.enable(gl.DEPTH_TEST)
@@ -455,49 +484,80 @@ export function startMuyuFish(
     else clearTimeout(id)
   }
 
+  const drawPart = (p: Part, group: M4) => {
+    const model = mul(group, p.local)
+    gl.uniformMatrix4fv(U.uModel, false, model)
+    gl.uniformMatrix4fv(U.uMvp, false, mul(vp, model))
+    gl.uniformMatrix3fv(U.uNormal, false, normalMat(model))
+    if (p.kind === 'body') {
+      gl.uniform3fv(U.uColor, hexToLinear(mat.color))
+      gl.uniform3fv(U.uEmissive, hexToLinear(mat.emissive))
+      gl.uniform1f(U.uSpec, mat.spec)
+      gl.uniform1f(U.uShine, mat.shininess)
+      gl.uniform1f(U.uGrain, mat.pattern)
+      gl.uniform1f(U.uOpacity, mat.opacity)
+      gl.uniform1f(U.uRimGlow, mat.rimGlow)
+    } else {
+      gl.uniform3fv(U.uColor, hexToLinear(p.color || 0))
+      gl.uniform3fv(U.uEmissive, [0, 0, 0])
+      gl.uniform1f(U.uSpec, 0.05)
+      gl.uniform1f(U.uShine, 8)
+      gl.uniform1f(U.uGrain, 0)
+      gl.uniform1f(U.uOpacity, 1)
+      gl.uniform1f(U.uRimGlow, 0)
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, p.buf.pos)
+    gl.enableVertexAttribArray(aPos)
+    gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0)
+    gl.bindBuffer(gl.ARRAY_BUFFER, p.buf.nor)
+    gl.enableVertexAttribArray(aNor)
+    gl.vertexAttribPointer(aNor, 3, gl.FLOAT, false, 0, 0)
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, p.buf.idx)
+    gl.drawElements(gl.TRIANGLES, p.buf.count, gl.UNSIGNED_SHORT, 0)
+  }
+
   const draw = () => {
     const t = (Date.now() - t0) / 1000
+    const dt = Math.min(0.1, Math.max(0, t - lastT))
+    lastT = t
+    if (!dragging) swayT += dt
     const since = t - strikeAt
     const k = Math.max(0, 1 - since / 0.34)
     const press = Math.sin(k * Math.PI) * 0.085
     const s = 1.06 * (1 - press)
-    // 原型是持续自转；这里改成轻轻左右摆，口缝始终朝前
-    const sway = Math.sin(t * 0.5) * 0.28
-    const group = compose([0, -press * 0.5, 0], [0, sway, Math.sin(since * 14) * 0.02 * k], [s, s, s])
+    // 原型是持续自转；这里在用户拖到的角度上轻轻左右摆，口缝大体朝前
+    const sway = Math.sin(swayT * 0.5) * 0.22
+    const group = compose(
+      [0, -press * 0.5, 0],
+      [userPitch, userYaw + sway, Math.sin(since * 14) * 0.02 * k],
+      [s, s, s]
+    )
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+    gl.disable(gl.BLEND)
+    gl.depthMask(true)
+    gl.disable(gl.CULL_FACE)
+    const clear = mat.opacity >= 1
+    // 先画不透明的部分；琉璃的木身/唇沿最后半透明叠上去
     for (let i = 0; i < parts.length; i++) {
-      const p = parts[i]
-      const model = mul(group, p.local)
-      gl.uniformMatrix4fv(U.uModel, false, model)
-      gl.uniformMatrix4fv(U.uMvp, false, mul(vp, model))
-      gl.uniformMatrix3fv(U.uNormal, false, normalMat(model))
-      if (p.kind === 'body') {
-        gl.uniform3fv(U.uColor, hexToLinear(mat.color))
-        gl.uniform3fv(U.uEmissive, hexToLinear(mat.emissive))
-        gl.uniform1f(U.uSpec, mat.spec)
-        gl.uniform1f(U.uShine, mat.shininess)
-        gl.uniform1f(U.uGrain, mat.grain)
-      } else {
-        gl.uniform3fv(U.uColor, hexToLinear(p.color || 0))
-        gl.uniform3fv(U.uEmissive, [0, 0, 0])
-        gl.uniform1f(U.uSpec, 0.05)
-        gl.uniform1f(U.uShine, 8)
-        gl.uniform1f(U.uGrain, 0)
+      if (clear || parts[i].kind !== 'body') drawPart(parts[i], group)
+    }
+    if (!clear) {
+      gl.enable(gl.BLEND)
+      gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+      gl.enable(gl.CULL_FACE)
+      gl.cullFace(gl.BACK)
+      gl.depthMask(false)
+      for (let i = 0; i < parts.length; i++) {
+        if (parts[i].kind === 'body') drawPart(parts[i], group)
       }
-      gl.bindBuffer(gl.ARRAY_BUFFER, p.buf.pos)
-      gl.enableVertexAttribArray(aPos)
-      gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0)
-      gl.bindBuffer(gl.ARRAY_BUFFER, p.buf.nor)
-      gl.enableVertexAttribArray(aNor)
-      gl.vertexAttribPointer(aNor, 3, gl.FLOAT, false, 0, 0)
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, p.buf.idx)
-      gl.drawElements(gl.TRIANGLES, p.buf.count, gl.UNSIGNED_SHORT, 0)
+      gl.depthMask(true)
     }
   }
 
   const tick = () => {
-    if (!running) return
+    timer = 0
+    if (!running || paused) return
     draw()
     timer = raf(tick)
   }
@@ -509,6 +569,25 @@ export function startMuyuFish(
     },
     setMaterial(m: MuyuMaterial) {
       mat = MATS[m] || MATS.zitan
+    },
+    rotateBy(dx: number, dy: number) {
+      userYaw += dx * 0.008
+      userPitch = Math.max(-0.35, Math.min(0.5, userPitch + dy * 0.005))
+    },
+    setDragging(on: boolean) {
+      dragging = on
+    },
+    setPaused(on: boolean) {
+      if (on === paused) return
+      paused = on
+      if (on) {
+        if (timer) caf(timer)
+        timer = 0
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+      } else if (running && !timer) {
+        lastT = (Date.now() - t0) / 1000
+        tick()
+      }
     },
     stop() {
       running = false
