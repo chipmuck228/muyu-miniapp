@@ -62,3 +62,19 @@
   height: 100%;
   background: rgba(224, 181, 119, 0.55);
 }
+
+.wishes-page .wing-kicker {
+  width: 140rpx;
+}
+.add-kicker {
+  text-align: right;
+  white-space: nowrap;
+  color: rgba(224, 181, 119, 0.8);
+}
+.wishes-page .empty-go {
+  margin-top: 36rpx;
+  padding: 12rpx 8rpx;
+  font-size: 26rpx;
+  letter-spacing: 8rpx;
+  color: #e0b577;
+}

@@ -49,7 +49,10 @@ Page({
       const fulfilled = list.filter((w) => w.status === 'fulfilled')
       const completed = list.filter((w) => w.status === 'completed')
       const certs = fulfilled.concat(completed).map(toCert)
-      const keepId = this.data.cert && this.data.cert._id
+      const app = getApp<IAppOption>()
+      const focusId = app.globalData.certFocusId
+      app.globalData.certFocusId = null
+      const keepId = focusId || (this.data.cert && this.data.cert._id)
       const pick = certs.find((c) => c._id === keepId) || certs[0] || null
       if (!pick) {
         this.setData({ loading: false, hasCert: false, certs: [], cert: null, certPath: '' })

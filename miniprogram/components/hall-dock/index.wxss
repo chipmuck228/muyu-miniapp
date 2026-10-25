@@ -109,3 +109,24 @@
 .exit-hair-hover {
   opacity: 0.7;
 }
+
+/* 香案：细线换成上拉提示，收起时轻轻浮动，展开后翻转向下 */
+.exit-chevron {
+  width: 22rpx;
+  height: 22rpx;
+  margin-top: 12rpx;
+  border-left: 3rpx solid rgba(224, 181, 119, 0.7);
+  border-top: 3rpx solid rgba(224, 181, 119, 0.7);
+  transform: rotate(45deg);
+  animation: chevron-hint 2.4s ease-in-out infinite;
+  transition: transform 0.48s ease;
+}
+.exit-dock.open .exit-chevron {
+  margin-top: 0;
+  transform: rotate(225deg);
+  animation: none;
+}
+@keyframes chevron-hint {
+  0%, 100% { transform: translateY(0) rotate(45deg); opacity: 0.55; }
+  50% { transform: translateY(-8rpx) rotate(45deg); opacity: 1; }
+}

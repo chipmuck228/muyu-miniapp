@@ -103,5 +103,5 @@
     </view>
   </scroll-view>
 
-  <hall-dock mode="wing" current="{{4}}" />
+  <hall-dock mode="wing" current="{{3}}" />
 </view>

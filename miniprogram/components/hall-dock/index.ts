@@ -2,9 +2,8 @@ import { concealTabBar, safeBottomPx } from '../../utils/util'
 
 const LINKS = [
   { index: 1, url: '/pages/wishes/index', name: '心愿' },
-  { index: 2, url: '/pages/wish-form/index', name: '立愿' },
-  { index: 3, url: '/pages/certificate/index', name: '证书' },
-  { index: 4, url: '/pages/profile/index', name: '静心' },
+  { index: 2, url: '/pages/certificate/index', name: '证书' },
+  { index: 3, url: '/pages/profile/index', name: '静心' },
 ]
 
 function hostPage(): any {

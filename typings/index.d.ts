@@ -18,6 +18,8 @@ interface IAppOption {
     knockWishId?: string | null
     /** 今日功课标题：心愿名，或「随机专注」 */
     knockWishName?: string | null
+    /** 圆满弹窗点「查看证书」：证书页优先展示这张 */
+    certFocusId?: string | null
     /** 扫码进入时的 scene，供首页首次触点归因 */
     pendingChannelScene?: string | null
   }

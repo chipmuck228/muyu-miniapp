@@ -73,6 +73,10 @@ Page({
     this.load(true)
   },
 
+  goNew() {
+    wx.navigateTo({ url: '/pages/wish-form/index' })
+  },
+
   openDetail(e: any) {
     const id = e.currentTarget.dataset.id
     if (id) {

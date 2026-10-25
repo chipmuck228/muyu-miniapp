@@ -8,6 +8,7 @@ import { DAWN_FILE_ID, resolveCloudFile } from '../../utils/cloudFile'
 import { startAmbience, stopAmbience } from '../../utils/ambience'
 import { AmbienceId } from '../../utils/audioCatalog'
 import { parseTheme, themeEnds, ThemeId } from '../../utils/theme'
+import { applyLesson, nextLesson, LessonPick, RANDOM_NAME } from '../../utils/lesson'
 
 interface FloatItem {
   key: number
@@ -18,6 +19,12 @@ interface FloatItem {
 
 type EnterPhase = 'cover' | 'reveal' | 'done'
 type EnterKind = 'first' | 'back'
+
+interface CelebrateInfo {
+  name: string
+  goalText: string
+  thumbUrl: string
+}
 
 function bindWishId(): string | null {
   const app = getApp<IAppOption>()
@@ -54,7 +61,7 @@ function lessonTitleOf(): string {
   if (app.globalData.knockMode === 'wish' && app.globalData.knockWishId) {
     return app.globalData.knockWishName || '心愿'
   }
-  return '随机专注'
+  return RANDOM_NAME
 }
 
 function lessonCharsOf(name: string): string[] {
@@ -91,6 +98,14 @@ Page({
     dawnSky: 0,
     smokeFade: 1,
     dawnSrc: '',
+    // 顶部当前功课：心愿显示 进度/目标，随机专注显示今日次数
+    headWish: false,
+    headReady: false,
+    headCur: 0,
+    headGoal: 0,
+    headPct: 0,
+    celebrateOn: false,
+    celebrate: null as CelebrateInfo | null,
   },
 
   _floatSeq: 0,
@@ -111,6 +126,7 @@ Page({
   _titleCtx: null as any,
   _titleCssW: 0,
   _titleCssH: 0,
+  _celebrateId: '' as string,
   onLoad(options: Record<string, string | undefined>) {
     const app = getApp<IAppOption>()
     const scene =
@@ -138,25 +154,7 @@ Page({
       () => this._wishId,
       (r) => {
         if (!this._alive) return
-        if (r.completed) {
-          this._wishId = null
-          app.globalData.knockWishId = null
-          app.globalData.knockMode = 'random'
-          app.globalData.knockWishName = '随机专注'
-          this._lessonKind = 'random'
-          this._randomHits = 0
-          this._titleCurrent = 0
-          this._titleGoal = RANDOM_GOAL
-          this.setData(
-            Object.assign(
-              lessonTitlePatch('随机专注'),
-              { lessonTitleOn: true },
-              scenePatch(0, RANDOM_GOAL, parseTheme(this.data.theme))
-            )
-          )
-          this.drawLessonTitle()
-          wx.showToast({ title: '心愿已成 · 惊喜已启', icon: 'none' })
-        }
+        if (r.completed) this.celebrateWish()
         this.setData(this.levelPatch(r.totalMerit, r.todayCount))
       },
       () => {
@@ -184,7 +182,13 @@ Page({
       this.openLesson()
       return
     }
+    const prevWishId = this._wishId
     this._wishId = bindWishId()
+    if (this._wishId !== prevWishId && this._lessonKind === 'wish') {
+      // 从今日功课换了心愿：旧进度作废，等新心愿拉回来再显示数字
+      this._lessonKind = ''
+      this._titleCurrent = 0
+    }
     this.setData({ readyToKnock: true })
     if (!this.data.dawnSrc) this.loadDawn()
     ensureKnock()
@@ -229,11 +233,11 @@ Page({
     }
   },
 
-  openLesson() {
+  openLesson(fromHome?: boolean) {
     if (this._openingLesson) return
     this._openingLesson = true
     wx.navigateTo({
-      url: '/pages/lesson/index',
+      url: '/pages/lesson/index' + (fromHome ? '?from=home' : ''),
       complete: () => {
         this._openingLesson = false
       },
@@ -272,7 +276,7 @@ Page({
         if (!this._alive) return
         this._hasEntered = true
         this.setData({ enterPhase: 'done' })
-        if (this.data.autoMode) this.startAuto()
+        if (this.data.autoMode && !this.data.celebrateOn) this.startAuto()
       }, 560)
     }
     const arm = () => {
@@ -302,7 +306,15 @@ Page({
   },
 
   titleColorPatch() {
-    return scenePatch(this._titleCurrent, this._titleGoal, parseTheme(this.data.theme))
+    const isWish = getApp<IAppOption>().globalData.knockMode === 'wish'
+    const ready = this._lessonKind === 'wish'
+    return Object.assign(scenePatch(this._titleCurrent, this._titleGoal, parseTheme(this.data.theme)), {
+      headWish: isWish,
+      headReady: ready,
+      headCur: isWish ? this._titleCurrent : 0,
+      headGoal: isWish ? this._titleGoal : 0,
+      headPct: isWish ? Math.round(progressT(this._titleCurrent, this._titleGoal) * 1000) / 10 : 0,
+    })
   },
 
   applyTitleProgress() {
@@ -327,17 +339,26 @@ Page({
     const app = getApp<IAppOption>()
     const id = app.globalData.knockWishId
     if (app.globalData.knockMode === 'wish' && id) {
-      this._lessonKind = 'wish'
+      // 拉到心愿进度后才算就绪，避免顶部先闪出上一个心愿的数字
       try {
         const res = await fetchWishDetail(id)
-        if (!this._alive || !res.wish) return
+        if (!this._alive) return
+        if (!res.wish || res.wish.status !== 'ongoing') {
+          // 上次的心愿已圆满或已删除：接着下一个进行中的心愿
+          this.switchLesson(await nextLesson(id))
+          return
+        }
         const name = res.wish.name || '心愿'
-        app.globalData.knockWishName = name
+        if (name !== app.globalData.knockWishName) {
+          applyLesson({ mode: 'wish', wishId: id, name })
+        }
+        this._lessonKind = 'wish'
         this._titleGoal = Math.max(1, res.wish.goal || 1)
         this._titleCurrent = Math.max(0, Math.min(this._titleGoal, res.wish.current || 0))
         this.setData(Object.assign(lessonTitlePatch(name), this.titleColorPatch()))
         this.drawLessonTitle()
       } catch {
+        this._lessonKind = 'wish'
         this.applyTitleProgress()
       }
       return
@@ -452,8 +473,9 @@ Page({
         scenePatch(this._titleCurrent, this._titleGoal, s.theme)
       )
     )
+    this.setData(this.titleColorPatch())
     this.drawLessonTitle()
-    if (s.autoMode && !this.entering()) this.startAuto()
+    if (s.autoMode && !this.entering() && !this.data.celebrateOn) this.startAuto()
     else if (!s.autoMode) this.stopAuto()
     startAmbience(s.ambience)
   },
@@ -463,7 +485,7 @@ Page({
   },
 
   knock() {
-    if (!this._alive || this.entering() || !this.data.readyToKnock) return
+    if (!this._alive || this.entering() || !this.data.readyToKnock || this.data.celebrateOn) return
     const d = this.data
     playKnock(d.soundOn)
     vibrate(d.vibrateOn)
@@ -532,6 +554,70 @@ Page({
     this._pulseTimer = setTimeout(() => {
       if (this._alive) this.setData({ pulsing: false })
     }, 240)
+  },
+
+  switchLesson(p: LessonPick) {
+    if (!this._alive) return
+    applyLesson(p)
+    this._wishId = bindWishId()
+    this._lessonKind = ''
+    this._randomHits = 0
+    this._titleCurrent = 0
+    this._titleGoal = p.mode === 'wish' ? 1 : RANDOM_GOAL
+    this.syncTitleProgress()
+  },
+
+  onOpenLessonPanel() {
+    if (this.entering() || this.data.celebrateOn) return
+    this.openLesson(true)
+  },
+
+  /** 心愿敲满：停住敲击，弹出圆满；关掉时再切到下一个心愿 */
+  celebrateWish() {
+    const id = this._wishId
+    if (!id || this._celebrateId) return
+    this._celebrateId = id
+    this._wishId = null
+    this.stopAuto()
+    this.setData({
+      celebrateOn: true,
+      celebrate: {
+        name: this.data.lessonTitle || '心愿',
+        goalText: String(this._titleGoal),
+        thumbUrl: '',
+      },
+    })
+    fetchWishDetail(id)
+      .then((res) => {
+        const thumbUrl = (res.wish && res.wish.thumbUrl) || ''
+        if (this._alive && thumbUrl && this._celebrateId === id && this.data.celebrate) {
+          this.setData({ 'celebrate.thumbUrl': thumbUrl })
+        }
+      })
+      .catch(() => {})
+  },
+
+  endCelebrate(): string {
+    const id = this._celebrateId
+    this._celebrateId = ''
+    this.setData({ celebrateOn: false })
+    return id
+  },
+
+  async onCelebrateContinue() {
+    const id = this.endCelebrate()
+    this.switchLesson(await nextLesson(id))
+    if (this.data.autoMode && !this.entering()) this.startAuto()
+  },
+
+  async onCelebrateCert() {
+    const id = this.endCelebrate()
+    const app = getApp<IAppOption>()
+    app.globalData.certFocusId = id
+    app.globalData.homeWillReenter = true
+    concealTabBar(this)
+    wx.switchTab({ url: '/pages/certificate/index' })
+    applyLesson(await nextLesson(id))
   },
 
   noop() {},

@@ -1,7 +1,7 @@
 <!-- 立 / 改心愿 -->
 <view class="page wing-page form-page">
   <view class="wing-head has-kicker" style="padding-top: {{statusBarHeight}}px;">
-    <text class="wing-kicker" hover-class="hover-dim" bindtap="doCancel">回堂</text>
+    <text class="wing-kicker" hover-class="hover-dim" bindtap="doCancel">返回</text>
     <text class="wing-title">{{isEdit ? '改 愿' : '立 愿'}}</text>
     <text class="wing-kicker ghost"></text>
   </view>
@@ -60,5 +60,4 @@
     </view>
   </scroll-view>
 
-  <hall-dock mode="wing" current="{{2}}" />
 </view>

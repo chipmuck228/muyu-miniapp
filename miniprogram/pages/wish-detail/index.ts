@@ -1,7 +1,8 @@
 // 心愿详情
-import { fetchWishDetail, fulfillWish, fetchPaperOrigin, Wish } from '../../utils/cloud'
+import { fetchWishDetail, fetchPaperOrigin, Wish } from '../../utils/cloud'
 import { STATUS_TEXT, STATUS_CLS, percentOf } from '../../utils/constants'
 import { setFormState } from '../../utils/formState'
+import { applyLesson } from '../../utils/lesson'
 import { fmtMD, todayStr, offsetDate, fmtInt, winInfo, concealTabBar } from '../../utils/util'
 
 interface BarItem {
@@ -91,7 +92,6 @@ Page({
     records: [] as RecordVM[],
     canKnock: false,
     canEdit: false,
-    showFulfill: false,
     canSave: false,
     revealed: false,
     thumbUrl: '',
@@ -102,6 +102,7 @@ Page({
 
   _alive: false,
   _revealTimer: 0 as any,
+  _needReload: false,
 
   onLoad(options: Record<string, string | undefined>) {
     const app = getApp<IAppOption>()
@@ -120,6 +121,14 @@ Page({
       wishId,
     })
     this.load()
+  },
+
+  onShow() {
+    // 从修改页返回：重新拉取
+    if (this._needReload) {
+      this._needReload = false
+      this.load()
+    }
   },
 
   onUnload() {
@@ -159,7 +168,6 @@ Page({
         records,
         canKnock: vm.status === 'ongoing',
         canEdit: vm.status !== 'fulfilled',
-        showFulfill: vm.status === 'completed',
         canSave: revealed,
         revealed,
         thumbUrl,
@@ -182,41 +190,12 @@ Page({
   goAltar() {
     const w = this.data.wish
     if (!w || w.status !== 'ongoing') return
-    const app = getApp<IAppOption>()
-    app.globalData.lessonChosen = true
-    app.globalData.knockMode = 'wish'
-    app.globalData.knockWishId = w._id
-    app.globalData.knockWishName = w.name
-    app.globalData.homeEnterAnim = true
+    applyLesson({ mode: 'wish', wishId: w._id, name: w.name })
+    getApp<IAppOption>().globalData.homeEnterAnim = true
     concealTabBar(this)
     wx.switchTab({ url: '/pages/home/index' })
   },
 
-  doFulfill() {
-    const w = this.data.wish
-    if (!w || w.status !== 'completed') return
-    wx.showModal({
-      title: '了结确认',
-      content: '心愿已成，是否正式了结并生成证书？',
-      confirmText: '了结',
-      confirmColor: '#c0955f',
-      success: async (res) => {
-        if (!res.confirm) return
-        wx.showLoading({ title: '了结中', mask: true })
-        try {
-          await fulfillWish(w._id)
-          wx.hideLoading()
-          wx.showToast({ title: '已了结', icon: 'success' })
-          setTimeout(() => {
-            wx.switchTab({ url: '/pages/certificate/index' })
-          }, 600)
-        } catch (e: any) {
-          wx.hideLoading()
-          wx.showToast({ title: (e && e.message) || '了结失败', icon: 'none' })
-        }
-      },
-    })
-  },
 
   savePaper() {
     const w = this.data.wish
@@ -278,6 +257,7 @@ Page({
     const w = this.data.wish
     if (!w || w.status === 'fulfilled') return
     setFormState({ mode: 'edit', wish: w as any })
-    wx.switchTab({ url: '/pages/wish-form/index' })
+    this._needReload = true
+    wx.navigateTo({ url: '/pages/wish-form/index' })
   },
 })

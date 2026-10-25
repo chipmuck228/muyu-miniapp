@@ -134,3 +134,27 @@
   from { opacity: 0; transform: translateY(16rpx); }
   to { opacity: 1; transform: none; }
 }
+
+.lesson-back {
+  position: absolute;
+  left: 40rpx;
+  z-index: 2;
+  padding: 12rpx 8rpx;
+  font-size: 24rpx;
+  letter-spacing: 4rpx;
+  color: rgba(224, 181, 119, 0.55);
+}
+
+.wish-row.cur .wish-name {
+  color: #e8c98a;
+}
+.wish-row.cur .wish-mark {
+  color: rgba(232, 201, 138, 0.8);
+}
+
+.wish-add {
+  padding: 28rpx 8rpx;
+  font-size: 26rpx;
+  letter-spacing: 6rpx;
+  color: rgba(224, 181, 119, 0.7);
+}

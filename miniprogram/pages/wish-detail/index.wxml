@@ -64,9 +64,8 @@
     </view>
   </scroll-view>
 
-  <view class="foot" wx:if="{{!loading && wish && (canKnock || showFulfill || canSave)}}" style="padding-bottom: {{safeBottom}}px;">
+  <view class="foot" wx:if="{{!loading && wish && (canKnock || canSave)}}" style="padding-bottom: {{safeBottom}}px;">
     <text wx:if="{{canKnock}}" class="foot-act" hover-class="hover-dim" bindtap="goAltar">回堂叩击</text>
-    <text wx:if="{{showFulfill}}" class="foot-act" hover-class="hover-dim" bindtap="doFulfill">了结</text>
     <text wx:if="{{canSave}}" class="foot-act {{savingPaper ? 'off' : ''}}" hover-class="hover-dim" bindtap="savePaper">存入相册</text>
   </view>
 

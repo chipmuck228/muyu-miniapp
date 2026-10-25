@@ -36,10 +36,6 @@
         "text": "心愿"
       },
       {
-        "pagePath": "pages/wish-form/index",
-        "text": "立愿"
-      },
-      {
         "pagePath": "pages/certificate/index",
         "text": "证书"
       },

@@ -44,5 +44,5 @@
   </scroll-view>
 
   <canvas type="2d" id="certCanvas" class="hidden-canvas"></canvas>
-  <hall-dock mode="wing" current="{{3}}" />
+  <hall-dock mode="wing" current="{{2}}" />
 </view>

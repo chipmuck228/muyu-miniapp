@@ -1,7 +1,9 @@
 <!-- 心愿：侧殿列表 -->
 <view class="page wing-page wishes-page">
-  <view class="wing-head" style="padding-top: {{statusBarHeight}}px;">
+  <view class="wing-head has-kicker" style="padding-top: {{statusBarHeight}}px;">
+    <text class="wing-kicker ghost">＋</text>
     <text class="wing-title">心 愿</text>
+    <text class="wing-kicker add-kicker" hover-class="hover-dim" bindtap="goNew">＋ 立愿</text>
   </view>
 
   <scroll-view
@@ -36,6 +38,7 @@
       <view class="empty" wx:elif="{{!loading}}">
         <text class="empty-title">尚未立愿</text>
         <text class="empty-sub">完成后另有惊喜</text>
+        <text class="empty-go" hover-class="hover-dim" bindtap="goNew">去立愿</text>
       </view>
     </view>
   </scroll-view>
