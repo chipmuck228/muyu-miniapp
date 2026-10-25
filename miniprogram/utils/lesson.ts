@@ -25,13 +25,15 @@ export function loadLesson(): LessonPick | null {
   return null
 }
 
-export function applyLesson(p: LessonPick) {
+/** persist=false：只用于本次（首次打开还没选时先按随机专注摆好香案） */
+export function applyLesson(p: LessonPick, persist = true) {
   const app = getApp<IAppOption>()
   const isWish = p.mode === 'wish' && !!p.wishId
   app.globalData.lessonChosen = true
   app.globalData.knockMode = isWish ? 'wish' : 'random'
   app.globalData.knockWishId = isWish ? p.wishId : null
   app.globalData.knockWishName = isWish ? p.name || '心愿' : RANDOM_NAME
+  if (!persist) return
   try {
     wx.setStorageSync(STORE_KEY, {
       mode: app.globalData.knockMode,

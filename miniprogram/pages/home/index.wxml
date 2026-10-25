@@ -7,7 +7,7 @@
       <view class="dawn">
         <image wx:if="{{dawnSrc}}" class="dawn-paper" src="{{dawnSrc}}" mode="aspectFill" style="opacity: {{dawnSky}};" />
       </view>
-      <smoke-gl class="smoke-gl-fill" theme="{{theme}}" style="opacity: {{celebrateOn ? 0 : smokeFade}};" bind:risen="onSmokeRisen" />
+      <smoke-gl class="smoke-gl-fill" theme="{{theme}}" style="opacity: {{celebrateOn || sheetOn ? 0 : smokeFade}};" bind:risen="onSmokeRisen" />
 
       <view
         class="lesson-head enter-altar {{switchHint ? 'switched' : ''}}"
@@ -30,15 +30,15 @@
       </view>
 
       <view class="altar-fill enter-altar"></view>
-      <view class="lesson-title {{lessonTitleOn && !celebrateOn ? 'on' : ''}}">
+      <view class="lesson-title {{lessonTitleOn && !celebrateOn && !sheetOn ? 'on' : ''}}">
         <text wx:for="{{lessonChars}}" wx:for-item="ch" wx:for-index="ci" wx:key="ci" class="lesson-ch" style="color: {{lessonColor}};">{{ch}}</text>
       </view>
       <canvas type="2d" id="lessonTitleCanvas" class="lesson-title-canvas"></canvas>
 
       <view class="knock-wrap enter-altar">
         <!-- 木鱼只负责显示，不接收点击；圆满弹窗打开时隐去，免得画布盖在弹窗上 -->
-        <view class="muyu-stage" style="opacity: {{celebrateOn ? 0 : 1}};">
-          <muyu-gl id="muyu" class="muyu-gl" strike="{{strikeSeq}}" material="{{material}}" paused="{{celebrateOn}}" />
+        <view class="muyu-stage" style="opacity: {{celebrateOn || sheetOn ? 0 : 1}};">
+          <muyu-gl id="muyu" class="muyu-gl" strike="{{strikeSeq}}" material="{{material}}" paused="{{celebrateOn || sheetOn}}" />
         </view>
         <view
           class="knock-pad {{pulsing ? 'pulsing' : ''}}"
@@ -77,6 +77,39 @@
       <hall-dock mode="hall" current="{{0}}" />
     </view>
   </block>
+
+  <!-- 今日功课：底部面板，切换心愿 / 随机专注 / 立新愿 -->
+  <view class="sheet-mask" wx:if="{{sheetOn}}" catchtouchmove="noop" bindtap="closeSheet"></view>
+  <view class="lesson-sheet" wx:if="{{sheetOn}}" catchtouchmove="noop">
+    <view class="sheet-head">
+      <view class="sheet-titles">
+        <text class="sheet-title">今日功课</text>
+        <text class="sheet-sub">{{sheetFirst ? '一念既起 · 选一件事来专注' : '一念既起 · 功课自成'}}</text>
+      </view>
+      <text class="sheet-close" hover-class="sheet-hover" bindtap="closeSheet">收起</text>
+    </view>
+    <scroll-view class="sheet-list" scroll-y enhanced show-scrollbar="{{false}}">
+      <text class="sheet-loading" wx:if="{{sheetLoading}}">正在取心愿…</text>
+      <view
+        wx:for="{{sheetRows}}"
+        wx:key="_id"
+        class="sheet-row {{item.cur ? 'cur' : ''}}"
+        hover-class="sheet-hover"
+        data-id="{{item._id}}"
+        bindtap="onSheetPick"
+      >
+        <text class="sheet-name">{{item.name}}</text>
+        <text class="sheet-mark">{{item.cur ? '当前 · ' : ''}}{{item.mark}}</text>
+      </view>
+      <view class="sheet-row {{sheetRandomCur ? 'cur' : ''}}" hover-class="sheet-hover" bindtap="onSheetRandom">
+        <text class="sheet-name">随机专注</text>
+        <text class="sheet-mark">{{sheetRandomCur ? '当前 · ' : ''}}不记心愿，随缘叩击</text>
+      </view>
+      <view class="sheet-row sheet-new" hover-class="sheet-hover" bindtap="onSheetNew">
+        <text class="sheet-name">＋ 立新愿</text>
+      </view>
+    </scroll-view>
+  </view>
 
   <!-- 心愿圆满 -->
   <view class="celebrate-mask" wx:if="{{celebrateOn && celebrate}}" catchtouchmove="noop">

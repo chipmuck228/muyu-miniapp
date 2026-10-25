@@ -98,3 +98,11 @@
   letter-spacing: 4rpx;
   color: rgba(224, 181, 119, 0.8);
 }
+
+/* 列表末尾的立愿入口，和今日功课面板写法一致 */
+.wish-new {
+  padding: 36rpx 0;
+  font-size: 30rpx;
+  letter-spacing: 6rpx;
+  color: rgba(224, 181, 119, 0.85);
+}

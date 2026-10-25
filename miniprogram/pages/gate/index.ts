@@ -1,6 +1,6 @@
 // 入堂页：冷启动仪式。轻触随时打断。
-// 首次打开：约 4s 后入今日功课；之后再打开：只闪一下，直接回香案接着上次的心愿。
-import { applyLesson, loadLesson, LessonPick } from '../../utils/lesson'
+// 首次打开：约 4s 后进香案并弹出「今日功课」面板；之后再打开：只闪一下，直接接着上次的心愿。
+import { applyLesson, loadLesson, LessonPick, RANDOM_LESSON } from '../../utils/lesson'
 
 const AUTO_ENTER_MS = 4000
 const RETURN_ENTER_MS = 700
@@ -46,11 +46,16 @@ Page({
     const app = getApp<IAppOption>()
     app.globalData.fromGate = true
     const last = this._last
-    if (last) applyLesson(last)
+    if (last) {
+      applyLesson(last)
+    } else {
+      // 还没选过：先按随机专注摆好香案（不记住），进去后弹面板让用户选
+      applyLesson(RANDOM_LESSON, false)
+      app.globalData.openLessonSheet = true
+    }
     this.setData({ leaving: true })
     setTimeout(() => {
-      if (last) wx.switchTab({ url: '/pages/home/index' })
-      else wx.redirectTo({ url: '/pages/lesson/index' })
+      wx.switchTab({ url: '/pages/home/index' })
     }, LEAVE_FADE_MS)
   },
 })

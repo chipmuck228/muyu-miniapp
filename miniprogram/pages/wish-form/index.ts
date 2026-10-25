@@ -1,4 +1,4 @@
-// 立 / 改心愿：普通页面，从今日功课、心愿列表、心愿详情 navigateTo 进来，完成后返回来处
+// 立 / 改心愿：普通页面，从香案的今日功课面板、心愿列表、心愿详情 navigateTo 进来，完成后返回来处
 import { PRESET_GOALS } from '../../utils/constants'
 import { createWish, updateWish } from '../../utils/cloud'
 import { getFormState, setFormState } from '../../utils/formState'

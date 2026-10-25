@@ -1,5 +1,5 @@
 // 木鱼香案：选完今日功课后敲击；从其他 Tab 切回时播放短暗幕
-import { fetchHome, fetchWishDetail, UserRecord, settingsOf, bindChannelByScene, normalizeChannelScene } from '../../utils/cloud'
+import { fetchHome, fetchWishDetail, fetchWishes, UserRecord, settingsOf, bindChannelByScene, normalizeChannelScene } from '../../utils/cloud'
 import { CHANTS } from '../../utils/constants'
 import { playKnock, vibrate, ensureKnock } from '../../utils/knock'
 import { KnockQueue } from '../../utils/knockQueue'
@@ -8,7 +8,7 @@ import { DAWN_FILE_ID, resolveCloudFile } from '../../utils/cloudFile'
 import { startAmbience, stopAmbience } from '../../utils/ambience'
 import { AmbienceId } from '../../utils/audioCatalog'
 import { parseTheme, themeEnds, ThemeId } from '../../utils/theme'
-import { applyLesson, nextLesson, LessonPick, RANDOM_NAME } from '../../utils/lesson'
+import { applyLesson, nextLesson, LessonPick, RANDOM_NAME, RANDOM_LESSON } from '../../utils/lesson'
 
 interface FloatItem {
   key: number
@@ -19,6 +19,13 @@ interface FloatItem {
 
 type EnterPhase = 'cover' | 'reveal' | 'done'
 type EnterKind = 'first' | 'back'
+
+interface SheetRow {
+  _id: string
+  name: string
+  mark: string
+  cur: boolean
+}
 
 interface CelebrateInfo {
   name: string
@@ -139,6 +146,12 @@ Page({
     switchHint: '',
     /** 每敲一下 +1，驱动 3D 木鱼回弹 */
     strikeSeq: 0,
+    // 「今日功课」底部面板：切换心愿 / 随机专注 / 立新愿
+    sheetOn: false,
+    sheetFirst: false,
+    sheetLoading: false,
+    sheetRows: [] as SheetRow[],
+    sheetRandomCur: false,
     materials: MATERIALS,
     material: savedMaterial(),
   },
@@ -151,7 +164,6 @@ Page({
   _wishId: null as string | null,
   _alive: false,
   _hasEntered: false,
-  _openingLesson: false,
   _titleTimer: 0,
   _titleCurrent: 0,
   _titleGoal: RANDOM_GOAL,
@@ -220,8 +232,9 @@ Page({
   onShow() {
     const app = getApp<IAppOption>()
     if (!app.globalData.lessonChosen) {
-      this.openLesson()
-      return
+      // 没经过入堂（如扫码直达）：先按随机专注摆好，再弹面板让用户选
+      applyLesson(RANDOM_LESSON, false)
+      app.globalData.openLessonSheet = true
     }
     const prevWishId = this._wishId
     this._wishId = bindWishId()
@@ -238,6 +251,16 @@ Page({
     concealTabBar(this)
     this.refresh()
     this.tryEnter()
+    if (app.globalData.openLessonSheet) {
+      app.globalData.openLessonSheet = false
+      // 先让香案亮出来，再升起面板
+      setTimeout(() => {
+        if (this._alive) this.openSheet(true)
+      }, 700)
+    } else if (this.data.sheetOn) {
+      // 从面板去立愿后回来：刷新列表，新心愿就在里面
+      this.loadSheet()
+    }
   },
 
   onHide() {
@@ -275,17 +298,6 @@ Page({
     }
   },
 
-  openLesson(fromHome?: boolean) {
-    if (this._openingLesson) return
-    this._openingLesson = true
-    wx.navigateTo({
-      url: '/pages/lesson/index' + (fromHome ? '?from=home' : ''),
-      complete: () => {
-        this._openingLesson = false
-      },
-    })
-  },
-
   tryEnter() {
     const app = getApp<IAppOption>()
     const fromGate = !!app.globalData.fromGate
@@ -318,7 +330,7 @@ Page({
         if (!this._alive) return
         this._hasEntered = true
         this.setData({ enterPhase: 'done' })
-        if (this.data.autoMode && !this.data.celebrateOn) this.startAuto()
+        if (this.data.autoMode && !this.overlayOn()) this.startAuto()
       }, 560)
     }
     const arm = () => {
@@ -424,7 +436,7 @@ Page({
     const chars = this.data.lessonChars || []
     ctx.clearRect(0, 0, w, h)
     // 画布会盖在普通视图之上：圆满弹窗打开时先擦掉竖排标题，否则会叠在弹窗文字上
-    if (!this.data.lessonTitleOn || this.data.celebrateOn || !chars.length) return
+    if (!this.data.lessonTitleOn || this.overlayOn() || !chars.length) return
     ctx.fillStyle = this.data.lessonColor || mixTitleColor(this._titleCurrent, this._titleGoal, parseTheme(this.data.theme))
     ctx.font = '17px sans-serif'
     ctx.textAlign = 'center'
@@ -518,7 +530,7 @@ Page({
     )
     this.setData(this.titleColorPatch())
     this.drawLessonTitle()
-    if (s.autoMode && !this.entering() && !this.data.celebrateOn) this.startAuto()
+    if (s.autoMode && !this.entering() && !this.overlayOn()) this.startAuto()
     else if (!s.autoMode) this.stopAuto()
     startAmbience(s.ambience)
   },
@@ -586,7 +598,7 @@ Page({
   },
 
   knock() {
-    if (!this._alive || this.entering() || !this.data.readyToKnock || this.data.celebrateOn) return
+    if (!this._alive || this.entering() || !this.data.readyToKnock || this.overlayOn()) return
     const d = this.data
     playKnock(d.soundOn)
     vibrate(d.vibrateOn)
@@ -670,9 +682,74 @@ Page({
     this.syncTitleProgress()
   },
 
+  /** 弹窗 / 面板盖在香案上：画布是原生层，要暂停木鱼、隐去烟和竖排标题 */
+  overlayOn(): boolean {
+    return this.data.celebrateOn || this.data.sheetOn
+  },
+
   onOpenLessonPanel() {
-    if (this.entering() || this.data.celebrateOn) return
-    this.openLesson(true)
+    if (this.entering() || this.overlayOn()) return
+    this.openSheet(false)
+  },
+
+  openSheet(first: boolean) {
+    this.stopAuto()
+    this.setData({ sheetOn: true, sheetFirst: first, sheetLoading: !this.data.sheetRows.length })
+    this.drawLessonTitle()
+    this.loadSheet()
+  },
+
+  async loadSheet() {
+    const app = getApp<IAppOption>()
+    const curId = app.globalData.knockMode === 'wish' ? app.globalData.knockWishId : null
+    let rows: SheetRow[] = []
+    try {
+      const res = await fetchWishes()
+      rows = (res.wishes || [])
+        .filter((w) => w.status === 'ongoing')
+        .map((w) => ({
+          _id: w._id,
+          name: w.name || '无名心愿',
+          mark: w.current + ' / ' + w.goal,
+          cur: w._id === curId,
+        }))
+    } catch {
+      rows = []
+    }
+    if (!this._alive || !this.data.sheetOn) return
+    this.setData({ sheetLoading: false, sheetRows: rows, sheetRandomCur: !curId })
+  },
+
+  closeSheet() {
+    if (!this.data.sheetOn) return
+    if (this.data.sheetFirst) {
+      // 首次没选就收起：就按随机专注，并记住，下次不再弹
+      const app = getApp<IAppOption>()
+      if (app.globalData.knockMode !== 'wish') applyLesson(RANDOM_LESSON)
+    }
+    this.setData({ sheetOn: false, sheetFirst: false })
+    this.drawLessonTitle()
+    if (this.data.autoMode && !this.entering() && !this.data.celebrateOn) this.startAuto()
+  },
+
+  onSheetPick(e: any) {
+    const id = (e.currentTarget.dataset.id as string) || ''
+    const row = this.data.sheetRows.find((r) => r._id === id)
+    if (!row) return
+    if (!row.cur) this.switchLesson({ mode: 'wish', wishId: row._id, name: row.name })
+    this.setData({ sheetFirst: false })
+    this.closeSheet()
+  },
+
+  onSheetRandom() {
+    if (!this.data.sheetRandomCur) this.switchLesson(RANDOM_LESSON)
+    else applyLesson(RANDOM_LESSON)
+    this.setData({ sheetFirst: false })
+    this.closeSheet()
+  },
+
+  onSheetNew() {
+    wx.navigateTo({ url: '/pages/wish-form/index' })
   },
 
   /** 心愿敲满：停住敲击，弹出圆满；关掉时再切到下一个心愿 */

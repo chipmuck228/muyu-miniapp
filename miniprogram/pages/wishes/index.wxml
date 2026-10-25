@@ -44,6 +44,7 @@
             >详情 ›</text>
           </view>
         </view>
+        <view class="wish-new" hover-class="hover-dim" bindtap="goNew">＋ 立新愿</view>
       </block>
       <view class="empty" wx:elif="{{!loading}}">
         <text class="empty-title">尚未立愿</text>

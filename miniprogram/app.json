@@ -1,7 +1,6 @@
 {
   "pages": [
     "pages/gate/index",
-    "pages/lesson/index",
     "pages/home/index",
     "pages/wishes/index",
     "pages/wish-form/index",
