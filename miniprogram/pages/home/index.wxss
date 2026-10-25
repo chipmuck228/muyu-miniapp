@@ -509,3 +509,36 @@
   from { opacity: 0; transform: translateY(24rpx); }
   to { opacity: 1; transform: none; }
 }
+
+/* 圆满后切换功课：弹窗里预告下一个，关掉后顶部再提示一次 */
+.cel-next {
+  margin-top: 40rpx;
+  max-width: 100%;
+  font-size: 24rpx;
+  letter-spacing: 2rpx;
+  color: rgba(243, 234, 220, 0.7);
+  text-align: center;
+}
+.cel-next + .cel-actions {
+  margin-top: 24rpx;
+}
+.lh-hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 20rpx;
+  letter-spacing: 2rpx;
+  color: #e8c98a;
+  animation: lh-hint 2.6s ease both;
+}
+@keyframes lh-hint {
+  0% { opacity: 0; transform: translateY(-8rpx); }
+  12%, 80% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
+.lesson-head.switched .lh-name {
+  animation: lh-glow 1.4s ease 2;
+}
+@keyframes lh-glow {
+  0%, 100% { color: rgba(243, 234, 220, 0.88); }
+  50% { color: #ffd98a; text-shadow: 0 0 16rpx rgba(255, 217, 138, 0.55); }
+}

@@ -10,7 +10,7 @@
       <smoke-gl class="smoke-gl-fill" theme="{{theme}}" style="opacity: {{celebrateOn ? 0 : smokeFade}};" bind:risen="onSmokeRisen" />
 
       <view
-        class="lesson-head enter-altar"
+        class="lesson-head enter-altar {{switchHint ? 'switched' : ''}}"
         style="top: {{statusBarHeight + 10}}px;"
         hover-class="lesson-head-hover"
         bindtap="onOpenLessonPanel"
@@ -26,6 +26,7 @@
           </view>
           <view class="lh-bar"><view class="lh-fill" style="width: {{headPct}}%;"></view></view>
         </block>
+        <text wx:if="{{switchHint}}" class="lh-hint">{{switchHint}}</text>
       </view>
 
       <view class="altar-fill enter-altar"></view>
@@ -65,6 +66,7 @@
       <text class="cel-goal">专注 {{celebrate.goalText}}</text>
       <image wx:if="{{celebrate.thumbUrl}}" class="cel-thumb" src="{{celebrate.thumbUrl}}" mode="aspectFill" />
       <text wx:if="{{celebrate.thumbUrl}}" class="cel-hint">惊喜已启 · 可在心愿详情存入相册</text>
+      <text wx:if="{{celebrate.nextText}}" class="cel-next">{{celebrate.nextText}}</text>
       <view class="cel-actions">
         <view class="cel-btn primary" hover-class="cel-hover" bindtap="onCelebrateCert">查看证书</view>
         <view class="cel-btn" hover-class="cel-hover" bindtap="onCelebrateContinue">继续敲击</view>

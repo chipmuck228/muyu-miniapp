@@ -24,6 +24,14 @@ interface CelebrateInfo {
   name: string
   goalText: string
   thumbUrl: string
+  /** 关掉弹窗后接着敲的功课，提前告诉用户 */
+  nextText: string
+}
+
+const SWITCH_HINT_MS = 2600
+
+function nextTextOf(p: LessonPick): string {
+  return p.mode === 'wish' ? '接下来专注：' + p.name : '心愿都已圆满，接下来随机专注'
 }
 
 function bindWishId(): string | null {
@@ -106,6 +114,8 @@ Page({
     headPct: 0,
     celebrateOn: false,
     celebrate: null as CelebrateInfo | null,
+    /** 圆满后切到下一个功课时，顶部短暂提示 */
+    switchHint: '',
   },
 
   _floatSeq: 0,
@@ -127,6 +137,8 @@ Page({
   _titleCssW: 0,
   _titleCssH: 0,
   _celebrateId: '' as string,
+  _nextPick: null as Promise<LessonPick> | null,
+  _hintTimer: 0,
   onLoad(options: Record<string, string | undefined>) {
     const app = getApp<IAppOption>()
     const scene =
@@ -223,6 +235,7 @@ Page({
 
   onUnload() {
     this._alive = false
+    if (this._hintTimer) clearTimeout(this._hintTimer)
     this.stopAuto()
     stopAmbience()
     this.clearEnterTimer()
@@ -586,9 +599,18 @@ Page({
         name: this.data.lessonTitle || '心愿',
         goalText: String(this._titleGoal),
         thumbUrl: '',
+        nextText: '',
       },
     })
     this.drawLessonTitle()
+    // 先算好下一个功课，弹窗里就能告诉用户「继续敲击」会去哪
+    const pick = nextLesson(id)
+    this._nextPick = pick
+    pick.then((p) => {
+      if (this._alive && this._celebrateId === id && this.data.celebrate) {
+        this.setData({ 'celebrate.nextText': nextTextOf(p) })
+      }
+    })
     fetchWishDetail(id)
       .then((res) => {
         const thumbUrl = (res.wish && res.wish.thumbUrl) || ''
@@ -607,10 +629,27 @@ Page({
     return id
   },
 
+  takeNextPick(id: string): Promise<LessonPick> {
+    const pick = this._nextPick || nextLesson(id)
+    this._nextPick = null
+    return pick
+  },
+
   async onCelebrateContinue() {
     const id = this.endCelebrate()
-    this.switchLesson(await nextLesson(id))
+    const p = await this.takeNextPick(id)
+    this.switchLesson(p)
+    this.showSwitchHint(p.mode === 'wish' ? '已切换到下一个心愿' : '心愿都已圆满 · 已转入随机专注')
     if (this.data.autoMode && !this.entering()) this.startAuto()
+  },
+
+  showSwitchHint(text: string) {
+    if (this._hintTimer) clearTimeout(this._hintTimer)
+    this.setData({ switchHint: text })
+    this._hintTimer = setTimeout(() => {
+      this._hintTimer = 0
+      if (this._alive) this.setData({ switchHint: '' })
+    }, SWITCH_HINT_MS)
   },
 
   async onCelebrateCert() {
@@ -620,7 +659,7 @@ Page({
     app.globalData.homeWillReenter = true
     concealTabBar(this)
     wx.switchTab({ url: '/pages/certificate/index' })
-    applyLesson(await nextLesson(id))
+    applyLesson(await this.takeNextPick(id))
   },
 
   noop() {},
