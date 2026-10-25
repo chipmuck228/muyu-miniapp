@@ -181,9 +181,9 @@
   margin-top: 72rpx;
   padding-bottom: 24rpx;
   text-align: center;
-  font-size: 24rpx;
+  font-size: 28rpx;
   letter-spacing: 8rpx;
-  color: rgba(240, 230, 216, 0.16);
+  color: #e8c98a;
 }
 .tog {
   position: relative;
