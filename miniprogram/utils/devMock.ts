@@ -2,10 +2,14 @@
 // 只在开发版生效（体验版、正式版永远走云端）。
 // 开关：开发者工具「添加编译模式」→ 启动参数填 mock=1（开）/ mock=0（关）/ mock=reset（重置示例数据）。
 // 也可以在调试器 Console 里执行 wx.setStorageSync('muyu_mock_cloud', 1) 后重新编译。
-// 想测付费主题：在 Storage 面板把 muyu_mock_db.user.premium 改成 true。
+// 完成心愿的惊喜壁纸：用 miniprogram/dev-papers/ 里的本地占位图（scripts/gen-dev-papers.py 生成，不上传）。
+// 示例数据里有五个「试壁纸」心愿，每档一个、都差一下圆满；启动参数 papers=1 可把它们恢复成未完成并重抽壁纸。
+// 付费功能：点灰色的氛围 / 主题会走模拟支付（弹窗选成功或取消，不真扣款）。
+// 也可以用启动参数直接切换：premium=1（已开启）/ premium=0（未开启）/ premium=refund（模拟已退款，进静心页时收回）。
 
 const FLAG_KEY = 'muyu_mock_cloud'
 const DB_KEY = 'muyu_mock_db'
+const PREMIUM_PRICE = 600
 const LATENCY_MS = 160
 
 const DEFAULT_SETTINGS = { soundOn: true, vibrateOn: true, autoMode: false, ambience: 'off', theme: 'dawn' }
@@ -14,12 +18,53 @@ const PREMIUM_AMBIENCE: Record<string, 1> = { noise: 1, stream: 1, pine: 1, fire
 const FREE_THEME: Record<string, 1> = { dawn: 1 }
 const PREMIUM_THEME: Record<string, 1> = { night: 1, ink: 1, dusk: 1 }
 
+// 与 cloudfunctions/{fetch,wish}/papers.js 的档位一致
+const PAPER_TIERS = [
+  { id: 'su', max: 99 },
+  { id: 'ya', max: 499 },
+  { id: 'jing', max: 999 },
+  { id: 'zhen', max: 4999 },
+  { id: 'ji', max: Infinity },
+]
+const PAPER_DIR = '/dev-papers/'
+
+function tierOfGoal(goal: number): string {
+  for (let i = 0; i < PAPER_TIERS.length; i++) {
+    if (goal <= PAPER_TIERS[i].max) return PAPER_TIERS[i].id
+  }
+  return 'ji'
+}
+
+function pickPaper(goal: number): { paperId: string; paperTier: string } {
+  const tier = tierOfGoal(goal)
+  return { paperId: tier + '-' + (Math.random() < 0.5 ? 1 : 2), paperTier: tier }
+}
+
+function isDone(w: any): boolean {
+  return w.status === 'completed' || w.status === 'fulfilled'
+}
+
+/** 和云端一样：抽中的是哪张不下发，只给 hasSurprise */
+function publicWish(w: any): any {
+  if (!w) return w
+  const out = Object.assign({}, w, { hasSurprise: true })
+  delete out.paperId
+  delete out.paperTier
+  return out
+}
+
 interface MockDb {
   seq: number
   user: any
   wishes: any[]
   /** 日期 → 当天敲击次数 */
   daily: Record<string, number>
+  /** 模拟支付订单：outTradeNo → 状态 */
+  orders?: Record<string, 'created' | 'paid'>
+  /** premium=refund 时置位，下一次 verify 收回权益 */
+  refundPending?: boolean
+  /** 已放入过试壁纸心愿 */
+  paperTests?: boolean
 }
 
 let enabled: boolean | null = null
@@ -33,20 +78,36 @@ function isDevelop(): boolean {
   }
 }
 
-/** 读启动参数里的 mock=1 / 0 / reset，写进本地开关。App onLaunch 调用。 */
+/** 读启动参数里的 mock=1 / 0 / reset 和 premium=1 / 0 / refund，写进本地存储。App onLaunch 调用。 */
 export function applyMockLaunch(query: Record<string, any> | undefined) {
   enabled = null
-  const v = query && query.mock
-  if (v === undefined || v === null || !isDevelop()) return
-  try {
-    if (v === '0') {
-      wx.removeStorageSync(FLAG_KEY)
-    } else {
-      wx.setStorageSync(FLAG_KEY, 1)
-      if (v === 'reset') wx.removeStorageSync(DB_KEY)
+  if (!query || !isDevelop()) return
+  const v = query.mock
+  if (v !== undefined && v !== null) {
+    try {
+      if (v === '0') {
+        wx.removeStorageSync(FLAG_KEY)
+      } else {
+        wx.setStorageSync(FLAG_KEY, 1)
+        if (v === 'reset') wx.removeStorageSync(DB_KEY)
+      }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
+  }
+  if (!mockEnabled()) return
+  const p = query.premium
+  if (p !== undefined && p !== null) {
+    const db = load()
+    db.user.premium = p !== '0'
+    db.refundPending = p === 'refund'
+    db.orders = {}
+    save(db)
+  }
+  if (query.papers !== undefined && query.papers !== null) {
+    const db = load()
+    resetPaperTests(db)
+    save(db)
   }
 }
 
@@ -126,6 +187,7 @@ function seed(): MockDb {
         // 示例记录放在昨天和前天，和 daily 一致（今天从 0 开始）
         hitLog: hitLogOf(today, [0, Math.min(current, 40), Math.min(Math.max(0, current - 40), 60)]),
       },
+      pickPaper(goal),
       extra
     )
   return {
@@ -147,17 +209,62 @@ function seed(): MockDb {
       wish('mock-w4', '戒断妄念', 100, 100, 30, {
         status: 'completed',
         completedDate: daysAgo(today, 12),
-        hasSurprise: true,
       }),
-    ],
+    ].concat(paperTestWishes()),
     daily,
+    paperTests: true,
   }
+}
+
+const PAPER_TEST_GOALS: [string, number][] = [
+  ['素', 10],
+  ['雅', 100],
+  ['净', 500],
+  ['真', 1000],
+  ['极', 5000],
+]
+
+/** 每档一个差一下圆满的心愿，专门用来看惊喜壁纸 */
+function paperTestWishes(): any[] {
+  const today = dateStr(new Date())
+  const now = Date.now()
+  return PAPER_TEST_GOALS.map(([tier, goal], i) =>
+    Object.assign(
+      {
+        _id: 'mock-paper-' + i,
+        name: '试壁纸 · ' + tier,
+        goal,
+        current: goal - 1,
+        deadline: null,
+        status: 'ongoing',
+        // 排在列表最前，素在最上
+        createdAt: now + (PAPER_TEST_GOALS.length - i),
+        hitLog: hitLogOf(today, [0, goal - 1]),
+      },
+      pickPaper(goal)
+    )
+  )
+}
+
+function resetPaperTests(db: MockDb) {
+  db.wishes = db.wishes.filter((w) => String(w._id).indexOf('mock-paper-') !== 0).concat(paperTestWishes())
+  db.paperTests = true
 }
 
 function load(): MockDb {
   try {
     const v = wx.getStorageSync(DB_KEY)
-    if (v && v.user && Array.isArray(v.wishes)) return v
+    if (v && v.user && Array.isArray(v.wishes)) {
+      // 旧的模拟数据没有壁纸，补上
+      v.wishes.forEach((w: any) => {
+        if (!w.paperId) Object.assign(w, pickPaper(w.goal))
+      })
+      if (!v.paperTests) {
+        resetPaperTests(v)
+        save(v)
+      }
+      return v
+    }
   } catch {
     // 读坏了就重来
   }
@@ -185,7 +292,10 @@ function calcStreak(map: Record<string, number>, today: string): number {
 }
 
 function sortedWishes(db: MockDb): any[] {
-  return db.wishes.slice().sort((a, b) => b.createdAt - a.createdAt)
+  return db.wishes
+    .slice()
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map(publicWish)
 }
 
 function validDate(s: any): boolean {
@@ -220,8 +330,10 @@ function handle(name: string, data: any): any {
     if (action === 'wishes') return { ok: true, user: publicUser(db.user), wishes }
     if (action === 'detail') {
       const w = db.wishes.find((x) => x._id === (data && data.wishId))
-      // 本地没有壁纸文件，thumbUrl 留空
-      return w ? { ok: true, wish: w } : fail('心愿不存在')
+      if (!w) return fail('心愿不存在')
+      const out = publicWish(w)
+      if (isDone(w)) out.thumbUrl = PAPER_DIR + w.paperId + '-thumb.jpg'
+      return { ok: true, wish: out }
     }
     if (action === 'profile') {
       return {
@@ -252,9 +364,8 @@ function handle(name: string, data: any): any {
       if (w.current >= w.goal) {
         w.status = 'completed'
         w.completedDate = today
-        w.hasSurprise = true
       }
-      wish = w
+      wish = publicWish(w)
     }
     save(db)
     return { ok: true, totalMerit: db.user.totalMerit, todayCount: db.daily[today], wish }
@@ -280,6 +391,7 @@ function handle(name: string, data: any): any {
         status: 'ongoing',
         createdAt: Date.now(),
         hitLog: [],
+        ...pickPaper(goal),
       })
       save(db)
       return { ok: true, wishId: id }
@@ -288,6 +400,8 @@ function handle(name: string, data: any): any {
     if (!w) return fail('心愿不存在')
     if (action === 'update') {
       w.name = nameText.slice(0, 20)
+      // 改了目标跨档才重抽壁纸，和云端一致
+      if (tierOfGoal(goal) !== w.paperTier) Object.assign(w, pickPaper(goal))
       w.goal = goal
       w.deadline = validDate(data.deadline) ? data.deadline : null
       save(db)
@@ -299,14 +413,17 @@ function handle(name: string, data: any): any {
         w.fulfilledDate = today
         save(db)
       }
-      return { ok: true, wish: w }
+      return { ok: true, wish: publicWish(w) }
     }
     if (action === 'remove') {
       db.wishes = db.wishes.filter((x) => x !== w)
       save(db)
       return { ok: true }
     }
-    if (action === 'paperOrigin') return fail('本地模式没有壁纸')
+    if (action === 'paperOrigin') {
+      if (!isDone(w)) return fail('心愿尚未完成')
+      return { ok: true, originUrl: '', originFileId: '', localPath: PAPER_DIR + w.paperId + '.jpg' }
+    }
     return fail('未知操作')
   }
 
@@ -327,9 +444,52 @@ function handle(name: string, data: any): any {
     return { ok: true, settings: dressSettings(db.user.settings, premium), premium }
   }
 
-  // 只读状态给个无害的默认值，页面能照常渲染
-  if (name === 'wxpay' && data && data.action === 'verify') {
-    return { ok: true, premium: db.user.premium === true, refunded: false }
+  if (name === 'wxpay') {
+    const action = (data && data.action) || 'prepay'
+    const orders = (db.orders = db.orders || {})
+    if (action === 'prepay') {
+      if (db.user.premium === true) return { ok: true, premium: true, already: true }
+      // 和云端一样：已付款未发货的单复用同一个单号，前端据此只轮询不再拉起支付
+      const paid = Object.keys(orders).find((k) => orders[k] === 'paid')
+      let no = paid
+      if (!no) {
+        db.seq += 1
+        no = 'mock-order-' + db.seq
+        orders[no] = 'created'
+        save(db)
+      }
+      return {
+        ok: true,
+        premium: false,
+        outTradeNo: no,
+        goodsPrice: PREMIUM_PRICE,
+        timeStamp: String(Math.floor(Date.now() / 1000)),
+        nonceStr: 'mock',
+        package: 'prepay_id=' + no,
+        signType: 'RSA',
+        paySign: 'mock',
+      }
+    }
+    if (action === 'query') {
+      const no = data && data.outTradeNo
+      // 模拟发货推送：已付款的单在查询时发货
+      if (no && orders[no] === 'paid') {
+        db.user.premium = true
+        delete orders[no]
+        save(db)
+      }
+      return { ok: true, premium: db.user.premium === true }
+    }
+    if (action === 'verify') {
+      if (db.refundPending && db.user.premium === true) {
+        db.user.premium = false
+        db.refundPending = false
+        save(db)
+        return { ok: true, premium: false, refunded: true }
+      }
+      return { ok: true, premium: db.user.premium === true, refunded: false }
+    }
+    return fail('未知操作')
   }
   if (name === 'checkChannelAuth') return { ok: true, isChannel: false }
   if (name === 'bindChannel') return { ok: true, bound: false, reason: 'mock' }
@@ -338,6 +498,16 @@ function handle(name: string, data: any): any {
   }
 
   return fail('本地模式不支持')
+}
+
+/** 模拟 wx.requestPayment 成功：把订单标成已付款，之后 query 时发货。 */
+export function mockMarkPaid(outTradeNo: string) {
+  const db = load()
+  db.orders = db.orders || {}
+  if (db.orders[outTradeNo]) {
+    db.orders[outTradeNo] = 'paid'
+    save(db)
+  }
 }
 
 /** 和 wx.cloud.callFunction 同形：resolve { result } */

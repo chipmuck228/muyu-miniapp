@@ -205,6 +205,7 @@ Page({
     wx.showLoading({ title: '取图中', mask: true })
     fetchPaperOrigin(w._id)
       .then((r) => {
+        if (r.localPath) return r.localPath
         if (r.originFileId) {
           return wx.cloud.downloadFile({ fileID: r.originFileId }).then((dl) => {
             if (dl && dl.tempFilePath) return dl.tempFilePath

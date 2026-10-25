@@ -11,6 +11,7 @@ import {
 } from '../../utils/cloud'
 import { AMBIENCE_OPTIONS, AmbienceId, isPremiumAmbience, parseAmbience } from '../../utils/audioCatalog'
 import { isPremiumTheme, parseTheme, ThemeId, THEMES } from '../../utils/theme'
+import { mockEnabled, mockMarkPaid } from '../../utils/devMock'
 import { fmtInt, todayStr, offsetDate, weekdayMon0, fmtMD, concealTabBar } from '../../utils/util'
 
 interface HeatCell {
@@ -108,6 +109,30 @@ function requestPayment(p: {
   paySign: string
 }): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (mockEnabled()) {
+      wx.showModal({
+        title: '模拟支付',
+        content: '本地模拟模式，不会真实扣款',
+        confirmText: '支付成功',
+        cancelText: '取消',
+        success: (r) => {
+          if (r.confirm) {
+            mockMarkPaid(p.package.replace(/^prepay_id=/, ''))
+            resolve()
+            return
+          }
+          const err: any = new Error('已取消')
+          err.code = 'cancel'
+          reject(err)
+        },
+        fail: () => {
+          const err: any = new Error('已取消')
+          err.code = 'cancel'
+          reject(err)
+        },
+      })
+      return
+    }
     if (devicePlatform() === 'devtools') {
       reject(new Error('请用手机微信打开（开发者工具不支持支付）'))
       return

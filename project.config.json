@@ -51,7 +51,8 @@
     "ignore": [
       { "type": "folder", "value": "pkg-smoke/models" },
       { "type": "folder", "value": "pkg-smoke/incense-smoke" },
-      { "type": "file", "value": "assets/home/dawn.png" }
+      { "type": "file", "value": "assets/home/dawn.png" },
+      { "type": "folder", "value": "dev-papers" }
     ],
     "include": []
   },

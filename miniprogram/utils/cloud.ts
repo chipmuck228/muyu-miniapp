@@ -154,7 +154,10 @@ export function fulfillWish(wishId: string): Promise<{ wish: Wish }> {
   return callCloud('wish', { action: 'fulfill', wishId, date: todayStrLocal() })
 }
 
-export function fetchPaperOrigin(wishId: string): Promise<{ originUrl: string; originFileId?: string }> {
+/** localPath 只在本地模拟模式下出现，指向包内的占位壁纸 */
+export function fetchPaperOrigin(
+  wishId: string
+): Promise<{ originUrl: string; originFileId?: string; localPath?: string }> {
   return callCloud('wish', { action: 'paperOrigin', wishId })
 }
 
