@@ -3,6 +3,7 @@ import { ensureKnock } from './utils/knock'
 import { ensureSmokeTexture } from './utils/smoke'
 import { loginUser, bindChannelByScene, normalizeChannelScene } from './utils/cloud'
 import { winInfo } from './utils/util'
+import { applyMockLaunch, mockEnabled } from './utils/devMock'
 
 // 云开发环境 ID（如需切换环境，改这里即可）
 const CLOUD_ENV = 'cloud1-d5gcfyv8v980774aa'
@@ -23,6 +24,11 @@ App<IAppOption>({
   },
 
   onLaunch(opt: any) {
+    applyMockLaunch(opt && opt.query)
+    if (mockEnabled()) {
+      console.warn('[muyu] 本地模拟模式：云函数由 utils/devMock.ts 模拟，数据只存在本机')
+      wx.showToast({ title: '本地模拟模式', icon: 'none', duration: 2500 })
+    }
     const scene = pickChannelScene(opt)
     if (scene.indexOf('ch_') === 0) this.globalData.pendingChannelScene = scene
     // 状态栏高度（自定义导航栏适配）

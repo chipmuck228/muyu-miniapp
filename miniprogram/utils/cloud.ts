@@ -1,6 +1,7 @@
 // 云开发数据访问层（所有读写都经由云函数，避免依赖集合权限配置）
 import { isPremiumAmbience, parseAmbience } from './audioCatalog'
 import { isPremiumTheme, parseTheme, ThemeId } from './theme'
+import { mockEnabled, mockCallFunction } from './devMock'
 
 export interface WishHit {
   date: string
@@ -82,8 +83,11 @@ export function settingsOf(u?: UserRecord | null): UserSettings {
 type CloudResult<T> = { ok: boolean; msg?: string; code?: string } & T
 
 function callCloud<T>(name: string, data: Record<string, any> = {}): Promise<CloudResult<T>> {
-  return wx.cloud
-    .callFunction({ name, data })
+  // 开发版可切到本地模拟，见 utils/devMock.ts
+  const call: Promise<{ result: any }> = mockEnabled()
+    ? mockCallFunction(name, data)
+    : (wx.cloud.callFunction({ name, data }) as Promise<any>)
+  return call
     .then((res) => {
       const r = res.result as CloudResult<T>
       if (!r || r.ok === false) {

@@ -1,5 +1,7 @@
 // 云存储 fileID → 本地临时路径。Skyline 下 <image> 不能直接吃 cloud://。
 
+import { mockEnabled } from './devMock'
+
 const cache: Record<string, string> = {}
 const inflight: Record<string, Promise<string>> = {}
 
@@ -8,6 +10,8 @@ export const DAWN_FILE_ID =
 
 export function resolveCloudFile(fileID: string): Promise<string> {
   if (!fileID) return Promise.reject(new Error('empty fileID'))
+  // 本地模拟模式没有云存储权限：直接失败，不白等下载超时
+  if (mockEnabled()) return Promise.reject(new Error('mock: no cloud file'))
   if (cache[fileID]) return Promise.resolve(cache[fileID])
   if (inflight[fileID]) return inflight[fileID]
   inflight[fileID] = wx.cloud
