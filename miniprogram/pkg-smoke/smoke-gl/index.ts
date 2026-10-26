@@ -13,6 +13,16 @@ Component({
       type: String,
       value: 'dawn',
     },
+    /** 烟头相对默认位置的下移比例（负数上移）：一炷香燃烧时跟着香头走 */
+    sink: {
+      type: Number,
+      value: 0,
+    },
+    /** 整体透明度 0..1：面板盖上时为 0，心愿越近圆满越淡 */
+    fade: {
+      type: Number,
+      value: 1,
+    },
   },
 
   data: {
@@ -26,6 +36,12 @@ Component({
       if (this._smoke && typeof this._smoke.setTint === 'function') {
         this._smoke.setTint(tintOf(id))
       }
+    },
+    sink(r: number) {
+      if (this._smoke && typeof this._smoke.setSink === 'function') this._smoke.setSink(r)
+    },
+    fade(a: number) {
+      if (this._smoke && typeof this._smoke.setFade === 'function') this._smoke.setFade(a)
     },
   },
 
@@ -122,6 +138,8 @@ Component({
                 },
                 tintOf(this.data.theme)
               )
+              if (this.data.sink) this._smoke.setSink(this.data.sink)
+              this._smoke.setFade(this.data.fade, true)
               this._booting = false
               this.setData({
                 smokeFallback: false,

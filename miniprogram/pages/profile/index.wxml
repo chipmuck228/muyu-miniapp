@@ -65,12 +65,6 @@
             <view class="tog-knob"></view>
           </view>
         </view>
-        <view class="set-item">
-          <text class="set-name">自动敲击</text>
-          <view class="tog {{autoMode ? 'on' : ''}}" hover-class="hover-dim" bindtap="toggleAuto">
-            <view class="tog-knob"></view>
-          </view>
-        </view>
         <view class="set-item ambi-item">
           <text class="set-name">氛围</text>
           <view class="ambi-row">

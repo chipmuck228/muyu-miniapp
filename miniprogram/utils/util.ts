@@ -40,6 +40,17 @@ export function fmtInt(n: number): string {
   return s.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
+/** 心愿专注的来源构成：「其中 亲手 3,240 · 燃香 6 炷 · 自动 1,200」。早先没记来源的心愿返回空串 */
+export function sourceLine(w: { bySource?: { hand?: number; auto?: number; incense?: number }; incenseCount?: number }): string {
+  const by = w.bySource
+  if (!by) return ''
+  const parts: string[] = []
+  if (by.hand && by.hand > 0) parts.push('亲手 ' + fmtInt(by.hand))
+  if (w.incenseCount && w.incenseCount > 0) parts.push('燃香 ' + w.incenseCount + ' 炷')
+  if (by.auto && by.auto > 0) parts.push('自动 ' + fmtInt(by.auto))
+  return parts.length ? '其中 ' + parts.join(' · ') : ''
+}
+
 /** '2026-09-07' -> '9月7日' */
 export function fmtMD(dateStr: string): string {
   const m = parseInt(dateStr.slice(5, 7), 10)
