@@ -1,6 +1,7 @@
 // 心愿证书（Canvas 绘制，保存相册 / 转发）
 import { fetchWishes } from '../../utils/cloud'
-import { fmtInt, fmtFullCN, winInfo, concealTabBar } from '../../utils/util'
+import { Wish } from '../../utils/cloud'
+import { fmtInt, fmtFullCN, winInfo, concealTabBar, sourceLine } from '../../utils/util'
 
 const CW = 400
 const CH = 560
@@ -9,14 +10,17 @@ interface CertInfo {
   _id: string
   name: string
   totalText: string
+  /** 亲手 / 燃香 / 自动 的构成，没记来源的旧心愿为空 */
+  sourceText: string
   dateText: string
 }
 
-function toCert(w: { _id: string; name: string; current: number; fulfilledDate?: string; completedDate?: string }): CertInfo {
+function toCert(w: Wish): CertInfo {
   return {
     _id: w._id,
     name: w.name,
     totalText: fmtInt(w.current),
+    sourceText: sourceLine(w),
     dateText: fmtFullCN(w.fulfilledDate || w.completedDate || ''),
   }
 }
@@ -188,6 +192,10 @@ Page({
     ctx.fillStyle = mute
     ctx.font = '13px "PingFang SC", sans-serif'
     this.fillTracked(ctx, '共积专注  ' + info.totalText, w / 2, 368, 3)
+    if (info.sourceText) {
+      ctx.font = '12px "PingFang SC", sans-serif'
+      ctx.fillText(info.sourceText, w / 2, 396)
+    }
 
     ctx.textAlign = 'left'
     ctx.fillStyle = mute

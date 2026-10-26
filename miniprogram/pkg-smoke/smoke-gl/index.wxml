@@ -1,6 +1,6 @@
 <view class="smoke-root theme-{{theme}}">
   <canvas wx:if="{{canvasOn}}" type="webgl" id="smokeCanvas" class="void-canvas" />
-  <view class="void-fallback" wx:if="{{smokeFallback}}">
+  <view class="void-fallback" wx:if="{{smokeFallback}}" style="opacity: {{fade}};">
     <view class="ember"></view>
     <view class="puff p0"></view>
     <view class="puff p1"></view>

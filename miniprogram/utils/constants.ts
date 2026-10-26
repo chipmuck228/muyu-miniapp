@@ -45,6 +45,12 @@ export function levelOf(totalMerit: number): LevelInfo {
 /** 心愿目标预设 */
 export const PRESET_GOALS: number[] = [100, 500, 1000, 5000, 10000]
 
+/** 一炷香：可选时长（分钟），每分钟折算的专注。与 cloudfunctions/hit 一致 */
+/** 一炷香暂时关闭：入口不显示，也不接云端残留的香。云函数 hit 里的 INCENSE_ON 同步 */
+export const INCENSE_ON = false
+export const INCENSE_MINUTES: number[] = [15, 30, 45]
+export const INCENSE_RATE = 10
+
 /** 敲击飘字 */
 export const CHANTS: string[] = ['静心', '专注', '一步', '加油', '心愿', '继续']
 

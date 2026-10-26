@@ -35,6 +35,7 @@
         <text class="num-slash">/</text>
         <text class="num-goal mono-num">{{wish.goalText}}</text>
       </view>
+      <text class="source-line" wx:if="{{wish.sourceText}}">{{wish.sourceText}}</text>
 
       <view class="block">
         <view class="block-head">

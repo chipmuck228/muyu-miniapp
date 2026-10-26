@@ -10,7 +10,12 @@
         <view class="theme-glow"></view>
         <image wx:if="{{dawnSrc}}" class="dawn-paper" src="{{dawnSrc}}" mode="aspectFill" style="opacity: {{dawnSky}};" />
       </view>
-      <smoke-gl class="smoke-gl-fill" theme="{{theme}}" style="opacity: {{celebrateOn || sheetOn ? 0 : smokeFade}};" bind:risen="onSmokeRisen" />
+      <smoke-gl class="smoke-gl-fill" theme="{{theme}}" sink="{{incenseSink}}" fade="{{celebrateOn || sheetOn || incenseSheetOn ? 0 : (incenseOn ? 1 : smokeFade)}}" bind:risen="onSmokeRisen" />
+      <!-- 一炷香：香身从烟头插进香炉，燃烧时一起往下走 -->
+      <block wx:if="{{incenseOn && !celebrateOn}}">
+        <view class="incense-stick" style="top: {{incenseTop}}%; height: {{incenseLen}}%;"></view>
+        <view class="incense-censer" style="top: {{incenseTop + incenseLen}}%;"></view>
+      </block>
 
       <view
         class="lesson-head enter-altar {{switchHint ? 'switched' : ''}}"
@@ -33,17 +38,16 @@
       </view>
 
       <view class="altar-fill enter-altar"></view>
-      <view class="lesson-title {{lessonTitleOn && !celebrateOn && !sheetOn ? 'on' : ''}}">
-        <text wx:for="{{lessonChars}}" wx:for-item="ch" wx:for-index="ci" wx:key="ci" class="lesson-ch" style="color: {{lessonColor}};">{{ch}}</text>
-      </view>
+      <!-- 竖排功课名只画在 canvas 上（同层压得住青烟）；以前另有一份 DOM 文字，行距对不上会重影 -->
       <canvas type="2d" id="lessonTitleCanvas" class="lesson-title-canvas"></canvas>
 
       <view class="knock-wrap enter-altar">
         <!-- 木鱼只负责显示，不接收点击；圆满弹窗打开时隐去，免得画布盖在弹窗上 -->
-        <view class="muyu-stage" style="opacity: {{celebrateOn || sheetOn ? 0 : 1}};">
-          <muyu-gl id="muyu" class="muyu-gl" strike="{{strikeSeq}}" material="{{material}}" paused="{{celebrateOn || sheetOn}}" />
+        <view class="muyu-stage" style="opacity: {{celebrateOn || sheetOn || incenseSheetOn || incenseOn ? 0 : 1}};">
+          <muyu-gl id="muyu" class="muyu-gl" strike="{{strikeSeq}}" material="{{material}}" paused="{{celebrateOn || sheetOn || incenseSheetOn || incenseOn}}" />
         </view>
         <view
+          wx:if="{{!incenseOn}}"
           class="knock-pad {{pulsing ? 'pulsing' : ''}}"
           hover-class="knock-hover"
           hover-stay-time="60"
@@ -56,7 +60,7 @@
           <view class="ripple-ring {{rippleOn ? 'on' : ''}}"></view>
         </view>
         <!-- 木鱼材质：紫檀 / 黄花梨 / 琉璃 / 玉 -->
-        <view class="mat-dots">
+        <view class="mat-dots" wx:if="{{!incenseOn}}">
           <view
             wx:for="{{materials}}"
             wx:key="id"
@@ -66,6 +70,23 @@
             data-id="{{item.id}}"
             catchtap="onPickMaterial"
           ></view>
+        </view>
+        <!-- 右下角：自动敲开关 + 一炷香入口；燃烧时换成倒计时 -->
+        <view wx:if="{{!incenseOn}}" class="side-tools">
+          <view class="auto-tog {{autoMode ? 'on' : ''}}" hover-class="mat-dot-hover" catchtap="onToggleAuto">
+            <view class="auto-dot"></view>
+            <text class="auto-text">自动</text>
+          </view>
+          <view wx:if="{{incenseFeature}}" class="incense-entry" hover-class="mat-dot-hover" catchtap="onOpenIncense">
+            <view class="incense-entry-icon"></view>
+            <text class="incense-entry-text">一炷香</text>
+          </view>
+        </view>
+        <view wx:else class="incense-burn">
+          <text class="incense-clock">{{incenseLeft}}</text>
+          <text class="incense-gain">燃尽积专注 {{incenseGain}}</text>
+          <text class="incense-note">可以锁屏或离开，香照常燃</text>
+          <text class="incense-snuff" hover-class="mat-dot-hover" catchtap="onSnuffIncense">掐灭</text>
         </view>
         <view class="floats-layer">
           <view
@@ -112,6 +133,32 @@
         <text class="sheet-name">＋ 立新愿</text>
       </view>
     </scroll-view>
+  </view>
+
+  <!-- 一炷香：选时长即点燃 -->
+  <view class="sheet-mask" wx:if="{{incenseSheetOn}}" catchtouchmove="noop" bindtap="closeIncenseSheet"></view>
+  <view class="lesson-sheet" wx:if="{{incenseSheetOn}}" catchtouchmove="noop">
+    <view class="sheet-head">
+      <view class="sheet-titles">
+        <text class="sheet-title">一炷香</text>
+        <text class="sheet-sub">为「{{lessonTitle}}」 · 放下手机去做事</text>
+      </view>
+      <text class="sheet-close" hover-class="sheet-hover" bindtap="closeIncenseSheet">收起</text>
+    </view>
+    <view class="sheet-list">
+      <view
+        wx:for="{{incenseOptions}}"
+        wx:key="minutes"
+        class="sheet-row {{incenseBusy ? 'busy' : ''}}"
+        hover-class="sheet-hover"
+        data-minutes="{{item.minutes}}"
+        bindtap="onLightIncense"
+      >
+        <text class="sheet-name">{{item.minutes}} 分钟</text>
+        <text class="sheet-mark">燃尽积专注 {{item.gain}}</text>
+      </view>
+    </view>
+    <text class="incense-rule">香燃时木鱼静置。锁屏、切到别的应用都不影响，燃尽回来即入账；中途掐灭不计。</text>
   </view>
 
   <!-- 心愿圆满 -->

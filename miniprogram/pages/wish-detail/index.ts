@@ -3,7 +3,7 @@ import { fetchWishDetail, fetchPaperOrigin, Wish } from '../../utils/cloud'
 import { STATUS_TEXT, STATUS_CLS, percentOf } from '../../utils/constants'
 import { setFormState } from '../../utils/formState'
 import { applyLesson } from '../../utils/lesson'
-import { fmtMD, todayStr, offsetDate, fmtInt, winInfo, concealTabBar } from '../../utils/util'
+import { fmtMD, todayStr, offsetDate, fmtInt, winInfo, concealTabBar, sourceLine } from '../../utils/util'
 
 interface BarItem {
   key: string
@@ -32,6 +32,7 @@ interface WishVM {
   percent: number
   currentText: string
   goalText: string
+  sourceText: string
   hitLog: { date: string; count: number }[]
   completedDate?: string
   fulfilledDate?: string
@@ -50,6 +51,7 @@ function enrich(w: Wish): WishVM {
     percent: percentOf(w.current, w.goal),
     currentText: fmtInt(Math.min(w.current, w.goal)),
     goalText: fmtInt(w.goal),
+    sourceText: sourceLine(w),
     hitLog: Array.isArray(w.hitLog) ? w.hitLog : [],
     completedDate: w.completedDate,
     fulfilledDate: w.fulfilledDate,

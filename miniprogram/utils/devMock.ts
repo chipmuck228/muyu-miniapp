@@ -11,6 +11,9 @@ const FLAG_KEY = 'muyu_mock_cloud'
 const DB_KEY = 'muyu_mock_db'
 const PREMIUM_PRICE = 600
 const LATENCY_MS = 160
+// 和 cloudfunctions/hit 一致；本地多一个 1 分钟方便看燃尽
+const INCENSE_MINUTES: Record<number, 1> = { 1: 1, 15: 1, 30: 1, 45: 1 }
+const INCENSE_RATE = 10
 
 const DEFAULT_SETTINGS = { soundOn: true, vibrateOn: true, autoMode: false, ambience: 'off', theme: 'dawn' }
 const FREE_AMBIENCE: Record<string, 1> = { off: 1, rain: 1, bowl: 1 }
@@ -325,6 +328,7 @@ function handle(name: string, data: any): any {
         completedWish: wishes.find((w) => w.status === 'completed') || null,
         streak: calcStreak(db.daily, today),
         todayCount: db.daily[today] || 0,
+        serverNow: Date.now(),
       }
     }
     if (action === 'wishes') return { ok: true, user: publicUser(db.user), wishes }
@@ -349,26 +353,73 @@ function handle(name: string, data: any): any {
   }
 
   if (name === 'hit') {
-    const raw = parseInt(data && data.n, 10)
-    const n = Math.max(1, Math.min(999, isNaN(raw) ? 1 : raw))
-    db.user.totalMerit = (db.user.totalMerit || 0) + n
-    db.user.lastHitDate = today
-    db.daily[today] = (db.daily[today] || 0) + n
-    let wish = null
-    const w = data && data.wishId ? db.wishes.find((x) => x._id === data.wishId) : null
-    if (w && w.status === 'ongoing') {
-      w.current = (w.current || 0) + n
-      const log = w.hitLog.find((h: any) => h.date === today)
-      if (log) log.count += n
-      else w.hitLog.push({ date: today, count: n })
-      if (w.current >= w.goal) {
-        w.status = 'completed'
-        w.completedDate = today
+    const action = (data && data.action) || 'knock'
+    const now = Date.now()
+    const credit = (wishId: string | null, n: number, by: Record<string, number> | null, incense: boolean) => {
+      db.user.totalMerit = (db.user.totalMerit || 0) + n
+      db.user.lastHitDate = today
+      db.daily[today] = (db.daily[today] || 0) + n
+      let wish = null
+      const w = wishId ? db.wishes.find((x) => x._id === wishId) : null
+      if (w && w.status === 'ongoing') {
+        w.current = (w.current || 0) + n
+        const log = w.hitLog.find((h: any) => h.date === today)
+        if (log) log.count += n
+        else w.hitLog.push({ date: today, count: n })
+        if (by) {
+          const src = Object.assign({ hand: 0, auto: 0, incense: 0 }, w.bySource || {})
+          Object.keys(by).forEach((k) => {
+            src[k] = (src[k] || 0) + by[k]
+          })
+          w.bySource = src
+        }
+        if (incense) w.incenseCount = (w.incenseCount || 0) + 1
+        if (w.current >= w.goal) {
+          w.status = 'completed'
+          w.completedDate = today
+        }
+        wish = publicWish(w)
       }
-      wish = publicWish(w)
+      save(db)
+      return { totalMerit: db.user.totalMerit, todayCount: db.daily[today], wish }
     }
-    save(db)
-    return { ok: true, totalMerit: db.user.totalMerit, todayCount: db.daily[today], wish }
+    const view = (inc: any) =>
+      inc ? { wishId: inc.wishId, minutes: inc.minutes, startMs: inc.startMs, endMs: inc.startMs + inc.minutes * 60000, serverNow: now } : null
+
+    if (action === 'knock') {
+      const raw = data && data.by
+      const clampN = (v: any) => Math.max(0, Math.min(999, parseInt(v, 10) || 0))
+      let by: Record<string, number> | null = null
+      if (raw && typeof raw === 'object' && clampN(raw.hand) + clampN(raw.auto) > 0) {
+        by = { hand: clampN(raw.hand), auto: clampN(raw.auto) }
+      }
+      const rawN = parseInt(data && data.n, 10)
+      const n = by ? by.hand + by.auto : Math.max(1, Math.min(999, isNaN(rawN) ? 1 : rawN))
+      return Object.assign({ ok: true }, credit((data && data.wishId) || null, n, by, false))
+    }
+    if (action === 'light') {
+      const minutes = parseInt(data && data.minutes, 10)
+      if (!INCENSE_MINUTES[minutes]) return fail('香的时长不对')
+      if (db.user.incense) return { ok: true, incense: view(db.user.incense), already: true }
+      db.user.incense = { wishId: (data && data.wishId) || null, minutes, startMs: now }
+      save(db)
+      return { ok: true, incense: view(db.user.incense) }
+    }
+    if (action === 'snuff') {
+      delete db.user.incense
+      save(db)
+      return { ok: true }
+    }
+    if (action === 'settle') {
+      const inc = db.user.incense
+      if (!inc) return { ok: true, settled: false }
+      if (now + 5000 < inc.startMs + inc.minutes * 60000) return { ok: true, settled: false, incense: view(inc) }
+      delete db.user.incense
+      const n = inc.minutes * INCENSE_RATE
+      const r = credit(inc.wishId, n, { incense: n }, true)
+      return Object.assign({ ok: true, settled: true, gained: n, minutes: inc.minutes, wishId: inc.wishId }, r)
+    }
+    return fail('未知操作')
   }
 
   if (name === 'wish') {

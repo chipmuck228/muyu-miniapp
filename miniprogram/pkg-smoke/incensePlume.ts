@@ -11,6 +11,10 @@ export interface SmokeTint {
 
 export interface VoidSmokeHandle {
   setTint: (tint: SmokeTint) => void
+  /** 烟头相对默认位置下移（占画布高度的比例，负数为上移），一炷香燃烧时用；会缓动过去 */
+  setSink: (ratio: number) => void
+  /** 整体淡出（0..1）。外层 CSS opacity 管不到 WebGL 画布，淡出只能画在这里；instant 跳过缓动 */
+  setFade: (alpha: number, instant?: boolean) => void
   stop: () => void
 }
 
@@ -53,6 +57,7 @@ void main() {
 const FRAG = `
 precision mediump float;
 uniform vec3 uColor;
+uniform float uFade;
 varying float vAlpha;
 varying float vSoft;
 varying float vV;
@@ -61,7 +66,7 @@ void main() {
   float edge = 1.0 - smoothstep(inner, 1.0, abs(vV));
   float a = vAlpha * edge;
   if (a < 0.012) discard;
-  gl_FragColor = vec4(uColor, a);
+  gl_FragColor = vec4(uColor, a * uFade);
 }
 `
 
@@ -172,6 +177,7 @@ export function startIncensePlume(
   const aSoft = gl.getAttribLocation(prog, 'aSoft')
   const uProj = gl.getUniformLocation(prog, 'uProj')
   const uColor = gl.getUniformLocation(prog, 'uColor')
+  const uFade = gl.getUniformLocation(prog, 'uFade')
   const proj = ortho(cssW, cssH)
   const color = {
     ember: [1, 0.36, 0.16] as [number, number, number],
@@ -184,10 +190,13 @@ export function startIncensePlume(
   }
   useTint(tint)
 
-  const originY = cssH * (0.5 - CONFIG.originYRatio)
+  let originY = cssH * (0.5 - CONFIG.originYRatio)
   const screenTop = cssH * 0.5
   const curlY = screenTop - cssH * CONFIG.curlFromTop
-  const stemH = Math.max(1, curlY - originY)
+  let stemH = Math.max(1, curlY - originY)
+  let originTarget = originY
+  let fade = 1
+  let fadeTarget = 1
   const growMs = (stemH / CONFIG.riseSpeed) * 16.67
   const vortexSpan = CONFIG.holdMs + CONFIG.scatterMs
   const strandN = CONFIG.strands
@@ -241,6 +250,13 @@ export function startIncensePlume(
   gl.bufferData(gl.ARRAY_BUFFER, emberV, gl.STATIC_DRAW)
   gl.bindBuffer(gl.ARRAY_BUFFER, bufEmberS)
   gl.bufferData(gl.ARRAY_BUFFER, emberS, gl.STATIC_DRAW)
+
+  const placeEmber = () => {
+    const ys = [originY - 7, originY - 7, originY + 7, originY - 7, originY + 7, originY + 7]
+    for (let i = 0; i < 6; i++) emberPos[i * 2 + 1] = ys[i]
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufEmberPos)
+    gl.bufferData(gl.ARRAY_BUFFER, emberPos, gl.STATIC_DRAW)
+  }
 
   let ampScale = 1
   let ampTarget = 1
@@ -397,6 +413,17 @@ export function startIncensePlume(
   const tick = () => {
     if (!running) return
     const now = Date.now()
+    if (originY !== originTarget) {
+      const d = originTarget - originY
+      originY = Math.abs(d) < 0.5 ? originTarget : originY + d * 0.1
+      stemH = Math.max(1, curlY - originY)
+      placeEmber()
+    }
+    if (fade !== fadeTarget) {
+      // 约 0.4s 到位，和原来 CSS 的过渡相当
+      const d = fadeTarget - fade
+      fade = Math.abs(d) < 0.004 ? fadeTarget : fade + d * 0.12
+    }
     const growU = clamp((now - born) / growMs, 0, 1)
     if (!risen && now - born >= riseAt) {
       risen = true
@@ -412,11 +439,16 @@ export function startIncensePlume(
     gl.viewport(0, 0, pixelW, pixelH)
     gl.clearColor(0, 0, 0, 0)
     gl.clear(gl.COLOR_BUFFER_BIT)
+    if (fade <= 0) {
+      raf = setTimeout(tick, 16) as unknown as number
+      return
+    }
     gl.disable(gl.DEPTH_TEST)
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
     gl.useProgram(prog)
     gl.uniformMatrix4fv(uProj, false, proj)
+    gl.uniform1f(uFade, fade)
 
     const pulse = 0.74 + Math.sin(now * 0.001) * 0.14
     for (let i = 0; i < 6; i++) emberA[i] = 0.55 * pulse
@@ -463,6 +495,15 @@ export function startIncensePlume(
   return {
     setTint(next: SmokeTint) {
       useTint(next)
+    },
+    setSink(ratio: number) {
+      const r = clamp(Number(ratio) || 0, -0.3, 0.12)
+      originTarget = cssH * (0.5 - CONFIG.originYRatio - r)
+    },
+    setFade(alpha: number, instant?: boolean) {
+      const a = clamp(Number(alpha), 0, 1)
+      fadeTarget = isNaN(a) ? 1 : a
+      if (instant) fade = fadeTarget
     },
     stop() {
       running = false

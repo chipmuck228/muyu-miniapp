@@ -206,3 +206,12 @@
   letter-spacing: 8rpx;
   color: rgba(224, 181, 119, 0.55);
 }
+
+/* 专注来源：亲手 / 燃香 / 自动 */
+.source-line {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  letter-spacing: 2rpx;
+  color: rgba(240, 230, 216, 0.45);
+}

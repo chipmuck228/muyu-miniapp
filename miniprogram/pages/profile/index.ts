@@ -211,7 +211,6 @@ Page({
     todayLabel: '',
     soundOn: true,
     vibrateOn: true,
-    autoMode: false,
     ambience: 'off' as AmbienceId,
     ambienceOptions: dressList(AMBIENCE_OPTIONS, false),
     theme: 'dawn' as ThemeId,
@@ -313,7 +312,6 @@ Page({
         selText: todayCount > 0 ? today + '  ·  ' + todayCount : today,
         soundOn: s.soundOn,
         vibrateOn: s.vibrateOn,
-        autoMode: s.autoMode,
         ambience: s.ambience,
         ambienceOptions: dressList(AMBIENCE_OPTIONS, premium),
         theme: s.theme,
@@ -342,9 +340,6 @@ Page({
   },
   toggleVibrate() {
     this.saveSetting({ vibrateOn: !this.data.vibrateOn })
-  },
-  toggleAuto() {
-    this.saveSetting({ autoMode: !this.data.autoMode })
   },
   onPickAmbience(e: any) {
     const ambience = parseAmbience(e.currentTarget.dataset.id)
@@ -475,7 +470,6 @@ Page({
     const prev = {
       soundOn: this.data.soundOn,
       vibrateOn: this.data.vibrateOn,
-      autoMode: this.data.autoMode,
       ambience: this.data.ambience,
       theme: this.data.theme,
     }

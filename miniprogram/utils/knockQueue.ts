@@ -1,5 +1,7 @@
-// 敲击队列：高频敲击在客户端合并批量提交，避免请求风暴，且计数不丢失
+// 敲击队列：高频敲击在客户端合并批量提交，避免请求风暴，且计数不丢失。亲手 / 自动分开记数
 import { hitKnock, HitResp } from './cloud'
+
+export type TapSource = 'hand' | 'auto'
 
 export interface KnockResult {
   totalMerit: number
@@ -11,7 +13,7 @@ export interface KnockResult {
 }
 
 export class KnockQueue {
-  private pending: number
+  private pending: { hand: number; auto: number }
   private running: boolean
   private alive: boolean
 
@@ -20,26 +22,30 @@ export class KnockQueue {
     private readonly onResult: (r: KnockResult) => void,
     private readonly onError: () => void = () => undefined
   ) {
-    this.pending = 0
+    this.pending = { hand: 0, auto: 0 }
     this.running = false
     this.alive = true
   }
 
-  tap(n = 1) {
+  tap(source: TapSource, n = 1) {
     if (!this.alive) return
-    this.pending += n
+    this.pending[source] += n
     this.flush()
+  }
+
+  private hasPending(): boolean {
+    return this.pending.hand + this.pending.auto > 0
   }
 
   private async flush() {
     if (this.running) return
     this.running = true
-    while (this.pending > 0 && this.alive) {
-      const n = this.pending
-      this.pending = 0
+    while (this.hasPending() && this.alive) {
+      const by = this.pending
+      this.pending = { hand: 0, auto: 0 }
       const wishId = this.wishIdProvider()
       try {
-        const res: HitResp = await hitKnock(wishId, n)
+        const res: HitResp = await hitKnock(wishId, by)
         if (!this.alive) return
         this.onResult({
           totalMerit: res.totalMerit,
@@ -58,6 +64,6 @@ export class KnockQueue {
 
   destroy() {
     this.alive = false
-    this.pending = 0
+    this.pending = { hand: 0, auto: 0 }
   }
 }
