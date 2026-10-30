@@ -45,6 +45,10 @@ export function levelOf(totalMerit: number): LevelInfo {
 /** 心愿目标预设 */
 export const PRESET_GOALS: number[] = [100, 500, 1000, 5000, 10000]
 
+/** 定课：一炷香定时（分钟）、一串念珠定数。手敲 / 自动都照常计入专注 */
+export const SESSION_MINUTES: number[] = [3, 5, 10]
+export const SESSION_BEADS = 108
+
 /** 敲击飘字 */
 export const CHANTS: string[] = ['静心', '专注', '一步', '加油', '心愿', '继续']
 

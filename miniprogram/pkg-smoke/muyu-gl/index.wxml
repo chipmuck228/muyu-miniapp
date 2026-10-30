@@ -1,0 +1,7 @@
+<view class="muyu-root">
+  <canvas wx:if="{{canvasOn}}" type="webgl" id="muyuCanvas" class="muyu-canvas" />
+  <!-- WebGL 起不来时的平面木鱼（同原型的兜底） -->
+  <view class="muyu-fallback" wx:if="{{fallback}}">
+    <view class="muyu-fallback-slot"></view>
+  </view>
+</view>

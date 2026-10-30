@@ -1,7 +1,5 @@
 {
-  "usingComponents": {
-    "hall-dock": "/components/hall-dock/index"
-  },
+  "usingComponents": {},
   "disableScroll": true,
   "backgroundColor": "#0a0806",
   "backgroundColorTop": "#0a0806",

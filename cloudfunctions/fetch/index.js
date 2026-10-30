@@ -143,6 +143,8 @@ exports.main = async (event) => {
         completedWish,
         streak: calcStreak(map, today),
         todayCount: map[today] || 0,
+        // 一炷香按云端时钟计时，客户端据此校正本机时差
+        serverNow: Date.now(),
       }
     }
 

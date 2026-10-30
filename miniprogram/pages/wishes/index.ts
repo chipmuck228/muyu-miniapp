@@ -1,7 +1,8 @@
 // 心愿列表
 import { fetchWishes, Wish } from '../../utils/cloud'
 import { percentOf } from '../../utils/constants'
-import { concealTabBar } from '../../utils/util'
+import { concealTabBar, fmtInt } from '../../utils/util'
+import { applyLesson } from '../../utils/lesson'
 
 interface WishVM {
   _id: string
@@ -18,9 +19,16 @@ function build(w: Wish): WishVM {
     _id: w._id,
     name: w.name,
     percent,
-    mark: w.status === 'fulfilled' ? '已了结' : w.status === 'completed' ? '已成' : percent + '%',
+    mark:
+      fmtInt(w.current) + ' / ' + fmtInt(w.goal) +
+      (w.status === 'fulfilled' ? ' · 已了结' : w.status === 'completed' ? ' · 已成' : ''),
     done,
   }
+}
+
+// 未成的在上，已成 / 已了结的沉到下面；各组内保持云端的新→旧顺序
+function ongoingFirst(list: WishVM[]): WishVM[] {
+  return list.filter((w) => !w.done).concat(list.filter((w) => w.done))
 }
 
 Page({
@@ -60,7 +68,7 @@ Page({
       this.setData({
         loading: false,
         refreshing: false,
-        wishes: res.wishes.map(build),
+        wishes: ongoingFirst(res.wishes.map(build)),
       })
     } catch (e: any) {
       if (!this._alive) return
@@ -71,6 +79,25 @@ Page({
 
   onRefresh() {
     this.load(true)
+  },
+
+  goNew() {
+    wx.navigateTo({ url: '/pages/wish-form/index' })
+  },
+
+  /** 轻触心愿：进行中的直接回堂敲击；已圆满的没法再敲，打开详情 */
+  onPickWish(e: any) {
+    const id = (e.currentTarget.dataset.id as string) || ''
+    const w = this.data.wishes.find((x) => x._id === id)
+    if (!w) return
+    if (w.done) {
+      this.openDetail(e)
+      return
+    }
+    applyLesson({ mode: 'wish', wishId: w._id, name: w.name })
+    getApp<IAppOption>().globalData.homeEnterAnim = true
+    concealTabBar(this)
+    wx.switchTab({ url: '/pages/home/index' })
   },
 
   openDetail(e: any) {

@@ -1,6 +1,7 @@
 // 云开发数据访问层（所有读写都经由云函数，避免依赖集合权限配置）
 import { isPremiumAmbience, parseAmbience } from './audioCatalog'
 import { isPremiumTheme, parseTheme, ThemeId } from './theme'
+import { mockEnabled, mockCallFunction } from './devMock'
 
 export interface WishHit {
   date: string
@@ -8,6 +9,10 @@ export interface WishHit {
 }
 
 export type WishStatus = 'ongoing' | 'completed' | 'fulfilled'
+
+/** 专注来源：亲手敲 / 自动敲 / 燃香折算 */
+export type KnockSource = 'hand' | 'auto' | 'incense'
+export type BySource = Partial<Record<KnockSource, number>>
 
 export interface Wish {
   _id: string
@@ -22,6 +27,10 @@ export interface Wish {
   fulfilledDate?: string
   hasSurprise?: boolean
   thumbUrl?: string
+  /** 按来源累计；早于此功能的心愿没有，或只覆盖一部分 current */
+  bySource?: BySource
+  /** 为这个心愿燃尽的香（炷） */
+  incenseCount?: number
 }
 
 export type AmbienceId = import('./audioCatalog').AmbienceId
@@ -51,6 +60,8 @@ export interface HomePayload {
   completedWish: Wish | null
   streak: number
   todayCount: number
+  /** 云端此刻的毫秒时间，用来校正本机时钟 */
+  serverNow?: number
 }
 
 export interface ProfilePayload {
@@ -82,8 +93,11 @@ export function settingsOf(u?: UserRecord | null): UserSettings {
 type CloudResult<T> = { ok: boolean; msg?: string; code?: string } & T
 
 function callCloud<T>(name: string, data: Record<string, any> = {}): Promise<CloudResult<T>> {
-  return wx.cloud
-    .callFunction({ name, data })
+  // 开发版可切到本地模拟，见 utils/devMock.ts
+  const call: Promise<{ result: any }> = mockEnabled()
+    ? mockCallFunction(name, data)
+    : (wx.cloud.callFunction({ name, data }) as Promise<any>)
+  return call
     .then((res) => {
       const r = res.result as CloudResult<T>
       if (!r || r.ok === false) {
@@ -134,8 +148,8 @@ export interface HitResp {
   wish: Wish | null
 }
 
-export function hitKnock(wishId: string | null, n: number): Promise<HitResp> {
-  return callCloud<HitResp>('hit', { wishId: wishId || '', n, date: todayStrLocal() })
+export function hitKnock(wishId: string | null, by: { hand: number; auto: number }): Promise<HitResp> {
+  return callCloud<HitResp>('hit', { wishId: wishId || '', n: by.hand + by.auto, by, date: todayStrLocal() })
 }
 
 export function createWish(name: string, goal: number, deadline: string | null): Promise<{ wishId: string }> {
@@ -150,7 +164,10 @@ export function fulfillWish(wishId: string): Promise<{ wish: Wish }> {
   return callCloud('wish', { action: 'fulfill', wishId, date: todayStrLocal() })
 }
 
-export function fetchPaperOrigin(wishId: string): Promise<{ originUrl: string; originFileId?: string }> {
+/** localPath 只在本地模拟模式下出现，指向包内的占位壁纸 */
+export function fetchPaperOrigin(
+  wishId: string
+): Promise<{ originUrl: string; originFileId?: string; localPath?: string }> {
   return callCloud('wish', { action: 'paperOrigin', wishId })
 }
 

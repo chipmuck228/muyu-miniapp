@@ -1,7 +1,6 @@
 {
   "pages": [
     "pages/gate/index",
-    "pages/lesson/index",
     "pages/home/index",
     "pages/wishes/index",
     "pages/wish-form/index",
@@ -34,10 +33,6 @@
       {
         "pagePath": "pages/wishes/index",
         "text": "心愿"
-      },
-      {
-        "pagePath": "pages/wish-form/index",
-        "text": "立愿"
       },
       {
         "pagePath": "pages/certificate/index",

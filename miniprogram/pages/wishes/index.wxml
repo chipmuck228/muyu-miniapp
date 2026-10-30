@@ -1,7 +1,9 @@
 <!-- 心愿：侧殿列表 -->
 <view class="page wing-page wishes-page">
-  <view class="wing-head" style="padding-top: {{statusBarHeight}}px;">
+  <view class="wing-head has-kicker" style="padding-top: {{statusBarHeight}}px;">
+    <text class="wing-kicker ghost">＋</text>
     <text class="wing-title">心 愿</text>
+    <text class="wing-kicker add-kicker" hover-class="hover-dim" bindtap="goNew">＋ 立愿</text>
   </view>
 
   <scroll-view
@@ -14,7 +16,7 @@
     bindrefresherrefresh="onRefresh"
   >
     <view class="wing-body">
-      <text class="list-hint" wx:if="{{wishes.length > 0}}">完成后另有惊喜</text>
+      <text class="list-hint" wx:if="{{wishes.length > 0}}">轻触心愿即回堂敲击 · 完成后另有惊喜</text>
       <block wx:if="{{wishes.length > 0}}">
         <view
           wx:for="{{wishes}}"
@@ -22,7 +24,7 @@
           class="wish-row {{item.done ? 'done' : ''}}"
           hover-class="hover-dim"
           data-id="{{item._id}}"
-          bindtap="openDetail"
+          bindtap="onPickWish"
         >
           <view class="wish-top">
             <text class="wish-name">{{item.name}}</text>
@@ -31,11 +33,23 @@
           <view class="wish-line">
             <view class="wish-fill" style="width: {{item.percent}}%;"></view>
           </view>
+          <view class="wish-foot">
+            <text class="wish-go" wx:if="{{!item.done}}">回堂敲击</text>
+            <text
+              class="wish-detail"
+              hover-class="hover-dim"
+              hover-stop-propagation
+              data-id="{{item._id}}"
+              catchtap="openDetail"
+            >详情 ›</text>
+          </view>
         </view>
+        <view class="wish-new" hover-class="hover-dim" bindtap="goNew">＋ 立新愿</view>
       </block>
       <view class="empty" wx:elif="{{!loading}}">
         <text class="empty-title">尚未立愿</text>
         <text class="empty-sub">完成后另有惊喜</text>
+        <text class="empty-go" hover-class="hover-dim" bindtap="goNew">去立愿</text>
       </view>
     </view>
   </scroll-view>

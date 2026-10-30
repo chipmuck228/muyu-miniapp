@@ -1,7 +1,7 @@
 .list-hint {
   display: block;
   margin-bottom: 12rpx;
-  font-size: 22rpx;
+  font-size: 26rpx;
   letter-spacing: 6rpx;
   color: rgba(224, 181, 119, 0.38);
 }
@@ -10,14 +10,14 @@
 }
 .wishes-page .empty-title {
   margin-top: 0;
-  font-size: 28rpx;
+  font-size: 32rpx;
   letter-spacing: 10rpx;
   font-weight: 400;
   color: rgba(240, 230, 216, 0.55);
 }
 .empty-sub {
   margin-top: 16rpx;
-  font-size: 22rpx;
+  font-size: 26rpx;
   letter-spacing: 6rpx;
   color: rgba(224, 181, 119, 0.42);
 }
@@ -34,7 +34,7 @@
 .wish-name {
   flex: 1;
   min-width: 0;
-  font-size: 30rpx;
+  font-size: 34rpx;
   letter-spacing: 4rpx;
   color: rgba(240, 230, 216, 0.88);
   overflow: hidden;
@@ -43,7 +43,7 @@
 }
 .wish-mark {
   margin-left: 24rpx;
-  font-size: 22rpx;
+  font-size: 26rpx;
   letter-spacing: 4rpx;
   color: rgba(224, 181, 119, 0.5);
 }
@@ -61,4 +61,48 @@
 .wish-fill {
   height: 100%;
   background: rgba(224, 181, 119, 0.55);
+}
+
+.wishes-page .wing-kicker {
+  width: 140rpx;
+}
+.add-kicker {
+  text-align: right;
+  white-space: nowrap;
+  color: rgba(224, 181, 119, 0.8);
+}
+.wishes-page .empty-go {
+  margin-top: 36rpx;
+  padding: 12rpx 8rpx;
+  font-size: 30rpx;
+  letter-spacing: 8rpx;
+  color: #e0b577;
+}
+
+/* 轻触整行回堂敲击；右侧「详情」看记录、改愿、存壁纸 */
+.wish-foot {
+  margin-top: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.wish-go {
+  font-size: 24rpx;
+  letter-spacing: 4rpx;
+  color: rgba(224, 181, 119, 0.5);
+}
+.wish-detail {
+  margin-left: auto;
+  padding: 8rpx 0 8rpx 32rpx;
+  font-size: 26rpx;
+  letter-spacing: 4rpx;
+  color: rgba(224, 181, 119, 0.8);
+}
+
+/* 列表末尾的立愿入口，和今日功课面板写法一致 */
+.wish-new {
+  padding: 36rpx 0;
+  font-size: 30rpx;
+  letter-spacing: 6rpx;
+  color: rgba(224, 181, 119, 0.85);
 }

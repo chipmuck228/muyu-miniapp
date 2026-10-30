@@ -1,4 +1,4 @@
-// 自定义底部 TabBar：5 项，100rpx 高 + 底部安全区
+// 自定义底部 TabBar：4 项，100rpx 高 + 底部安全区
 import { winInfo } from '../utils/util'
 
 interface TabItem {
@@ -16,7 +16,6 @@ Component({
     list: [
       { pagePath: '/pages/home/index', text: '木鱼', icon: '🪷' },
       { pagePath: '/pages/wishes/index', text: '心愿', icon: '❤️' },
-      { pagePath: '/pages/wish-form/index', text: '立愿', icon: '✚' },
       { pagePath: '/pages/certificate/index', text: '证书', icon: '📜' },
       { pagePath: '/pages/profile/index', text: '静心', icon: '👤' },
     ] as TabItem[],

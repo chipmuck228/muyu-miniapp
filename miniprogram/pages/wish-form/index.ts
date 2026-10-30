@@ -1,8 +1,8 @@
-// 立 / 改心愿
+// 立 / 改心愿：普通页面，从香案的今日功课面板、心愿列表、心愿详情 navigateTo 进来，完成后返回来处
 import { PRESET_GOALS } from '../../utils/constants'
 import { createWish, updateWish } from '../../utils/cloud'
 import { getFormState, setFormState } from '../../utils/formState'
-import { todayStr, fmtInt, concealTabBar } from '../../utils/util'
+import { todayStr, fmtInt } from '../../utils/util'
 
 interface GoalOption {
   value: number
@@ -34,7 +34,6 @@ Page({
   },
 
   onShow() {
-    concealTabBar(this)
     if (this.data.submitting) this.setData({ submitting: false })
     const st = getFormState()
     const editing = !!(st && st.mode === 'edit' && st.wish)
@@ -113,10 +112,17 @@ Page({
 
   doCancel() {
     this.clearState()
-    const app = getApp<IAppOption>()
-    app.globalData.homeEnterAnim = true
-    concealTabBar(this)
-    wx.switchTab({ url: '/pages/home/index' })
+    this.leave('/pages/home/index')
+  },
+
+  /** 返回来处；直接打开（页面栈只有自己）时回到兜底 Tab */
+  leave(fallbackTab: string) {
+    if (getCurrentPages().length > 1) {
+      wx.navigateBack({ delta: 1 })
+      return
+    }
+    if (fallbackTab === '/pages/home/index') getApp<IAppOption>().globalData.homeEnterAnim = true
+    wx.switchTab({ url: fallbackTab })
   },
 
   async doSubmit() {
@@ -159,7 +165,7 @@ Page({
       this.clearState()
       this.resetForm()
       setTimeout(() => {
-        wx.switchTab({ url: '/pages/wishes/index' })
+        this.leave('/pages/wishes/index')
       }, 500)
     } catch (e: any) {
       wx.showToast({ title: (e && e.message) || '提交失败', icon: 'none' })

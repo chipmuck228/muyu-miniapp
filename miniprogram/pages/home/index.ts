@@ -1,13 +1,25 @@
 // 木鱼香案：选完今日功课后敲击；从其他 Tab 切回时播放短暗幕
-import { fetchHome, fetchWishDetail, UserRecord, settingsOf, bindChannelByScene, normalizeChannelScene } from '../../utils/cloud'
-import { CHANTS } from '../../utils/constants'
-import { playKnock, vibrate, ensureKnock } from '../../utils/knock'
-import { KnockQueue } from '../../utils/knockQueue'
+import {
+  fetchHome,
+  fetchWishDetail,
+  fetchWishes,
+  UserRecord,
+  settingsOf,
+  bindChannelByScene,
+  normalizeChannelScene,
+} from '../../utils/cloud'
+import { CHANTS, SESSION_MINUTES, SESSION_BEADS } from '../../utils/constants'
+import { playKnock, vibrate, ensureKnock, ensureBell, playBell, KnockTimbre } from '../../utils/knock'
+import { KnockQueue, TapSource } from '../../utils/knockQueue'
+import { mockEnabled } from '../../utils/devMock'
 import { concealTabBar, winInfo } from '../../utils/util'
 import { DAWN_FILE_ID, resolveCloudFile } from '../../utils/cloudFile'
-import { startAmbience, stopAmbience } from '../../utils/ambience'
+import { startAmbience, stopAmbience, fadeOutAmbience } from '../../utils/ambience'
 import { AmbienceId } from '../../utils/audioCatalog'
 import { parseTheme, themeEnds, ThemeId } from '../../utils/theme'
+import { applyLesson, nextLesson, LessonPick, RANDOM_NAME, RANDOM_LESSON } from '../../utils/lesson'
+import { SESSION_PLANS, SessionPlan, PlanId, planOf, triedPlans, markPlanTried } from '../../utils/sessionPlans'
+import { buyPremium, PACK_NAME } from '../../utils/premium'
 
 interface FloatItem {
   key: number
@@ -19,6 +31,132 @@ interface FloatItem {
 type EnterPhase = 'cover' | 'reveal' | 'done'
 type EnterKind = 'first' | 'back'
 
+interface SheetRow {
+  _id: string
+  name: string
+  mark: string
+  cur: boolean
+}
+
+interface CelebrateInfo {
+  name: string
+  goalText: string
+  thumbUrl: string
+  /** 关掉弹窗后接着敲的功课，提前告诉用户 */
+  nextText: string
+}
+
+const SWITCH_HINT_MS = 2600
+
+// 定课：一炷香定时、一串念珠定数。木鱼照常敲，手敲 / 自动都算；只在香案前走时，结束响一声钟钵
+type SessionKind = 'time' | 'count'
+
+interface SessionOption {
+  kind: SessionKind
+  /** 分钟 / 下 */
+  value: number
+  name: string
+  mark: string
+}
+
+interface PlanOption {
+  id: PlanId
+  name: string
+  mark: string
+  locked: boolean
+}
+
+interface SessionState {
+  kind: SessionKind
+  value: number
+  /** 成品定课；自己选的一炷香 / 念珠为 null */
+  plan: SessionPlan | null
+  /** 没开静心包，在试这一套 */
+  trial: boolean
+  goalMs: number
+  elapsedMs: number
+  /** 上次走时的时刻，0 表示停着 */
+  lastTick: number
+  hand: number
+  auto: number
+}
+
+interface SessionDone {
+  kind: SessionKind
+  value: number
+  planId: PlanId | ''
+  trial: boolean
+  title: string
+  line: string
+  detail: string
+  /** 成品定课的收尾语 */
+  closing: string
+  /** 试用结束时介绍静心包 */
+  offer: string
+}
+
+/** 平时自动敲的间隔；成品定课按各自的节奏 */
+const AUTO_GAP_MS = 800
+
+/** 右下角香身图标的长度（rpx），定时时随燃烧变短 */
+const STICK_ICON_LEN = 56
+
+function sessionOptions(): SessionOption[] {
+  // 开发版本地多一个 1 分钟 / 10 下，方便看结束
+  const mins = mockEnabled() ? [1].concat(SESSION_MINUTES) : SESSION_MINUTES
+  const beads = mockEnabled() ? [10, SESSION_BEADS] : [SESSION_BEADS]
+  const timed: SessionOption[] = mins.map((m) => ({ kind: 'time', value: m, name: '一炷香 · ' + m + ' 分钟', mark: '到点即止' }))
+  const counted: SessionOption[] = beads.map((n) => ({ kind: 'count', value: n, name: '一串念珠 · ' + n + ' 下', mark: '敲满即止' }))
+  return timed.concat(counted)
+}
+
+function planOptions(premium: boolean): PlanOption[] {
+  const tried = triedPlans()
+  return SESSION_PLANS.map((p) => {
+    const locked = p.premium && !premium
+    let mark = p.scene + ' · ' + p.minutes + ' 分钟'
+    if (locked) mark = tried[p.id] ? PACK_NAME : '可试一次 · ' + p.minutes + ' 分钟'
+    return { id: p.id, name: p.name, mark, locked }
+  })
+}
+
+/** 成品定课的时长；开发版本地缩成 1 分钟，方便看收尾 */
+function planMinutes(p: SessionPlan): number {
+  return mockEnabled() ? 1 : p.minutes
+}
+
+function clockText(ms: number): string {
+  const sec = Math.max(0, Math.ceil(ms / 1000))
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s
+}
+
+// 木鱼材质（渲染参数在 pkg-smoke/muyuFish.ts；分包代码主包不能同步引用，这里只放名字和色点）
+const MATERIAL_KEY = 'muyu_material'
+const MATERIALS = [
+  { id: 'zitan', name: '紫檀', dot: 'radial-gradient(circle at 34% 26%, #a55014, #3d1a06)' },
+  { id: 'huali', name: '黄花梨', dot: 'radial-gradient(circle at 34% 26%, #e0a35a, #6b3d12)' },
+  { id: 'liuli', name: '琉璃', dot: 'radial-gradient(circle at 34% 26%, #8fd3ff, #0b4f8a)' },
+  { id: 'yu', name: '玉', dot: 'radial-gradient(circle at 34% 26%, #b8f0d0, #2f7a5c)' },
+]
+/** 手指移动超过这个距离（px）就算拖动，不算敲击 */
+const DRAG_SLOP = 6
+
+function savedMaterial(): string {
+  try {
+    const v = wx.getStorageSync(MATERIAL_KEY)
+    if (MATERIALS.some((m) => m.id === v)) return v
+  } catch {
+    // 用默认
+  }
+  return 'zitan'
+}
+
+function nextTextOf(p: LessonPick): string {
+  return p.mode === 'wish' ? '接下来专注：' + p.name : '心愿都已圆满，接下来随机专注'
+}
+
 function bindWishId(): string | null {
   const app = getApp<IAppOption>()
   if (app.globalData.knockMode === 'wish') return app.globalData.knockWishId || null
@@ -26,6 +164,7 @@ function bindWishId(): string | null {
 }
 
 const LESSON_TITLE_MAX = 8
+const TITLE_FADE_MS = 1600
 const RANDOM_GOAL = 10
 function progressT(cur: number, goal: number): number {
   return goal > 0 ? Math.max(0, Math.min(1, cur / goal)) : 0
@@ -54,7 +193,7 @@ function lessonTitleOf(): string {
   if (app.globalData.knockMode === 'wish' && app.globalData.knockWishId) {
     return app.globalData.knockWishName || '心愿'
   }
-  return '随机专注'
+  return RANDOM_NAME
 }
 
 function lessonCharsOf(name: string): string[] {
@@ -91,6 +230,39 @@ Page({
     dawnSky: 0,
     smokeFade: 1,
     dawnSrc: '',
+    // 顶部当前功课：心愿显示 进度/目标，随机专注显示今日次数
+    headWish: false,
+    headReady: false,
+    headCur: 0,
+    headGoal: 0,
+    headPct: 0,
+    celebrateOn: false,
+    celebrate: null as CelebrateInfo | null,
+    /** 圆满后切到下一个功课时，顶部短暂提示 */
+    switchHint: '',
+    /** 每敲一下 +1，驱动 3D 木鱼回弹 */
+    strikeSeq: 0,
+    // 「今日功课」底部面板：切换心愿 / 随机专注 / 立新愿
+    sheetOn: false,
+    sheetFirst: false,
+    sheetLoading: false,
+    sheetRows: [] as SheetRow[],
+    sheetRandomCur: false,
+    materials: MATERIALS,
+    material: savedMaterial(),
+    // 定课：进行中右下角显示剩余时间 / 已敲次数
+    sessionOn: false,
+    sessionKind: 'time' as SessionKind,
+    sessionBig: '',
+    sessionSmall: '',
+    sessionStick: STICK_ICON_LEN,
+    sessionSheetOn: false,
+    sessionOptions: [] as SessionOption[],
+    planOptions: [] as PlanOption[],
+    sessionDoneOn: false,
+    sessionDone: null as SessionDone | null,
+    /** 已开静心包 */
+    premium: false,
   },
 
   _floatSeq: 0,
@@ -101,7 +273,6 @@ Page({
   _wishId: null as string | null,
   _alive: false,
   _hasEntered: false,
-  _openingLesson: false,
   _titleTimer: 0,
   _titleCurrent: 0,
   _titleGoal: RANDOM_GOAL,
@@ -111,6 +282,27 @@ Page({
   _titleCtx: null as any,
   _titleCssW: 0,
   _titleCssH: 0,
+  /** 竖排标题这次显出的时刻，0 表示正隐去 */
+  _titleShownAt: 0,
+  _titleFadeRaf: 0,
+  _celebrateId: '' as string,
+  _nextPick: null as Promise<LessonPick> | null,
+  _hintTimer: 0,
+  _touchX: 0,
+  _touchY: 0,
+  _touchMoved: 0,
+  _dragging: false,
+  _session: null as SessionState | null,
+  _sessionTimer: 0,
+  /** 定课结束时正弹着圆满：等圆满关掉再给小结 */
+  _pendingDone: null as SessionDone | null,
+  // 自己在静心页选的氛围 / 主题；成品定课期间临时换成定课的，结束后换回来
+  _userAmbience: 'off' as AmbienceId,
+  _userTheme: 'dawn' as ThemeId,
+  /** 当前铺着的成品定课场景：定课中，以及结束后小结还开着时 */
+  _scenePlan: null as SessionPlan | null,
+  /** 成品定课收尾后声音已淡出，小结关掉前不再响 */
+  _sceneQuiet: false,
   onLoad(options: Record<string, string | undefined>) {
     const app = getApp<IAppOption>()
     const scene =
@@ -121,6 +313,8 @@ Page({
       bindChannelByScene(scene).catch(() => {})
     }
     const cached = settingsOf(app.globalData.user)
+    this._userAmbience = cached.ambience
+    this._userTheme = cached.theme
     this.setData(
       Object.assign(
         {
@@ -138,25 +332,7 @@ Page({
       () => this._wishId,
       (r) => {
         if (!this._alive) return
-        if (r.completed) {
-          this._wishId = null
-          app.globalData.knockWishId = null
-          app.globalData.knockMode = 'random'
-          app.globalData.knockWishName = '随机专注'
-          this._lessonKind = 'random'
-          this._randomHits = 0
-          this._titleCurrent = 0
-          this._titleGoal = RANDOM_GOAL
-          this.setData(
-            Object.assign(
-              lessonTitlePatch('随机专注'),
-              { lessonTitleOn: true },
-              scenePatch(0, RANDOM_GOAL, parseTheme(this.data.theme))
-            )
-          )
-          this.drawLessonTitle()
-          wx.showToast({ title: '心愿已成 · 惊喜已启', icon: 'none' })
-        }
+        if (r.completed) this.celebrateWish()
         this.setData(this.levelPatch(r.totalMerit, r.todayCount))
       },
       () => {
@@ -181,21 +357,46 @@ Page({
   onShow() {
     const app = getApp<IAppOption>()
     if (!app.globalData.lessonChosen) {
-      this.openLesson()
-      return
+      // 没经过入堂（如扫码直达）：先按随机专注摆好，再弹面板让用户选
+      applyLesson(RANDOM_LESSON, false)
+      app.globalData.openLessonSheet = true
     }
+    const prevWishId = this._wishId
     this._wishId = bindWishId()
+    if (this._wishId !== prevWishId && this._lessonKind === 'wish') {
+      // 从今日功课换了心愿：旧进度作废，等新心愿拉回来再显示数字
+      this._lessonKind = ''
+      this._titleCurrent = 0
+    }
     this.setData({ readyToKnock: true })
     if (!this.data.dawnSrc) this.loadDawn()
     ensureKnock()
     startAmbience(this.data.ambience)
     this.armLessonTitle()
     concealTabBar(this)
+    if (this._session) {
+      ensureBell()
+      this.startSessionTick()
+    }
     this.refresh()
     this.tryEnter()
+    // 自动敲只在本次打开内有效：切页、锁屏回来接着敲，重开小程序从手敲开始
+    if (this.data.autoMode && !this.entering() && !this.overlayOn()) this.startAuto()
+    if (app.globalData.openLessonSheet) {
+      app.globalData.openLessonSheet = false
+      // 先让香案亮出来，再升起面板
+      setTimeout(() => {
+        if (this._alive) this.openSheet(true)
+      }, 700)
+    } else if (this.data.sheetOn) {
+      // 从面板去立愿后回来：刷新列表，新心愿就在里面
+      this.loadSheet()
+    }
   },
 
   onHide() {
+    // 定课只在香案前走时：离开就停，回来接着走
+    this.stopSessionTick()
     this.stopAuto()
     stopAmbience()
     this.clearEnterTimer()
@@ -204,6 +405,8 @@ Page({
     this._titleCanvas = null
     this._titleCssW = 0
     this._titleCssH = 0
+    this._titleShownAt = 0
+    this._titleFadeRaf = 0
     this.setData({ lessonTitleOn: false })
     const app = getApp<IAppOption>()
     if (app.globalData.homeWillReenter) {
@@ -219,6 +422,8 @@ Page({
 
   onUnload() {
     this._alive = false
+    if (this._hintTimer) clearTimeout(this._hintTimer)
+    this.stopSessionTick()
     this.stopAuto()
     stopAmbience()
     this.clearEnterTimer()
@@ -227,17 +432,6 @@ Page({
       this._queue.destroy()
       this._queue = null
     }
-  },
-
-  openLesson() {
-    if (this._openingLesson) return
-    this._openingLesson = true
-    wx.navigateTo({
-      url: '/pages/lesson/index',
-      complete: () => {
-        this._openingLesson = false
-      },
-    })
   },
 
   tryEnter() {
@@ -272,7 +466,7 @@ Page({
         if (!this._alive) return
         this._hasEntered = true
         this.setData({ enterPhase: 'done' })
-        if (this.data.autoMode) this.startAuto()
+        if (this.data.autoMode && !this.overlayOn()) this.startAuto()
       }, 560)
     }
     const arm = () => {
@@ -302,7 +496,15 @@ Page({
   },
 
   titleColorPatch() {
-    return scenePatch(this._titleCurrent, this._titleGoal, parseTheme(this.data.theme))
+    const isWish = getApp<IAppOption>().globalData.knockMode === 'wish'
+    const ready = this._lessonKind === 'wish'
+    return Object.assign(scenePatch(this._titleCurrent, this._titleGoal, parseTheme(this.data.theme)), {
+      headWish: isWish,
+      headReady: ready,
+      headCur: isWish ? this._titleCurrent : 0,
+      headGoal: isWish ? this._titleGoal : 0,
+      headPct: isWish ? Math.round(progressT(this._titleCurrent, this._titleGoal) * 1000) / 10 : 0,
+    })
   },
 
   applyTitleProgress() {
@@ -327,17 +529,26 @@ Page({
     const app = getApp<IAppOption>()
     const id = app.globalData.knockWishId
     if (app.globalData.knockMode === 'wish' && id) {
-      this._lessonKind = 'wish'
+      // 拉到心愿进度后才算就绪，避免顶部先闪出上一个心愿的数字
       try {
         const res = await fetchWishDetail(id)
-        if (!this._alive || !res.wish) return
+        if (!this._alive) return
+        if (!res.wish || res.wish.status !== 'ongoing') {
+          // 上次的心愿已圆满或已删除：接着下一个进行中的心愿
+          this.switchLesson(await nextLesson(id))
+          return
+        }
         const name = res.wish.name || '心愿'
-        app.globalData.knockWishName = name
+        if (name !== app.globalData.knockWishName) {
+          applyLesson({ mode: 'wish', wishId: id, name })
+        }
+        this._lessonKind = 'wish'
         this._titleGoal = Math.max(1, res.wish.goal || 1)
         this._titleCurrent = Math.max(0, Math.min(this._titleGoal, res.wish.current || 0))
         this.setData(Object.assign(lessonTitlePatch(name), this.titleColorPatch()))
         this.drawLessonTitle()
       } catch {
+        this._lessonKind = 'wish'
         this.applyTitleProgress()
       }
       return
@@ -360,17 +571,40 @@ Page({
   paintLessonTitle(ctx: any, w: number, h: number) {
     const chars = this.data.lessonChars || []
     ctx.clearRect(0, 0, w, h)
-    if (!this.data.lessonTitleOn || !chars.length) return
+    // 画布会盖在普通视图之上：圆满弹窗打开时先擦掉竖排标题，否则会叠在弹窗文字上
+    if (!this.data.lessonTitleOn || this.overlayOn() || !chars.length) {
+      this._titleShownAt = 0
+      return
+    }
+    // 每次从隐去到显出都慢慢浮现
+    const now = Date.now()
+    if (!this._titleShownAt) this._titleShownAt = now
+    const t = Math.min(1, (now - this._titleShownAt) / TITLE_FADE_MS)
+    ctx.globalAlpha = t * t * (3 - 2 * t)
     ctx.fillStyle = this.data.lessonColor || mixTitleColor(this._titleCurrent, this._titleGoal, parseTheme(this.data.theme))
-    ctx.font = '15px sans-serif'
+    // 画布宽 88rpx：字号 34rpx、行高 1.45，随屏宽缩放
+    const size = (w * 34) / 88
+    const line = size * 1.45
+    ctx.font = size.toFixed(1) + 'px sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    const line = 22
     const total = chars.length * line
     let y = (h - total) / 2 + line / 2
     for (let i = 0; i < chars.length; i++) {
       ctx.fillText(chars[i], w / 2, y)
       y += line
+    }
+    ctx.globalAlpha = 1
+    if (t < 1 && !this._titleFadeRaf) {
+      const next = () => {
+        this._titleFadeRaf = 0
+        if (this._alive && this._titleCtx === ctx) this.paintLessonTitle(ctx, w, h)
+      }
+      const cv = this._titleCanvas
+      this._titleFadeRaf =
+        cv && typeof cv.requestAnimationFrame === 'function'
+          ? cv.requestAnimationFrame(next)
+          : (setTimeout(next, 16) as unknown as number)
     }
   },
 
@@ -438,34 +672,117 @@ Page({
   applyHome(user: UserRecord, todayCount: number) {
     this._wishId = bindWishId()
     const s = settingsOf(user)
+    this._userAmbience = s.ambience
+    this._userTheme = s.theme
+    const scene = this.sceneNow()
     this.setData(
       Object.assign(
         {
           loading: false,
           soundOn: s.soundOn,
           vibrateOn: s.vibrateOn,
-          autoMode: s.autoMode,
-          ambience: s.ambience,
-          theme: s.theme,
+          ambience: scene.ambience,
+          theme: scene.theme,
+          premium: user.premium === true,
         },
         this.levelPatch(user.totalMerit || 0, todayCount),
-        scenePatch(this._titleCurrent, this._titleGoal, s.theme)
+        scenePatch(this._titleCurrent, this._titleGoal, scene.theme)
       )
     )
+    this.setData(this.titleColorPatch())
     this.drawLessonTitle()
-    if (s.autoMode && !this.entering()) this.startAuto()
-    else if (!s.autoMode) this.stopAuto()
-    startAmbience(s.ambience)
+    startAmbience(scene.ambience)
+  },
+
+  /** 此刻香案该用的声音和主题：成品定课铺着时用定课的，否则用自己的设置 */
+  sceneNow(): { ambience: AmbienceId; theme: ThemeId } {
+    const plan = this._scenePlan
+    if (!plan) return { ambience: this._userAmbience, theme: this._userTheme }
+    return { ambience: this._sceneQuiet ? 'off' : plan.ambience, theme: plan.theme }
+  },
+
+  applyScene() {
+    const scene = this.sceneNow()
+    this.setData({ ambience: scene.ambience, theme: scene.theme })
+    this.setData(this.titleColorPatch())
+    this.drawLessonTitle()
+    startAmbience(scene.ambience)
+  },
+
+  /** 收起成品定课的场景，换回自己的声音和主题 */
+  restoreScene() {
+    if (!this._scenePlan) return
+    this._scenePlan = null
+    this._sceneQuiet = false
+    this.applyScene()
   },
 
   onKnockTap() {
-    this.knock()
+    // 刚拖过木鱼：这次松手不算敲击
+    if (this._dragging) {
+      this._dragging = false
+      return
+    }
+    this.knock('hand')
   },
 
-  knock() {
-    if (!this._alive || this.entering() || !this.data.readyToKnock) return
+  muyuComp(): any {
+    const c: any = this.selectComponent('#muyu')
+    // 分包还没加载完时是占位 view，没有这些方法
+    return c && typeof c.rotateBy === 'function' ? c : null
+  },
+
+  onPadTouchStart(e: any) {
+    const t = e.touches && e.touches[0]
+    if (!t) return
+    this._touchX = t.clientX
+    this._touchY = t.clientY
+    this._touchMoved = 0
+    this._dragging = false
+  },
+
+  onPadTouchMove(e: any) {
+    const t = e.touches && e.touches[0]
+    if (!t) return
+    const dx = t.clientX - this._touchX
+    const dy = t.clientY - this._touchY
+    this._touchX = t.clientX
+    this._touchY = t.clientY
+    this._touchMoved += Math.abs(dx) + Math.abs(dy)
+    if (!this._dragging && this._touchMoved < DRAG_SLOP) return
+    const comp = this.muyuComp()
+    if (!comp) return
+    if (!this._dragging) {
+      this._dragging = true
+      comp.setDragging(true)
+    }
+    comp.rotateBy(dx, dy)
+  },
+
+  onPadTouchEnd() {
+    if (!this._dragging) return
+    const comp = this.muyuComp()
+    if (comp) comp.setDragging(false)
+    // 有的机型拖完不触发 tap，下次按下时会重置
+  },
+
+  onPickMaterial(e: any) {
+    const id = (e.currentTarget.dataset.id as string) || ''
+    const m = MATERIALS.find((x) => x.id === id)
+    if (!m || m.id === this.data.material) return
+    this.setData({ material: m.id })
+    try {
+      wx.setStorageSync(MATERIAL_KEY, m.id)
+    } catch {
+      // 下次启动回到默认材质
+    }
+    wx.showToast({ title: m.name, icon: 'none', duration: 900 })
+  },
+
+  knock(source: TapSource) {
+    if (!this._alive || this.entering() || !this.data.readyToKnock || this.overlayOn()) return
     const d = this.data
-    playKnock(d.soundOn)
+    playKnock(d.soundOn, this.knockTimbre())
     vibrate(d.vibrateOn)
     this.spawnFloat()
     this.pulse()
@@ -474,46 +791,86 @@ Page({
     const nextTotal = d.totalMerit + 1
     this._titleCurrent = Math.min(this._titleGoal, this._titleCurrent + 1)
     if (this._lessonKind === 'random') this._randomHits = this._titleCurrent
-    this.setData(Object.assign(this.levelPatch(nextTotal, d.todayCount + 1), this.titleColorPatch()))
+    this.setData(
+      Object.assign(this.levelPatch(nextTotal, d.todayCount + 1), this.titleColorPatch(), { strikeSeq: d.strikeSeq + 1 })
+    )
     this.drawLessonTitle()
-    if (this._queue) this._queue.tap(1)
+    if (this._queue) this._queue.tap(source)
+    this.countSession(source)
+  },
+
+  /** 右下角「自动」开关：随时切换，不存云端 */
+  onToggleAuto() {
+    if (this.entering() || this.overlayOn()) return
+    const on = !this.data.autoMode
+    this.setData({ autoMode: on })
+    if (on) this.startAuto()
+    else this.stopAuto()
   },
 
   startAuto() {
     if (this._autoTimer || this.entering()) return
-    this._autoTimer = setInterval(() => {
-      if (this._alive) this.knock()
-    }, 800)
+    this.scheduleAuto()
   },
+
+  // 每一下都重新算间隔：成品定课的节奏会随进度变慢
+  scheduleAuto() {
+    this._autoTimer = setTimeout(() => {
+      if (!this._alive) {
+        this._autoTimer = 0
+        return
+      }
+      this.knock('auto')
+      // 这一下可能刚好结束了定课并停掉自动敲
+      if (this._autoTimer) this.scheduleAuto()
+    }, this.autoGap()) as unknown as number
+  },
+
   stopAuto() {
     if (this._autoTimer) {
-      clearInterval(this._autoTimer)
+      clearTimeout(this._autoTimer)
       this._autoTimer = 0
     }
   },
 
+  autoGap(): number {
+    const s = this._session
+    const plan = s && s.plan
+    if (!s || !plan) return AUTO_GAP_MS
+    const t = s.kind === 'time' ? s.elapsedMs / s.goalMs : (s.hand + s.auto) / s.value
+    const k = Math.max(0, Math.min(1, t))
+    return Math.round(plan.gapFrom + (plan.gapTo - plan.gapFrom) * k)
+  },
+
+  knockTimbre(): KnockTimbre {
+    const plan = this._session && this._session.plan
+    return plan ? plan.timbre : 'default'
+  },
+
   spawnFloat() {
-    const texts: string[] = []
-    if (Math.random() < 0.55) {
-      texts.push('专注 +1')
-    } else {
-      texts.push(CHANTS[Math.floor(Math.random() * CHANTS.length)])
-    }
+    const text = Math.random() < 0.55 ? '专注 +1' : CHANTS[Math.floor(Math.random() * CHANTS.length)]
+    this.spawnText(text, text.indexOf('+') >= 0 ? 'score' : 'chant')
+  },
+
+  spawnText(text: string, kind: FloatItem['kind']) {
     this._floatSeq += 1
     const floats = this.data.floats.slice()
     if (floats.length > 5) floats.shift()
     floats.push({
       key: this._floatSeq,
-      text: texts[0],
-      left: 26 + Math.random() * 44,
-      kind: texts[0].indexOf('+') >= 0 ? 'score' : 'chant',
+      text,
+      left: kind === 'celebrate' ? 50 : 26 + Math.random() * 44,
+      kind,
     })
     this.setData({ floats })
     const key = this._floatSeq
-    setTimeout(() => {
-      if (!this._alive) return
-      this.setData({ floats: this.data.floats.filter((f) => f.key !== key) })
-    }, 1000)
+    setTimeout(
+      () => {
+        if (!this._alive) return
+        this.setData({ floats: this.data.floats.filter((f) => f.key !== key) })
+      },
+      kind === 'celebrate' ? 2400 : 1000
+    )
   },
 
   ripple() {
@@ -532,6 +889,433 @@ Page({
     this._pulseTimer = setTimeout(() => {
       if (this._alive) this.setData({ pulsing: false })
     }, 240)
+  },
+
+  switchLesson(p: LessonPick) {
+    if (!this._alive) return
+    applyLesson(p)
+    this._wishId = bindWishId()
+    this._lessonKind = ''
+    this._randomHits = 0
+    this._titleCurrent = 0
+    this._titleGoal = p.mode === 'wish' ? 1 : RANDOM_GOAL
+    this.syncTitleProgress()
+  },
+
+  /** 弹窗 / 面板盖在香案上：画布是原生层，要暂停木鱼、隐去烟和竖排标题 */
+  overlayOn(): boolean {
+    return this.data.celebrateOn || this.data.sheetOn || this.data.sessionSheetOn || this.data.sessionDoneOn
+  },
+
+  onOpenLessonPanel() {
+    if (this.entering() || this.overlayOn()) return
+    this.openSheet(false)
+  },
+
+  openSheet(first: boolean) {
+    this.stopAuto()
+    this.setData({ sheetOn: true, sheetFirst: first, sheetLoading: !this.data.sheetRows.length })
+    this.drawLessonTitle()
+    this.loadSheet()
+  },
+
+  async loadSheet() {
+    const app = getApp<IAppOption>()
+    const curId = app.globalData.knockMode === 'wish' ? app.globalData.knockWishId : null
+    let rows: SheetRow[] = []
+    try {
+      const res = await fetchWishes()
+      rows = (res.wishes || [])
+        .filter((w) => w.status === 'ongoing')
+        .map((w) => ({
+          _id: w._id,
+          name: w.name || '无名心愿',
+          mark: w.current + ' / ' + w.goal,
+          cur: w._id === curId,
+        }))
+    } catch {
+      rows = []
+    }
+    if (!this._alive || !this.data.sheetOn) return
+    this.setData({ sheetLoading: false, sheetRows: rows, sheetRandomCur: !curId })
+  },
+
+  closeSheet() {
+    if (!this.data.sheetOn) return
+    if (this.data.sheetFirst) {
+      // 首次没选就收起：就按随机专注，并记住，下次不再弹
+      const app = getApp<IAppOption>()
+      if (app.globalData.knockMode !== 'wish') applyLesson(RANDOM_LESSON)
+    }
+    this.setData({ sheetOn: false, sheetFirst: false })
+    this.drawLessonTitle()
+    if (this.data.autoMode && !this.entering() && !this.data.celebrateOn) this.startAuto()
+  },
+
+  onSheetPick(e: any) {
+    const id = (e.currentTarget.dataset.id as string) || ''
+    const row = this.data.sheetRows.find((r) => r._id === id)
+    if (!row) return
+    if (!row.cur) this.switchLesson({ mode: 'wish', wishId: row._id, name: row.name })
+    this.setData({ sheetFirst: false })
+    this.closeSheet()
+  },
+
+  onSheetRandom() {
+    if (!this.data.sheetRandomCur) this.switchLesson(RANDOM_LESSON)
+    else applyLesson(RANDOM_LESSON)
+    this.setData({ sheetFirst: false })
+    this.closeSheet()
+  },
+
+  onSheetNew() {
+    wx.navigateTo({ url: '/pages/wish-form/index' })
+  },
+
+  /** 心愿敲满：停住敲击，弹出圆满；关掉时再切到下一个心愿 */
+  celebrateWish() {
+    const id = this._wishId
+    if (!id || this._celebrateId) return
+    this._celebrateId = id
+    this._wishId = null
+    this.stopAuto()
+    if (this.data.sessionDone) {
+      // 敲满念珠的同一下圆满了心愿：先庆圆满，小结等会儿再给
+      this._pendingDone = this.data.sessionDone
+      this.setData({ sessionDoneOn: false, sessionDone: null })
+    }
+    this.setData({
+      celebrateOn: true,
+      celebrate: {
+        name: this.data.lessonTitle || '心愿',
+        goalText: String(this._titleGoal),
+        thumbUrl: '',
+        nextText: '',
+      },
+    })
+    this.drawLessonTitle()
+    // 先算好下一个功课，弹窗里就能告诉用户「继续敲击」会去哪
+    const pick = nextLesson(id)
+    this._nextPick = pick
+    pick.then((p) => {
+      if (this._alive && this._celebrateId === id && this.data.celebrate) {
+        this.setData({ 'celebrate.nextText': nextTextOf(p) })
+      }
+    })
+    fetchWishDetail(id)
+      .then((res) => {
+        const thumbUrl = (res.wish && res.wish.thumbUrl) || ''
+        if (this._alive && thumbUrl && this._celebrateId === id && this.data.celebrate) {
+          this.setData({ 'celebrate.thumbUrl': thumbUrl })
+        }
+      })
+      .catch(() => {})
+  },
+
+  endCelebrate(): string {
+    const id = this._celebrateId
+    this._celebrateId = ''
+    this.setData({ celebrateOn: false })
+    this.drawLessonTitle()
+    return id
+  },
+
+  takeNextPick(id: string): Promise<LessonPick> {
+    const pick = this._nextPick || nextLesson(id)
+    this._nextPick = null
+    return pick
+  },
+
+  async onCelebrateContinue() {
+    const id = this.endCelebrate()
+    const p = await this.takeNextPick(id)
+    this.switchLesson(p)
+    this.showSwitchHint(p.mode === 'wish' ? '已切换到下一个心愿' : '心愿都已圆满 · 已转入随机专注')
+    if (this._pendingDone) {
+      this.showSessionDone(this._pendingDone)
+      this._pendingDone = null
+    }
+    if (this.data.autoMode && !this.entering() && !this.overlayOn()) this.startAuto()
+  },
+
+  showSwitchHint(text: string) {
+    if (this._hintTimer) clearTimeout(this._hintTimer)
+    this.setData({ switchHint: text })
+    this._hintTimer = setTimeout(() => {
+      this._hintTimer = 0
+      if (this._alive) this.setData({ switchHint: '' })
+    }, SWITCH_HINT_MS)
+  },
+
+  async onCelebrateCert() {
+    const id = this.endCelebrate()
+    this._pendingDone = null
+    this.restoreScene()
+    const app = getApp<IAppOption>()
+    app.globalData.certFocusId = id
+    app.globalData.homeWillReenter = true
+    concealTabBar(this)
+    wx.switchTab({ url: '/pages/certificate/index' })
+    applyLesson(await this.takeNextPick(id))
+  },
+
+  // ===== 定课 =====
+
+  onOpenSession() {
+    if (this.entering() || this.overlayOn() || this._session) return
+    this.stopAuto()
+    ensureBell()
+    this.setData({
+      sessionSheetOn: true,
+      sessionOptions: sessionOptions(),
+      planOptions: planOptions(this.data.premium),
+    })
+    this.drawLessonTitle()
+  },
+
+  closeSessionSheet() {
+    if (!this.data.sessionSheetOn) return
+    this.setData({ sessionSheetOn: false })
+    this.drawLessonTitle()
+    if (this.data.autoMode && !this.entering() && !this.overlayOn()) this.startAuto()
+  },
+
+  onPickSession(e: any) {
+    const kind = e.currentTarget.dataset.kind
+    const value = Number(e.currentTarget.dataset.value) || 0
+    if (!value || (kind !== 'time' && kind !== 'count')) return
+    this.setData({ sessionSheetOn: false })
+    this.drawLessonTitle()
+    this.beginSession(kind, value)
+  },
+
+  /** 成品定课：免费的直接开始；静心包的没开过先试一次，试过了再点就去开启 */
+  async onPickPlan(e: any) {
+    const plan = planOf(String(e.currentTarget.dataset.id || ''))
+    if (!plan) return
+    if (!plan.premium || this.data.premium) {
+      this.startPlan(plan, false)
+      return
+    }
+    if (!triedPlans()[plan.id]) {
+      this.startPlan(plan, true)
+      return
+    }
+    const r = await buyPremium(() => this._alive)
+    if (!this._alive) return
+    if (r === 'opened') {
+      this.setData({ premium: true })
+      wx.showToast({ title: PACK_NAME + '已开启', icon: 'none' })
+      this.startPlan(plan, false)
+    } else if (r === 'pending') {
+      wx.showToast({ title: '付款已收到，正在开启', icon: 'none' })
+    }
+  },
+
+  startPlan(plan: SessionPlan, trial: boolean) {
+    this.setData({ sessionSheetOn: false })
+    this.drawLessonTitle()
+    if (trial) wx.showToast({ title: '试一次 · 走完这一段', icon: 'none' })
+    this.beginSession('time', planMinutes(plan), plan, trial)
+  },
+
+  beginSession(kind: SessionKind, value: number, plan: SessionPlan | null = null, trial = false) {
+    this._session = {
+      kind,
+      value,
+      plan,
+      trial,
+      goalMs: kind === 'time' ? value * 60000 : 0,
+      elapsedMs: 0,
+      lastTick: 0,
+      hand: 0,
+      auto: 0,
+    }
+    if (plan) {
+      ensureKnock(plan.timbre)
+      this._scenePlan = plan
+      this._sceneQuiet = false
+      this.applyScene()
+    } else {
+      this.restoreScene()
+    }
+    this.setData(Object.assign({ sessionOn: true, sessionKind: kind }, this.sessionPatch()))
+    this.startSessionTick()
+    if (this.data.autoMode && !this.entering() && !this.overlayOn()) this.startAuto()
+  },
+
+  sessionPatch(): { sessionBig: string; sessionSmall: string; sessionStick: number } {
+    const s = this._session
+    if (!s) return { sessionBig: '', sessionSmall: '', sessionStick: STICK_ICON_LEN }
+    const n = s.hand + s.auto
+    if (s.kind === 'count') return { sessionBig: String(n), sessionSmall: '/ ' + s.value, sessionStick: STICK_ICON_LEN }
+    const burnt = Math.max(0, Math.min(1, s.elapsedMs / s.goalMs))
+    return {
+      sessionBig: clockText(s.goalMs - s.elapsedMs),
+      sessionSmall: '已敲 ' + n,
+      sessionStick: Math.max(4, Math.round(STICK_ICON_LEN * (1 - burnt))),
+    }
+  },
+
+  startSessionTick() {
+    this.stopSessionTick()
+    const s = this._session
+    if (!s || s.kind !== 'time') return
+    s.lastTick = Date.now()
+    this._sessionTimer = setInterval(() => this.sessionTick(), 500) as unknown as number
+  },
+
+  stopSessionTick() {
+    if (this._sessionTimer) {
+      clearInterval(this._sessionTimer)
+      this._sessionTimer = 0
+    }
+    if (this._session) this._session.lastTick = 0
+  },
+
+  sessionTick() {
+    const s = this._session
+    if (!this._alive || !s) return
+    const now = Date.now()
+    // 面板、弹窗盖着或正在入堂时不走；一次最多走 2 秒，机器休眠回来不会一下跳过去
+    if (s.lastTick && !this.overlayOn() && !this.entering()) {
+      s.elapsedMs += Math.min(2000, Math.max(0, now - s.lastTick))
+    }
+    s.lastTick = now
+    if (s.elapsedMs >= s.goalMs) {
+      this.finishSession()
+      return
+    }
+    const p = this.sessionPatch()
+    if (p.sessionBig !== this.data.sessionBig || p.sessionStick !== this.data.sessionStick) this.setData(p)
+  },
+
+  countSession(source: TapSource) {
+    const s = this._session
+    if (!s) return
+    s[source] += 1
+    if (s.kind === 'count' && s.hand + s.auto >= s.value) {
+      this.finishSession()
+      return
+    }
+    this.setData(this.sessionPatch())
+  },
+
+  endSession() {
+    this.stopSessionTick()
+    this._session = null
+    this.setData({ sessionOn: false })
+  },
+
+  /** 时间到 / 念珠满：停下自动敲；成品定课先让声音淡出，再响一声钟钵，给小结 */
+  finishSession() {
+    const s = this._session
+    if (!s) return
+    this.endSession()
+    this.stopAuto()
+    this.setData({ autoMode: false })
+    const plan = s.plan
+    if (plan && s.trial) markPlanTried(plan.id)
+    const n = s.hand + s.auto
+    const parts: string[] = []
+    if (s.kind === 'time') parts.push(s.value + ' 分钟')
+    if (s.hand) parts.push('手敲 ' + s.hand)
+    if (s.auto) parts.push('自动 ' + s.auto)
+    const info: SessionDone = {
+      kind: s.kind,
+      value: s.value,
+      planId: plan ? plan.id : '',
+      trial: s.trial,
+      title: plan ? plan.name : s.kind === 'time' ? '一炷香尽' : '念珠一串',
+      line: s.kind === 'time' ? '敲了 ' + n + ' 下' : n + ' 下圆满',
+      detail: parts.join(' · '),
+      closing: plan ? plan.closing : '',
+      offer: plan && s.trial ? '这是' + PACK_NAME + '里的一套定课，开启后随时可用' : '',
+    }
+    const ring = () => {
+      playBell(this.data.soundOn)
+      vibrate(this.data.vibrateOn)
+      this.showSessionDone(info)
+    }
+    if (!plan) {
+      ring()
+      return
+    }
+    this._sceneQuiet = true
+    this.setData({ ambience: 'off' })
+    fadeOutAmbience(plan.fadeMs).then(() => {
+      if (this._alive) ring()
+    })
+  },
+
+  showSessionDone(info: SessionDone) {
+    if (this.data.celebrateOn) {
+      this._pendingDone = info
+      return
+    }
+    this.stopAuto()
+    this.setData({ sessionDoneOn: true, sessionDone: info })
+    this.drawLessonTitle()
+  },
+
+  closeSessionDone(): SessionDone | null {
+    const info = this.data.sessionDone
+    this.setData({ sessionDoneOn: false, sessionDone: null })
+    this.drawLessonTitle()
+    return info
+  },
+
+  onSessionDoneClose() {
+    this.closeSessionDone()
+    this.restoreScene()
+  },
+
+  onSessionAgain() {
+    const info = this.closeSessionDone()
+    if (!info) return
+    const plan = info.planId ? planOf(info.planId) : null
+    if (plan) this.beginSession('time', planMinutes(plan), plan, false)
+    else this.beginSession(info.kind, info.value)
+  },
+
+  /** 试用结束的小结里直接开启；开了就接着用刚才这套 */
+  async onSessionBuy() {
+    const info = this.closeSessionDone()
+    const plan = info && info.planId ? planOf(info.planId) : null
+    const r = await buyPremium(() => this._alive)
+    if (!this._alive) return
+    if (r === 'opened') {
+      this.setData({ premium: true })
+      wx.showToast({ title: PACK_NAME + '已开启', icon: 'none' })
+      if (plan) {
+        this.beginSession('time', planMinutes(plan), plan, false)
+        return
+      }
+    } else if (r === 'pending') {
+      wx.showToast({ title: '付款已收到，正在开启', icon: 'none' })
+    }
+    this.restoreScene()
+  },
+
+  /** 提前收起：已敲的早已计入，收起只是不再计时 / 计数 */
+  onEndSession() {
+    const s = this._session
+    if (!s) return
+    const n = s.hand + s.auto
+    wx.showModal({
+      title: s.kind === 'time' ? '提前收起这炷香？' : '提前收起念珠？',
+      content:
+        (n > 0 ? '已敲 ' + n + ' 下，都已计入专注。' : '收起后回到自由敲击。') +
+        (s.plan && s.trial ? '这次试用也就用过了。' : ''),
+      confirmText: '收起',
+      cancelText: '接着敲',
+      success: (r) => {
+        if (!r.confirm || !this._alive || this._session !== s) return
+        if (s.plan && s.trial) markPlanTried(s.plan.id)
+        this.endSession()
+        this.restoreScene()
+      },
+    })
   },
 
   noop() {},

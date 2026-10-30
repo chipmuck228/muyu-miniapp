@@ -65,12 +65,6 @@
             <view class="tog-knob"></view>
           </view>
         </view>
-        <view class="set-item">
-          <text class="set-name">自动敲击</text>
-          <view class="tog {{autoMode ? 'on' : ''}}" hover-class="hover-dim" bindtap="toggleAuto">
-            <view class="tog-knob"></view>
-          </view>
-        </view>
         <view class="set-item ambi-item">
           <text class="set-name">氛围</text>
           <view class="ambi-row">
@@ -87,14 +81,17 @@
         <view class="set-item ambi-item last">
           <text class="set-name">主题</text>
           <view class="ambi-row">
-            <text
+            <view
               wx:for="{{themeOptions}}"
               wx:key="id"
-              class="ambi-opt {{theme === item.id ? 'on' : ''}} {{item.locked ? 'locked' : ''}}"
+              class="ambi-opt theme-opt {{theme === item.id ? 'on' : ''}} {{item.locked ? 'locked' : ''}}"
               hover-class="hover-dim"
               data-id="{{item.id}}"
               bindtap="onPickTheme"
-            >{{item.name}}</text>
+            >
+              <view class="theme-swatch" style="{{item.swatch}}"></view>
+              <text>{{item.name}}</text>
+            </view>
           </view>
         </view>
       </view>
@@ -103,5 +100,5 @@
     </view>
   </scroll-view>
 
-  <hall-dock mode="wing" current="{{4}}" />
+  <hall-dock mode="wing" current="{{3}}" />
 </view>

@@ -4,13 +4,51 @@
   overflow: hidden;
 }
 .home-page.theme-night {
-  background: #07090e;
+  background: #05070c;
 }
 .home-page.theme-ink {
-  background: #0c0c0c;
+  background: #0b0b0b;
 }
 .home-page.theme-dusk {
-  background: #120c09;
+  background: #0e0807;
+}
+
+/* 主题天色：上方天色 + 香案后的光晕，进门即可见 */
+.theme-sky,
+.theme-glow {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  transition: opacity 0.42s ease;
+}
+.theme-sky {
+  background: linear-gradient(180deg, #1c140c 0%, #120d08 46%, #0a0806 100%);
+}
+.theme-glow {
+  background: radial-gradient(ellipse 80% 42% at 50% 80%, rgba(200, 138, 74, 0.26) 0%, rgba(200, 138, 74, 0.08) 52%, rgba(200, 138, 74, 0) 100%);
+}
+.theme-night .theme-sky {
+  background: linear-gradient(180deg, #0c1626 0%, #08101c 50%, #05070c 100%);
+}
+.theme-night .theme-glow {
+  background:
+    radial-gradient(circle at 74% 16%, rgba(196, 216, 246, 0.2) 0%, rgba(196, 216, 246, 0.05) 14%, rgba(196, 216, 246, 0) 30%),
+    radial-gradient(ellipse 80% 42% at 50% 80%, rgba(111, 147, 196, 0.22) 0%, rgba(111, 147, 196, 0.06) 52%, rgba(111, 147, 196, 0) 100%);
+}
+.theme-ink .theme-sky {
+  background: linear-gradient(180deg, #1e1e1d 0%, #141414 48%, #0b0b0b 100%);
+}
+.theme-ink .theme-glow {
+  background: radial-gradient(ellipse 80% 42% at 50% 80%, rgba(206, 202, 192, 0.16) 0%, rgba(206, 202, 192, 0.05) 52%, rgba(206, 202, 192, 0) 100%);
+}
+.theme-dusk .theme-sky {
+  background: linear-gradient(180deg, #2a1210 0%, #3a1a12 30%, #1a0d0a 64%, #0e0807 100%);
+}
+.theme-dusk .theme-glow {
+  background: radial-gradient(ellipse 96% 46% at 50% 76%, rgba(224, 120, 74, 0.3) 0%, rgba(224, 120, 74, 0.09) 54%, rgba(224, 120, 74, 0) 100%);
 }
 .theme-night .dawn-paper {
   filter: brightness(0.42) saturate(0.55) hue-rotate(200deg);
@@ -121,7 +159,6 @@
   display: block;
   overflow: hidden;
   pointer-events: none;
-  transition: opacity 0.42s ease;
 }
 
 .void-canvas {
@@ -209,37 +246,6 @@
   letter-spacing: 0.04em;
   color: rgba(224, 181, 119, 0.38);
   pointer-events: none;
-}
-.lesson-title {
-  position: absolute;
-  left: 50%;
-  top: 18%;
-  z-index: 6;
-  width: 88rpx;
-  height: 56%;
-  margin-left: -44rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
-}
-.lesson-title.on {
-  animation: lesson-in 1.6s ease forwards;
-}
-@keyframes lesson-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-.lesson-ch {
-  display: block;
-  font-size: 30rpx;
-  line-height: 1.45;
-  text-align: center;
-  color: #ffffff;
-  transition: color 0.35s ease;
 }
 .lesson-title-canvas {
   position: absolute;
@@ -333,7 +339,7 @@
 .float-text {
   position: absolute;
   bottom: 40%;
-  font-size: 34rpx;
+  font-size: 38rpx;
   font-weight: 700;
   white-space: nowrap;
   opacity: 0;
@@ -348,7 +354,7 @@
 }
 .float-text.celebrate {
   color: #ff9d76;
-  font-size: 40rpx;
+  font-size: 44rpx;
 }
 @keyframes float-up {
   0% {
@@ -363,4 +369,490 @@
     opacity: 0;
     transform: translate(-50%, -220rpx) scale(1);
   }
+}
+
+/* 顶部当前功课：轻触打开今日功课切换 */
+.lesson-head {
+  position: absolute;
+  left: 40rpx;
+  z-index: 8;
+  max-width: 60%;
+  padding: 8rpx 12rpx 12rpx 0;
+}
+.lesson-head-hover {
+  opacity: 0.7;
+}
+.lh-row {
+  display: flex;
+  align-items: baseline;
+}
+.lh-name {
+  min-width: 0;
+  font-size: 34rpx;
+  letter-spacing: 4rpx;
+  color: rgba(243, 234, 220, 0.88);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lh-switch {
+  flex-shrink: 0;
+  margin-left: 16rpx;
+  font-size: 24rpx;
+  letter-spacing: 2rpx;
+  color: rgba(224, 181, 119, 0.55);
+}
+.lh-count {
+  margin-top: 12rpx;
+  font-variant-numeric: tabular-nums;
+}
+.lh-cur {
+  font-size: 44rpx;
+  color: #e8c98a;
+}
+.lh-goal {
+  font-size: 28rpx;
+  color: rgba(224, 181, 119, 0.55);
+}
+.lh-bar {
+  margin-top: 12rpx;
+  width: 320rpx;
+  height: 4rpx;
+  background: rgba(224, 181, 119, 0.16);
+}
+.lh-fill {
+  height: 100%;
+  background: #e0b577;
+  transition: width 0.15s ease;
+}
+
+/* 心愿圆满弹窗 */
+.celebrate-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 6, 4, 0.78);
+  animation: cel-fade 0.4s ease both;
+}
+.celebrate-card {
+  width: 600rpx;
+  padding: 64rpx 48rpx 48rpx;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #16110d;
+  border: 1rpx solid rgba(224, 181, 119, 0.28);
+  animation: cel-rise 0.5s ease both;
+}
+.cel-kicker {
+  font-size: 28rpx;
+  letter-spacing: 12rpx;
+  padding-left: 12rpx;
+  color: rgba(224, 181, 119, 0.7);
+}
+.cel-name {
+  margin-top: 24rpx;
+  max-width: 100%;
+  font-size: 44rpx;
+  letter-spacing: 6rpx;
+  color: #f3eadc;
+  text-align: center;
+}
+.cel-goal {
+  margin-top: 16rpx;
+  font-size: 28rpx;
+  letter-spacing: 4rpx;
+  color: #e8c98a;
+}
+.cel-thumb {
+  margin-top: 40rpx;
+  width: 360rpx;
+  height: 480rpx;
+}
+.cel-hint {
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  letter-spacing: 2rpx;
+  color: rgba(224, 181, 119, 0.55);
+}
+.cel-actions {
+  margin-top: 48rpx;
+  width: 100%;
+  display: flex;
+  gap: 24rpx;
+}
+.cel-btn {
+  flex: 1;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  letter-spacing: 6rpx;
+  color: #e8c98a;
+  border: 1rpx solid rgba(224, 181, 119, 0.45);
+}
+.cel-btn.primary {
+  background: #e0b577;
+  border-color: #e0b577;
+  color: #16110d;
+}
+.cel-hover {
+  opacity: 0.75;
+}
+@keyframes cel-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes cel-rise {
+  from { opacity: 0; transform: translateY(24rpx); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 圆满后切换功课：弹窗里预告下一个，关掉后顶部再提示一次 */
+.cel-next {
+  margin-top: 40rpx;
+  max-width: 100%;
+  font-size: 28rpx;
+  letter-spacing: 2rpx;
+  color: rgba(243, 234, 220, 0.7);
+  text-align: center;
+}
+.cel-next + .cel-actions {
+  margin-top: 24rpx;
+}
+.lh-hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  letter-spacing: 2rpx;
+  color: #e8c98a;
+  animation: lh-hint 2.6s ease both;
+}
+@keyframes lh-hint {
+  0% { opacity: 0; transform: translateY(-8rpx); }
+  12%, 80% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
+.lesson-head.switched .lh-name {
+  animation: lh-glow 1.4s ease 2;
+}
+@keyframes lh-glow {
+  0%, 100% { color: rgba(243, 234, 220, 0.88); }
+  50% { color: #ffd98a; text-shadow: 0 0 16rpx rgba(255, 217, 138, 0.55); }
+}
+
+/* 3D 木鱼：舞台在敲击热区正下方，热区透明盖在上面接收点击 */
+.knock-wrap {
+  height: 480rpx;
+}
+.muyu-stage {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  z-index: 2;
+  width: 520rpx;
+  height: 480rpx;
+  margin-left: -260rpx;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.muyu-gl {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.knock-pad {
+  bottom: 40rpx;
+  width: 400rpx;
+  height: 400rpx;
+  margin-left: -200rpx;
+  background: transparent;
+  box-shadow: none;
+}
+.theme-night .knock-pad,
+.theme-ink .knock-pad,
+.theme-dusk .knock-pad {
+  background: transparent;
+  box-shadow: none;
+}
+/* 飘字从木鱼上方升起，不压在木鱼身上 */
+.float-text {
+  bottom: 72%;
+}
+
+/* 木鱼材质色点：竖排在左侧，避开中间的敲击热区 */
+.mat-dots {
+  position: absolute;
+  left: 40rpx;
+  bottom: 40rpx;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.mat-dot {
+  width: 40rpx;
+  height: 40rpx;
+  margin-top: 24rpx;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2rpx rgba(255, 255, 255, 0.18);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.mat-dot.on {
+  box-shadow: 0 0 0 2rpx #e0b577, 0 0 0 8rpx rgba(224, 181, 119, 0.2);
+  transform: scale(1.1);
+}
+.mat-dot-hover {
+  opacity: 0.75;
+}
+
+/* 今日功课底部面板 */
+.sheet-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 84;
+  background: rgba(8, 6, 4, 0.6);
+  animation: cel-fade 0.3s ease both;
+}
+.lesson-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 85;
+  max-height: 72vh;
+  display: flex;
+  flex-direction: column;
+  padding: 40rpx 40rpx calc(32rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  background: #16110d;
+  border-top: 1rpx solid rgba(224, 181, 119, 0.28);
+  border-radius: 32rpx 32rpx 0 0;
+  animation: sheet-up 0.36s ease both;
+}
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+.sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+.sheet-titles {
+  display: flex;
+  flex-direction: column;
+}
+.sheet-title {
+  font-size: 44rpx;
+  font-weight: 600;
+  letter-spacing: 12rpx;
+  color: rgba(243, 234, 220, 0.92);
+}
+.sheet-sub {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  letter-spacing: 4rpx;
+  color: rgba(224, 181, 119, 0.6);
+}
+.sheet-close {
+  padding: 8rpx 0 8rpx 24rpx;
+  font-size: 28rpx;
+  letter-spacing: 4rpx;
+  color: rgba(224, 181, 119, 0.7);
+}
+.sheet-list {
+  flex: 1;
+  min-height: 0;
+  max-height: 56vh;
+}
+.sheet-loading {
+  display: block;
+  padding: 28rpx 0;
+  font-size: 26rpx;
+  color: rgba(224, 181, 119, 0.5);
+}
+.sheet-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 32rpx 4rpx;
+  border-bottom: 1rpx solid rgba(224, 181, 119, 0.1);
+}
+.sheet-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 32rpx;
+  letter-spacing: 4rpx;
+  color: rgba(243, 234, 220, 0.88);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sheet-mark {
+  margin-left: 24rpx;
+  font-size: 26rpx;
+  color: rgba(224, 181, 119, 0.55);
+  white-space: nowrap;
+}
+.sheet-row.cur .sheet-name,
+.sheet-row.cur .sheet-mark {
+  color: #e8c98a;
+}
+.sheet-new {
+  border-bottom: none;
+}
+.sheet-new .sheet-name {
+  color: rgba(224, 181, 119, 0.85);
+}
+.sheet-hover {
+  opacity: 0.7;
+}
+
+.side-tools {
+  position: absolute;
+  right: 40rpx;
+  bottom: 40rpx;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+/* 自动敲：关着是暗字，开着字亮起、小点缓缓呼吸 */
+.auto-tog {
+  display: flex;
+  align-items: center;
+  padding: 12rpx 8rpx;
+}
+.auto-dot {
+  width: 10rpx;
+  height: 10rpx;
+  margin-right: 10rpx;
+  border-radius: 50%;
+  background: rgba(224, 181, 119, 0.3);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+.auto-text {
+  font-size: 24rpx;
+  letter-spacing: 4rpx;
+  color: rgba(243, 234, 220, 0.4);
+  transition: color 0.3s ease;
+}
+.auto-tog.on .auto-dot {
+  background: #e8c98a;
+  box-shadow: 0 0 10rpx rgba(232, 201, 138, 0.7);
+  animation: auto-breathe 1.6s ease-in-out infinite;
+}
+.auto-tog.on .auto-text {
+  color: #e8c98a;
+}
+@keyframes auto-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.incense-entry {
+  margin-top: 36rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8rpx;
+}
+.incense-entry-icon {
+  width: 4rpx;
+  height: 56rpx;
+  border-radius: 2rpx;
+  background: linear-gradient(180deg, #ff7a3a 0%, #8a3a1c 8%, #5a2e1a 100%);
+  box-shadow: 0 -4rpx 12rpx rgba(255, 110, 50, 0.5);
+}
+.incense-entry-text {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  letter-spacing: 4rpx;
+  padding-left: 4rpx;
+  color: rgba(224, 181, 119, 0.75);
+}
+
+.session-burn {
+  margin-top: 36rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8rpx;
+}
+/* 香身从顶上往下烧短，底端不动 */
+.session-icon {
+  height: 56rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+}
+.session-icon .incense-entry-icon {
+  transition: height 0.5s linear;
+}
+.session-bead {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #c98a4a, #4a2616);
+  box-shadow: 0 0 10rpx rgba(224, 181, 119, 0.35);
+}
+.session-big {
+  margin-top: 12rpx;
+  font-size: 40rpx;
+  font-variant-numeric: tabular-nums;
+  color: #e8c98a;
+}
+.session-small {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  letter-spacing: 2rpx;
+  color: rgba(224, 181, 119, 0.7);
+}
+.session-end {
+  margin-top: 16rpx;
+  font-size: 22rpx;
+  letter-spacing: 4rpx;
+  padding-left: 4rpx;
+  color: rgba(243, 234, 220, 0.4);
+}
+
+.sheet-section {
+  display: block;
+  margin-top: 24rpx;
+  font-size: 22rpx;
+  letter-spacing: 6rpx;
+  color: rgba(224, 181, 119, 0.45);
+}
+.sheet-row.locked .sheet-name {
+  color: rgba(243, 234, 220, 0.6);
+}
+.incense-rule {
+  display: block;
+  margin-top: 24rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: rgba(243, 234, 220, 0.5);
+}
+/* 圆满的飘字停得久一些 */
+.float-text.celebrate {
+  animation-duration: 2.4s;
 }
