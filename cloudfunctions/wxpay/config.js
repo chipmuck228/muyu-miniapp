@@ -38,7 +38,7 @@ function wxpayConfig() {
     num(process.env.XPAY_GOODS_PRICE, 0)
   )
   const description = String(
-    process.env.WXPAY_DESC || s.description || '静心 · 氛围与主题一次开启'
+    process.env.WXPAY_DESC || s.description || '静心包 · 定课、氛围与主题一次开启'
   ).trim()
 
   return { appid, mchid, serialNo, privateKey, apiV3Key, notifyUrl, price, description }

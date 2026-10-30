@@ -16,5 +16,5 @@ module.exports = {
   // 单位：分
   price: 600,
   // 商品描述，会展示在用户支付凭证上
-  description: '静心 · 氛围与主题一次开启',
+  description: '静心包 · 定课、氛围与主题一次开启',
 }
