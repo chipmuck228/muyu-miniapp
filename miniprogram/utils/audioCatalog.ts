@@ -4,9 +4,15 @@
 
 export type AmbienceId = 'off' | 'rain' | 'bowl' | 'noise' | 'stream' | 'pine' | 'fire'
 
-export const AUDIO_FILES: Record<'knock' | 'rain' | 'bowl' | 'noise' | 'stream' | 'pine' | 'fire', string> = {
+export const AUDIO_FILES: Record<
+  'knock' | 'knockLow' | 'knockSoft' | 'rain' | 'bowl' | 'noise' | 'stream' | 'pine' | 'fire',
+  string
+> = {
   knock:
     'cloud://cloud1-d5gcfyv8v980774aa.636c-cloud1-d5gcfyv8v980774aa-1485006126/assets/audio/virtual_vibes-minimal-ui-pop-383735.mp3',
+  // 静心包定课的木鱼音色：低沉（松间慢叩）/ 轻柔（夜里收心）。留空就用 knock 放慢 / 放轻顶上
+  knockLow: '',
+  knockSoft: '',
   rain:
     'cloud://cloud1-d5gcfyv8v980774aa.636c-cloud1-d5gcfyv8v980774aa-1485006126/assets/audio/rain.mp3',
   bowl:

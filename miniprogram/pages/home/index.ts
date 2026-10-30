@@ -7,21 +7,19 @@ import {
   settingsOf,
   bindChannelByScene,
   normalizeChannelScene,
-  IncenseState,
-  lightIncense,
-  snuffIncense,
-  settleIncense,
 } from '../../utils/cloud'
-import { CHANTS, INCENSE_ON, INCENSE_MINUTES, INCENSE_RATE } from '../../utils/constants'
-import { playKnock, vibrate, ensureKnock } from '../../utils/knock'
+import { CHANTS, SESSION_MINUTES, SESSION_BEADS } from '../../utils/constants'
+import { playKnock, vibrate, ensureKnock, ensureBell, playBell, KnockTimbre } from '../../utils/knock'
 import { KnockQueue, TapSource } from '../../utils/knockQueue'
 import { mockEnabled } from '../../utils/devMock'
 import { concealTabBar, winInfo } from '../../utils/util'
 import { DAWN_FILE_ID, resolveCloudFile } from '../../utils/cloudFile'
-import { startAmbience, stopAmbience } from '../../utils/ambience'
+import { startAmbience, stopAmbience, fadeOutAmbience } from '../../utils/ambience'
 import { AmbienceId } from '../../utils/audioCatalog'
 import { parseTheme, themeEnds, ThemeId } from '../../utils/theme'
 import { applyLesson, nextLesson, LessonPick, RANDOM_NAME, RANDOM_LESSON } from '../../utils/lesson'
+import { SESSION_PLANS, SessionPlan, PlanId, planOf, triedPlans, markPlanTried } from '../../utils/sessionPlans'
+import { buyPremium, PACK_NAME } from '../../utils/premium'
 
 interface FloatItem {
   key: number
@@ -50,22 +48,81 @@ interface CelebrateInfo {
 
 const SWITCH_HINT_MS = 2600
 
-// 一炷香：平时烟头在画面 86% 处藏在木鱼后（pkg-smoke/incensePlume.ts 的 originYRatio）。
-// 燃香时木鱼隐去，烟头升到 70% 处，香身从烟头往下插进香炉（避开底部回堂把手），燃烧时香头和烟一起往下走
-const PLUME_BASE = 86
-const STICK_TOP = 70
-const STICK_LEN = 12
-const STICK_BURN = 10
+// 定课：一炷香定时、一串念珠定数。木鱼照常敲，手敲 / 自动都算；只在香案前走时，结束响一声钟钵
+type SessionKind = 'time' | 'count'
 
-interface IncenseOption {
-  minutes: number
-  gain: number
+interface SessionOption {
+  kind: SessionKind
+  /** 分钟 / 下 */
+  value: number
+  name: string
+  mark: string
 }
 
-function incenseOptions(): IncenseOption[] {
-  // 开发版本地模拟多一个 1 分钟，方便看燃尽
-  const list = mockEnabled() ? [1].concat(INCENSE_MINUTES) : INCENSE_MINUTES
-  return list.map((m) => ({ minutes: m, gain: m * INCENSE_RATE }))
+interface PlanOption {
+  id: PlanId
+  name: string
+  mark: string
+  locked: boolean
+}
+
+interface SessionState {
+  kind: SessionKind
+  value: number
+  /** 成品定课；自己选的一炷香 / 念珠为 null */
+  plan: SessionPlan | null
+  /** 没开静心包，在试这一套 */
+  trial: boolean
+  goalMs: number
+  elapsedMs: number
+  /** 上次走时的时刻，0 表示停着 */
+  lastTick: number
+  hand: number
+  auto: number
+}
+
+interface SessionDone {
+  kind: SessionKind
+  value: number
+  planId: PlanId | ''
+  trial: boolean
+  title: string
+  line: string
+  detail: string
+  /** 成品定课的收尾语 */
+  closing: string
+  /** 试用结束时介绍静心包 */
+  offer: string
+}
+
+/** 平时自动敲的间隔；成品定课按各自的节奏 */
+const AUTO_GAP_MS = 800
+
+/** 右下角香身图标的长度（rpx），定时时随燃烧变短 */
+const STICK_ICON_LEN = 56
+
+function sessionOptions(): SessionOption[] {
+  // 开发版本地多一个 1 分钟 / 10 下，方便看结束
+  const mins = mockEnabled() ? [1].concat(SESSION_MINUTES) : SESSION_MINUTES
+  const beads = mockEnabled() ? [10, SESSION_BEADS] : [SESSION_BEADS]
+  const timed: SessionOption[] = mins.map((m) => ({ kind: 'time', value: m, name: '一炷香 · ' + m + ' 分钟', mark: '到点即止' }))
+  const counted: SessionOption[] = beads.map((n) => ({ kind: 'count', value: n, name: '一串念珠 · ' + n + ' 下', mark: '敲满即止' }))
+  return timed.concat(counted)
+}
+
+function planOptions(premium: boolean): PlanOption[] {
+  const tried = triedPlans()
+  return SESSION_PLANS.map((p) => {
+    const locked = p.premium && !premium
+    let mark = p.scene + ' · ' + p.minutes + ' 分钟'
+    if (locked) mark = tried[p.id] ? PACK_NAME : '可试一次 · ' + p.minutes + ' 分钟'
+    return { id: p.id, name: p.name, mark, locked }
+  })
+}
+
+/** 成品定课的时长；开发版本地缩成 1 分钟，方便看收尾 */
+function planMinutes(p: SessionPlan): number {
+  return mockEnabled() ? 1 : p.minutes
 }
 
 function clockText(ms: number): string {
@@ -193,17 +250,19 @@ Page({
     sheetRandomCur: false,
     materials: MATERIALS,
     material: savedMaterial(),
-    // 一炷香：燃烧中木鱼静置，按云端时钟倒计时
-    incenseOn: false,
-    incenseLeft: '',
-    incenseGain: 0,
-    incenseSink: 0,
-    incenseTop: STICK_TOP,
-    incenseLen: STICK_LEN,
-    incenseSheetOn: false,
-    incenseOptions: [] as IncenseOption[],
-    incenseBusy: false,
-    incenseFeature: INCENSE_ON,
+    // 定课：进行中右下角显示剩余时间 / 已敲次数
+    sessionOn: false,
+    sessionKind: 'time' as SessionKind,
+    sessionBig: '',
+    sessionSmall: '',
+    sessionStick: STICK_ICON_LEN,
+    sessionSheetOn: false,
+    sessionOptions: [] as SessionOption[],
+    planOptions: [] as PlanOption[],
+    sessionDoneOn: false,
+    sessionDone: null as SessionDone | null,
+    /** 已开静心包 */
+    premium: false,
   },
 
   _floatSeq: 0,
@@ -233,11 +292,17 @@ Page({
   _touchY: 0,
   _touchMoved: 0,
   _dragging: false,
-  _incense: null as IncenseState | null,
-  /** 云端时钟 - 本机时钟 */
-  _clockSkew: 0,
-  _incenseTimer: 0,
-  _settling: false,
+  _session: null as SessionState | null,
+  _sessionTimer: 0,
+  /** 定课结束时正弹着圆满：等圆满关掉再给小结 */
+  _pendingDone: null as SessionDone | null,
+  // 自己在静心页选的氛围 / 主题；成品定课期间临时换成定课的，结束后换回来
+  _userAmbience: 'off' as AmbienceId,
+  _userTheme: 'dawn' as ThemeId,
+  /** 当前铺着的成品定课场景：定课中，以及结束后小结还开着时 */
+  _scenePlan: null as SessionPlan | null,
+  /** 成品定课收尾后声音已淡出，小结关掉前不再响 */
+  _sceneQuiet: false,
   onLoad(options: Record<string, string | undefined>) {
     const app = getApp<IAppOption>()
     const scene =
@@ -248,6 +313,8 @@ Page({
       bindChannelByScene(scene).catch(() => {})
     }
     const cached = settingsOf(app.globalData.user)
+    this._userAmbience = cached.ambience
+    this._userTheme = cached.theme
     this.setData(
       Object.assign(
         {
@@ -307,7 +374,10 @@ Page({
     startAmbience(this.data.ambience)
     this.armLessonTitle()
     concealTabBar(this)
-    if (this._incense) this.startIncenseTick()
+    if (this._session) {
+      ensureBell()
+      this.startSessionTick()
+    }
     this.refresh()
     this.tryEnter()
     // 自动敲只在本次打开内有效：切页、锁屏回来接着敲，重开小程序从手敲开始
@@ -325,8 +395,8 @@ Page({
   },
 
   onHide() {
-    // 香照常燃（云端计时），只停本页的倒计时
-    this.stopIncenseTick()
+    // 定课只在香案前走时：离开就停，回来接着走
+    this.stopSessionTick()
     this.stopAuto()
     stopAmbience()
     this.clearEnterTimer()
@@ -353,7 +423,7 @@ Page({
   onUnload() {
     this._alive = false
     if (this._hintTimer) clearTimeout(this._hintTimer)
-    this.stopIncenseTick()
+    this.stopSessionTick()
     this.stopAuto()
     stopAmbience()
     this.clearEnterTimer()
@@ -591,7 +661,6 @@ Page({
       const res = await fetchHome()
       if (!this._alive) return
       this.applyHome(res.user, res.todayCount)
-      this.syncIncense(res.user && res.user.incense, res.serverNow)
     } catch (e: any) {
       if (this._alive) {
         this.setData({ loading: false })
@@ -603,22 +672,49 @@ Page({
   applyHome(user: UserRecord, todayCount: number) {
     this._wishId = bindWishId()
     const s = settingsOf(user)
+    this._userAmbience = s.ambience
+    this._userTheme = s.theme
+    const scene = this.sceneNow()
     this.setData(
       Object.assign(
         {
           loading: false,
           soundOn: s.soundOn,
           vibrateOn: s.vibrateOn,
-          ambience: s.ambience,
-          theme: s.theme,
+          ambience: scene.ambience,
+          theme: scene.theme,
+          premium: user.premium === true,
         },
         this.levelPatch(user.totalMerit || 0, todayCount),
-        scenePatch(this._titleCurrent, this._titleGoal, s.theme)
+        scenePatch(this._titleCurrent, this._titleGoal, scene.theme)
       )
     )
     this.setData(this.titleColorPatch())
     this.drawLessonTitle()
-    startAmbience(s.ambience)
+    startAmbience(scene.ambience)
+  },
+
+  /** 此刻香案该用的声音和主题：成品定课铺着时用定课的，否则用自己的设置 */
+  sceneNow(): { ambience: AmbienceId; theme: ThemeId } {
+    const plan = this._scenePlan
+    if (!plan) return { ambience: this._userAmbience, theme: this._userTheme }
+    return { ambience: this._sceneQuiet ? 'off' : plan.ambience, theme: plan.theme }
+  },
+
+  applyScene() {
+    const scene = this.sceneNow()
+    this.setData({ ambience: scene.ambience, theme: scene.theme })
+    this.setData(this.titleColorPatch())
+    this.drawLessonTitle()
+    startAmbience(scene.ambience)
+  },
+
+  /** 收起成品定课的场景，换回自己的声音和主题 */
+  restoreScene() {
+    if (!this._scenePlan) return
+    this._scenePlan = null
+    this._sceneQuiet = false
+    this.applyScene()
   },
 
   onKnockTap() {
@@ -684,9 +780,9 @@ Page({
   },
 
   knock(source: TapSource) {
-    if (!this._alive || this.entering() || !this.data.readyToKnock || this.overlayOn() || this._incense) return
+    if (!this._alive || this.entering() || !this.data.readyToKnock || this.overlayOn()) return
     const d = this.data
-    playKnock(d.soundOn)
+    playKnock(d.soundOn, this.knockTimbre())
     vibrate(d.vibrateOn)
     this.spawnFloat()
     this.pulse()
@@ -700,11 +796,12 @@ Page({
     )
     this.drawLessonTitle()
     if (this._queue) this._queue.tap(source)
+    this.countSession(source)
   },
 
   /** 右下角「自动」开关：随时切换，不存云端 */
   onToggleAuto() {
-    if (this.entering() || this.overlayOn() || this._incense) return
+    if (this.entering() || this.overlayOn()) return
     const on = !this.data.autoMode
     this.setData({ autoMode: on })
     if (on) this.startAuto()
@@ -712,16 +809,42 @@ Page({
   },
 
   startAuto() {
-    if (this._autoTimer || this.entering() || this._incense) return
-    this._autoTimer = setInterval(() => {
-      if (this._alive) this.knock('auto')
-    }, 800)
+    if (this._autoTimer || this.entering()) return
+    this.scheduleAuto()
   },
+
+  // 每一下都重新算间隔：成品定课的节奏会随进度变慢
+  scheduleAuto() {
+    this._autoTimer = setTimeout(() => {
+      if (!this._alive) {
+        this._autoTimer = 0
+        return
+      }
+      this.knock('auto')
+      // 这一下可能刚好结束了定课并停掉自动敲
+      if (this._autoTimer) this.scheduleAuto()
+    }, this.autoGap()) as unknown as number
+  },
+
   stopAuto() {
     if (this._autoTimer) {
-      clearInterval(this._autoTimer)
+      clearTimeout(this._autoTimer)
       this._autoTimer = 0
     }
+  },
+
+  autoGap(): number {
+    const s = this._session
+    const plan = s && s.plan
+    if (!s || !plan) return AUTO_GAP_MS
+    const t = s.kind === 'time' ? s.elapsedMs / s.goalMs : (s.hand + s.auto) / s.value
+    const k = Math.max(0, Math.min(1, t))
+    return Math.round(plan.gapFrom + (plan.gapTo - plan.gapFrom) * k)
+  },
+
+  knockTimbre(): KnockTimbre {
+    const plan = this._session && this._session.plan
+    return plan ? plan.timbre : 'default'
   },
 
   spawnFloat() {
@@ -781,15 +904,11 @@ Page({
 
   /** 弹窗 / 面板盖在香案上：画布是原生层，要暂停木鱼、隐去烟和竖排标题 */
   overlayOn(): boolean {
-    return this.data.celebrateOn || this.data.sheetOn || this.data.incenseSheetOn
+    return this.data.celebrateOn || this.data.sheetOn || this.data.sessionSheetOn || this.data.sessionDoneOn
   },
 
   onOpenLessonPanel() {
     if (this.entering() || this.overlayOn()) return
-    if (this._incense) {
-      wx.showToast({ title: '香燃尽或掐灭后再换功课', icon: 'none' })
-      return
-    }
     this.openSheet(false)
   },
 
@@ -860,6 +979,11 @@ Page({
     this._celebrateId = id
     this._wishId = null
     this.stopAuto()
+    if (this.data.sessionDone) {
+      // 敲满念珠的同一下圆满了心愿：先庆圆满，小结等会儿再给
+      this._pendingDone = this.data.sessionDone
+      this.setData({ sessionDoneOn: false, sessionDone: null })
+    }
     this.setData({
       celebrateOn: true,
       celebrate: {
@@ -907,7 +1031,11 @@ Page({
     const p = await this.takeNextPick(id)
     this.switchLesson(p)
     this.showSwitchHint(p.mode === 'wish' ? '已切换到下一个心愿' : '心愿都已圆满 · 已转入随机专注')
-    if (this.data.autoMode && !this.entering()) this.startAuto()
+    if (this._pendingDone) {
+      this.showSessionDone(this._pendingDone)
+      this._pendingDone = null
+    }
+    if (this.data.autoMode && !this.entering() && !this.overlayOn()) this.startAuto()
   },
 
   showSwitchHint(text: string) {
@@ -921,6 +1049,8 @@ Page({
 
   async onCelebrateCert() {
     const id = this.endCelebrate()
+    this._pendingDone = null
+    this.restoreScene()
     const app = getApp<IAppOption>()
     app.globalData.certFocusId = id
     app.globalData.homeWillReenter = true
@@ -929,149 +1059,261 @@ Page({
     applyLesson(await this.takeNextPick(id))
   },
 
-  // ===== 一炷香 =====
+  // ===== 定课 =====
 
-  onOpenIncense() {
-    if (!INCENSE_ON) return
-    if (this.entering() || this.overlayOn() || this._incense) return
+  onOpenSession() {
+    if (this.entering() || this.overlayOn() || this._session) return
     this.stopAuto()
-    this.setData({ incenseSheetOn: true, incenseOptions: incenseOptions() })
+    ensureBell()
+    this.setData({
+      sessionSheetOn: true,
+      sessionOptions: sessionOptions(),
+      planOptions: planOptions(this.data.premium),
+    })
     this.drawLessonTitle()
   },
 
-  closeIncenseSheet() {
-    if (!this.data.incenseSheetOn) return
-    this.setData({ incenseSheetOn: false })
+  closeSessionSheet() {
+    if (!this.data.sessionSheetOn) return
+    this.setData({ sessionSheetOn: false })
     this.drawLessonTitle()
     if (this.data.autoMode && !this.entering() && !this.overlayOn()) this.startAuto()
   },
 
-  async onLightIncense(e: any) {
-    const minutes = Number(e.currentTarget.dataset.minutes) || 0
-    if (!minutes || this.data.incenseBusy) return
-    this.setData({ incenseBusy: true })
-    try {
-      const res = await lightIncense(this._wishId, minutes)
-      if (!this._alive) return
-      this.setData({ incenseSheetOn: false, incenseBusy: false })
-      this.drawLessonTitle()
-      this.syncIncense(res.incense, res.incense.serverNow)
-    } catch (err: any) {
-      if (!this._alive) return
-      this.setData({ incenseBusy: false })
-      wx.showToast({ title: (err && err.message) || '点香失败', icon: 'none' })
-    }
+  onPickSession(e: any) {
+    const kind = e.currentTarget.dataset.kind
+    const value = Number(e.currentTarget.dataset.value) || 0
+    if (!value || (kind !== 'time' && kind !== 'count')) return
+    this.setData({ sessionSheetOn: false })
+    this.drawLessonTitle()
+    this.beginSession(kind, value)
   },
 
-  /** 按云端记录摆香：没有就收起；已燃尽就结算 */
-  syncIncense(inc: { wishId: string | null; minutes: number; startMs: number } | null | undefined, serverNow?: number) {
-    if (!this._alive) return
-    if (typeof serverNow === 'number' && serverNow > 0) this._clockSkew = serverNow - Date.now()
-    if (!INCENSE_ON || !inc || !inc.startMs || !inc.minutes) {
-      if (this._incense) this.clearIncense()
+  /** 成品定课：免费的直接开始；静心包的没开过先试一次，试过了再点就去开启 */
+  async onPickPlan(e: any) {
+    const plan = planOf(String(e.currentTarget.dataset.id || ''))
+    if (!plan) return
+    if (!plan.premium || this.data.premium) {
+      this.startPlan(plan, false)
       return
     }
-    this._incense = {
-      wishId: inc.wishId || null,
-      minutes: inc.minutes,
-      startMs: inc.startMs,
-      endMs: inc.startMs + inc.minutes * 60000,
-      serverNow: serverNow || 0,
+    if (!triedPlans()[plan.id]) {
+      this.startPlan(plan, true)
+      return
     }
-    this.stopAuto()
-    this.setData({ incenseOn: true, incenseGain: inc.minutes * INCENSE_RATE })
-    this.startIncenseTick()
-  },
-
-  startIncenseTick() {
-    this.stopIncenseTick()
-    this.incenseTick()
-    this._incenseTimer = setInterval(() => this.incenseTick(), 1000) as unknown as number
-  },
-
-  stopIncenseTick() {
-    if (this._incenseTimer) {
-      clearInterval(this._incenseTimer)
-      this._incenseTimer = 0
+    const r = await buyPremium(() => this._alive)
+    if (!this._alive) return
+    if (r === 'opened') {
+      this.setData({ premium: true })
+      wx.showToast({ title: PACK_NAME + '已开启', icon: 'none' })
+      this.startPlan(plan, false)
+    } else if (r === 'pending') {
+      wx.showToast({ title: '付款已收到，正在开启', icon: 'none' })
     }
   },
 
-  incenseTick() {
-    const inc = this._incense
-    if (!this._alive || !inc) return
-    const total = inc.endMs - inc.startMs
-    const left = inc.endMs - (Date.now() + this._clockSkew)
-    const burnt = Math.max(0, Math.min(1, 1 - left / total))
-    const top = STICK_TOP + burnt * STICK_BURN
-    this.setData({
-      incenseLeft: clockText(left),
-      incenseSink: Number(((top - PLUME_BASE) / 100).toFixed(4)),
-      incenseTop: Number(top.toFixed(2)),
-      incenseLen: Number((STICK_LEN - burnt * STICK_BURN).toFixed(2)),
-    })
-    if (left <= 0) this.settleIncense()
+  startPlan(plan: SessionPlan, trial: boolean) {
+    this.setData({ sessionSheetOn: false })
+    this.drawLessonTitle()
+    if (trial) wx.showToast({ title: '试一次 · 走完这一段', icon: 'none' })
+    this.beginSession('time', planMinutes(plan), plan, trial)
   },
 
-  clearIncense() {
-    this._incense = null
-    this.stopIncenseTick()
-    this.setData({ incenseOn: false, incenseLeft: '', incenseSink: 0, incenseTop: STICK_TOP, incenseLen: STICK_LEN })
+  beginSession(kind: SessionKind, value: number, plan: SessionPlan | null = null, trial = false) {
+    this._session = {
+      kind,
+      value,
+      plan,
+      trial,
+      goalMs: kind === 'time' ? value * 60000 : 0,
+      elapsedMs: 0,
+      lastTick: 0,
+      hand: 0,
+      auto: 0,
+    }
+    if (plan) {
+      ensureKnock(plan.timbre)
+      this._scenePlan = plan
+      this._sceneQuiet = false
+      this.applyScene()
+    } else {
+      this.restoreScene()
+    }
+    this.setData(Object.assign({ sessionOn: true, sessionKind: kind }, this.sessionPatch()))
+    this.startSessionTick()
     if (this.data.autoMode && !this.entering() && !this.overlayOn()) this.startAuto()
   },
 
-  async settleIncense() {
-    if (this._settling) return
-    this._settling = true
-    this.stopIncenseTick()
-    try {
-      const res = await settleIncense()
-      if (!this._alive) return
-      if (!res.settled) {
-        // 云端还没燃尽（本机时钟快了）就接着等；香已不在就收起
-        if (res.incense) this.syncIncense(res.incense, res.incense.serverNow)
-        else this.clearIncense()
-        return
-      }
-      this.clearIncense()
-      vibrate(this.data.vibrateOn)
-      this.spawnText('一炷香尽 · 专注 +' + (res.gained || 0), 'celebrate')
-      if (typeof res.totalMerit === 'number') this.setData(this.levelPatch(res.totalMerit, res.todayCount))
-      const w = res.wish
-      if (w && res.wishId && res.wishId === this._wishId && this._lessonKind === 'wish') {
-        this._titleCurrent = Math.max(0, Math.min(this._titleGoal, w.current || 0))
-        this.applyTitleProgress()
-        if (w.status === 'completed') this.celebrateWish()
-      }
-    } catch {
-      // 网络不好：过几秒再试，香的记录在云端不会丢
-      if (this._alive && this._incense) {
-        setTimeout(() => {
-          if (this._alive && this._incense) this.startIncenseTick()
-        }, 5000)
-      }
-    } finally {
-      this._settling = false
+  sessionPatch(): { sessionBig: string; sessionSmall: string; sessionStick: number } {
+    const s = this._session
+    if (!s) return { sessionBig: '', sessionSmall: '', sessionStick: STICK_ICON_LEN }
+    const n = s.hand + s.auto
+    if (s.kind === 'count') return { sessionBig: String(n), sessionSmall: '/ ' + s.value, sessionStick: STICK_ICON_LEN }
+    const burnt = Math.max(0, Math.min(1, s.elapsedMs / s.goalMs))
+    return {
+      sessionBig: clockText(s.goalMs - s.elapsedMs),
+      sessionSmall: '已敲 ' + n,
+      sessionStick: Math.max(4, Math.round(STICK_ICON_LEN * (1 - burnt))),
     }
   },
 
-  onSnuffIncense() {
-    const inc = this._incense
-    if (!inc) return
-    const burnt = Math.max(0, Math.floor((Date.now() + this._clockSkew - inc.startMs) / 60000))
+  startSessionTick() {
+    this.stopSessionTick()
+    const s = this._session
+    if (!s || s.kind !== 'time') return
+    s.lastTick = Date.now()
+    this._sessionTimer = setInterval(() => this.sessionTick(), 500) as unknown as number
+  },
+
+  stopSessionTick() {
+    if (this._sessionTimer) {
+      clearInterval(this._sessionTimer)
+      this._sessionTimer = 0
+    }
+    if (this._session) this._session.lastTick = 0
+  },
+
+  sessionTick() {
+    const s = this._session
+    if (!this._alive || !s) return
+    const now = Date.now()
+    // 面板、弹窗盖着或正在入堂时不走；一次最多走 2 秒，机器休眠回来不会一下跳过去
+    if (s.lastTick && !this.overlayOn() && !this.entering()) {
+      s.elapsedMs += Math.min(2000, Math.max(0, now - s.lastTick))
+    }
+    s.lastTick = now
+    if (s.elapsedMs >= s.goalMs) {
+      this.finishSession()
+      return
+    }
+    const p = this.sessionPatch()
+    if (p.sessionBig !== this.data.sessionBig || p.sessionStick !== this.data.sessionStick) this.setData(p)
+  },
+
+  countSession(source: TapSource) {
+    const s = this._session
+    if (!s) return
+    s[source] += 1
+    if (s.kind === 'count' && s.hand + s.auto >= s.value) {
+      this.finishSession()
+      return
+    }
+    this.setData(this.sessionPatch())
+  },
+
+  endSession() {
+    this.stopSessionTick()
+    this._session = null
+    this.setData({ sessionOn: false })
+  },
+
+  /** 时间到 / 念珠满：停下自动敲；成品定课先让声音淡出，再响一声钟钵，给小结 */
+  finishSession() {
+    const s = this._session
+    if (!s) return
+    this.endSession()
+    this.stopAuto()
+    this.setData({ autoMode: false })
+    const plan = s.plan
+    if (plan && s.trial) markPlanTried(plan.id)
+    const n = s.hand + s.auto
+    const parts: string[] = []
+    if (s.kind === 'time') parts.push(s.value + ' 分钟')
+    if (s.hand) parts.push('手敲 ' + s.hand)
+    if (s.auto) parts.push('自动 ' + s.auto)
+    const info: SessionDone = {
+      kind: s.kind,
+      value: s.value,
+      planId: plan ? plan.id : '',
+      trial: s.trial,
+      title: plan ? plan.name : s.kind === 'time' ? '一炷香尽' : '念珠一串',
+      line: s.kind === 'time' ? '敲了 ' + n + ' 下' : n + ' 下圆满',
+      detail: parts.join(' · '),
+      closing: plan ? plan.closing : '',
+      offer: plan && s.trial ? '这是' + PACK_NAME + '里的一套定课，开启后随时可用' : '',
+    }
+    const ring = () => {
+      playBell(this.data.soundOn)
+      vibrate(this.data.vibrateOn)
+      this.showSessionDone(info)
+    }
+    if (!plan) {
+      ring()
+      return
+    }
+    this._sceneQuiet = true
+    this.setData({ ambience: 'off' })
+    fadeOutAmbience(plan.fadeMs).then(() => {
+      if (this._alive) ring()
+    })
+  },
+
+  showSessionDone(info: SessionDone) {
+    if (this.data.celebrateOn) {
+      this._pendingDone = info
+      return
+    }
+    this.stopAuto()
+    this.setData({ sessionDoneOn: true, sessionDone: info })
+    this.drawLessonTitle()
+  },
+
+  closeSessionDone(): SessionDone | null {
+    const info = this.data.sessionDone
+    this.setData({ sessionDoneOn: false, sessionDone: null })
+    this.drawLessonTitle()
+    return info
+  },
+
+  onSessionDoneClose() {
+    this.closeSessionDone()
+    this.restoreScene()
+  },
+
+  onSessionAgain() {
+    const info = this.closeSessionDone()
+    if (!info) return
+    const plan = info.planId ? planOf(info.planId) : null
+    if (plan) this.beginSession('time', planMinutes(plan), plan, false)
+    else this.beginSession(info.kind, info.value)
+  },
+
+  /** 试用结束的小结里直接开启；开了就接着用刚才这套 */
+  async onSessionBuy() {
+    const info = this.closeSessionDone()
+    const plan = info && info.planId ? planOf(info.planId) : null
+    const r = await buyPremium(() => this._alive)
+    if (!this._alive) return
+    if (r === 'opened') {
+      this.setData({ premium: true })
+      wx.showToast({ title: PACK_NAME + '已开启', icon: 'none' })
+      if (plan) {
+        this.beginSession('time', planMinutes(plan), plan, false)
+        return
+      }
+    } else if (r === 'pending') {
+      wx.showToast({ title: '付款已收到，正在开启', icon: 'none' })
+    }
+    this.restoreScene()
+  },
+
+  /** 提前收起：已敲的早已计入，收起只是不再计时 / 计数 */
+  onEndSession() {
+    const s = this._session
+    if (!s) return
+    const n = s.hand + s.auto
     wx.showModal({
-      title: '掐灭这炷香？',
-      content: burnt > 0 ? '已燃 ' + burnt + ' 分钟，掐灭后不计入专注。' : '掐灭后不计入专注。',
-      confirmText: '掐灭',
-      cancelText: '再等等',
+      title: s.kind === 'time' ? '提前收起这炷香？' : '提前收起念珠？',
+      content:
+        (n > 0 ? '已敲 ' + n + ' 下，都已计入专注。' : '收起后回到自由敲击。') +
+        (s.plan && s.trial ? '这次试用也就用过了。' : ''),
+      confirmText: '收起',
+      cancelText: '接着敲',
       success: (r) => {
-        if (!r.confirm) return
-        snuffIncense()
-          .then(() => {
-            if (this._alive) this.clearIncense()
-          })
-          .catch((err: any) => {
-            wx.showToast({ title: (err && err.message) || '掐灭失败', icon: 'none' })
-          })
+        if (!r.confirm || !this._alive || this._session !== s) return
+        if (s.plan && s.trial) markPlanTried(s.plan.id)
+        this.endSession()
+        this.restoreScene()
       },
     })
   },

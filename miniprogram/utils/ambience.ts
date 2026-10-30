@@ -19,7 +19,15 @@ const FILE_VOLUME: Record<Exclude<AmbienceId, 'off'>, number> = {
 let ctx: any = null
 let wanted: AmbienceId = 'off'
 let playingId: AmbienceId = 'off'
-let proc: { stop: () => void } | null = null
+interface Proc {
+  stop: () => void
+  /** 0..1，淡出用 */
+  setLevel: (k: number) => void
+}
+
+let proc: Proc | null = null
+/** 每次开 / 停都换一个号，正在进行的淡出看到号变了就收手 */
+let fadeSeq = 0
 
 function destroyCtx() {
   if (!ctx) return
@@ -59,7 +67,7 @@ function bake(id: SynthId, rate: number): [Float32Array, Float32Array] {
 
 const FADE_IN_MS = 1500
 
-function startProcedural(id: AmbienceId): { stop: () => void } | null {
+function startProcedural(id: AmbienceId): Proc | null {
   const anyWx: any = wx
   if (typeof anyWx.createWebAudioContext !== 'function') return null
   let audio: any
@@ -110,6 +118,17 @@ function startProcedural(id: AmbienceId): { stop: () => void } | null {
   }, 50)
 
   return {
+    setLevel(k: number) {
+      if (fade) {
+        clearInterval(fade)
+        fade = 0
+      }
+      try {
+        gain.gain.value = k
+      } catch {
+        // ignore
+      }
+    },
     stop() {
       if (fade) clearInterval(fade)
       try {
@@ -136,6 +155,7 @@ function playSynth(id: AmbienceId) {
 }
 
 export function stopAmbience() {
+  fadeSeq += 1
   wanted = 'off'
   destroyCtx()
   stopProc()
@@ -143,6 +163,7 @@ export function stopAmbience() {
 }
 
 export function startAmbience(id: AmbienceId) {
+  fadeSeq += 1
   applyAudioOption()
   wanted = id
   if (!id || id === 'off') {
@@ -191,4 +212,37 @@ export function startAmbience(id: AmbienceId) {
       // 付费氛围的录音拿不到时退回合成，别让付了费的人听到一片安静
       if (wanted === id && isPremiumAmbience(id)) playSynth(id)
     })
+}
+
+/** 定课收尾：当前氛围在 ms 内慢慢静下去，然后停掉。中途换了氛围就不管了 */
+export function fadeOutAmbience(ms: number): Promise<void> {
+  const seq = ++fadeSeq
+  const id = playingId
+  if (id === 'off' || (!ctx && !proc)) {
+    stopAmbience()
+    return Promise.resolve()
+  }
+  const base = ctx ? FILE_VOLUME[id] : 1
+  const t0 = Date.now()
+  return new Promise((resolve) => {
+    const timer = setInterval(() => {
+      if (seq !== fadeSeq) {
+        clearInterval(timer)
+        resolve()
+        return
+      }
+      const k = Math.max(0, 1 - (Date.now() - t0) / ms)
+      try {
+        if (ctx) ctx.volume = base * k * k
+        if (proc) proc.setLevel(k * k)
+      } catch {
+        // ignore
+      }
+      if (k <= 0) {
+        clearInterval(timer)
+        stopAmbience()
+        resolve()
+      }
+    }, 50)
+  })
 }

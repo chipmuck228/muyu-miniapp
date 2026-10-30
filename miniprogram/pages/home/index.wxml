@@ -10,12 +10,7 @@
         <view class="theme-glow"></view>
         <image wx:if="{{dawnSrc}}" class="dawn-paper" src="{{dawnSrc}}" mode="aspectFill" style="opacity: {{dawnSky}};" />
       </view>
-      <smoke-gl class="smoke-gl-fill" theme="{{theme}}" sink="{{incenseSink}}" fade="{{celebrateOn || sheetOn || incenseSheetOn ? 0 : (incenseOn ? 1 : smokeFade)}}" bind:risen="onSmokeRisen" />
-      <!-- 一炷香：香身从烟头插进香炉，燃烧时一起往下走 -->
-      <block wx:if="{{incenseOn && !celebrateOn}}">
-        <view class="incense-stick" style="top: {{incenseTop}}%; height: {{incenseLen}}%;"></view>
-        <view class="incense-censer" style="top: {{incenseTop + incenseLen}}%;"></view>
-      </block>
+      <smoke-gl class="smoke-gl-fill" theme="{{theme}}" fade="{{celebrateOn || sheetOn || sessionSheetOn || sessionDoneOn ? 0 : smokeFade}}" bind:risen="onSmokeRisen" />
 
       <view
         class="lesson-head enter-altar {{switchHint ? 'switched' : ''}}"
@@ -43,11 +38,10 @@
 
       <view class="knock-wrap enter-altar">
         <!-- 木鱼只负责显示，不接收点击；圆满弹窗打开时隐去，免得画布盖在弹窗上 -->
-        <view class="muyu-stage" style="opacity: {{celebrateOn || sheetOn || incenseSheetOn || incenseOn ? 0 : 1}};">
-          <muyu-gl id="muyu" class="muyu-gl" strike="{{strikeSeq}}" material="{{material}}" paused="{{celebrateOn || sheetOn || incenseSheetOn || incenseOn}}" />
+        <view class="muyu-stage" style="opacity: {{celebrateOn || sheetOn || sessionSheetOn || sessionDoneOn ? 0 : 1}};">
+          <muyu-gl id="muyu" class="muyu-gl" strike="{{strikeSeq}}" material="{{material}}" paused="{{celebrateOn || sheetOn || sessionSheetOn || sessionDoneOn}}" />
         </view>
         <view
-          wx:if="{{!incenseOn}}"
           class="knock-pad {{pulsing ? 'pulsing' : ''}}"
           hover-class="knock-hover"
           hover-stay-time="60"
@@ -60,7 +54,7 @@
           <view class="ripple-ring {{rippleOn ? 'on' : ''}}"></view>
         </view>
         <!-- 木鱼材质：紫檀 / 黄花梨 / 琉璃 / 玉 -->
-        <view class="mat-dots" wx:if="{{!incenseOn}}">
+        <view class="mat-dots">
           <view
             wx:for="{{materials}}"
             wx:key="id"
@@ -71,22 +65,25 @@
             catchtap="onPickMaterial"
           ></view>
         </view>
-        <!-- 右下角：自动敲开关 + 一炷香入口；燃烧时换成倒计时 -->
-        <view wx:if="{{!incenseOn}}" class="side-tools">
+        <!-- 右下角：自动敲开关 + 定课入口；定课中换成剩余时间 / 已敲次数，点一下可提前收起 -->
+        <view class="side-tools">
           <view class="auto-tog {{autoMode ? 'on' : ''}}" hover-class="mat-dot-hover" catchtap="onToggleAuto">
             <view class="auto-dot"></view>
             <text class="auto-text">自动</text>
           </view>
-          <view wx:if="{{incenseFeature}}" class="incense-entry" hover-class="mat-dot-hover" catchtap="onOpenIncense">
+          <view wx:if="{{!sessionOn}}" class="incense-entry" hover-class="mat-dot-hover" catchtap="onOpenSession">
             <view class="incense-entry-icon"></view>
-            <text class="incense-entry-text">一炷香</text>
+            <text class="incense-entry-text">定课</text>
           </view>
-        </view>
-        <view wx:else class="incense-burn">
-          <text class="incense-clock">{{incenseLeft}}</text>
-          <text class="incense-gain">燃尽积专注 {{incenseGain}}</text>
-          <text class="incense-note">可以锁屏或离开，香照常燃</text>
-          <text class="incense-snuff" hover-class="mat-dot-hover" catchtap="onSnuffIncense">掐灭</text>
+          <view wx:else class="session-burn" hover-class="mat-dot-hover" catchtap="onEndSession">
+            <view wx:if="{{sessionKind === 'time'}}" class="session-icon">
+              <view class="incense-entry-icon" style="height: {{sessionStick}}rpx;"></view>
+            </view>
+            <view wx:else class="session-icon"><view class="session-bead"></view></view>
+            <text class="session-big">{{sessionBig}}</text>
+            <text class="session-small">{{sessionSmall}}</text>
+            <text class="session-end">收起</text>
+          </view>
         </view>
         <view class="floats-layer">
           <view
@@ -135,30 +132,60 @@
     </scroll-view>
   </view>
 
-  <!-- 一炷香：选时长即点燃 -->
-  <view class="sheet-mask" wx:if="{{incenseSheetOn}}" catchtouchmove="noop" bindtap="closeIncenseSheet"></view>
-  <view class="lesson-sheet" wx:if="{{incenseSheetOn}}" catchtouchmove="noop">
+  <!-- 定课：成品定课 + 一炷香定时 / 一串念珠定数，选了就开始 -->
+  <view class="sheet-mask" wx:if="{{sessionSheetOn}}" catchtouchmove="noop" bindtap="closeSessionSheet"></view>
+  <view class="lesson-sheet" wx:if="{{sessionSheetOn}}" catchtouchmove="noop">
     <view class="sheet-head">
       <view class="sheet-titles">
-        <text class="sheet-title">一炷香</text>
-        <text class="sheet-sub">为「{{lessonTitle}}」 · 放下手机去做事</text>
+        <text class="sheet-title">定课</text>
+        <text class="sheet-sub">为「{{lessonTitle}}」 · 敲完这一段</text>
       </view>
-      <text class="sheet-close" hover-class="sheet-hover" bindtap="closeIncenseSheet">收起</text>
+      <text class="sheet-close" hover-class="sheet-hover" bindtap="closeSessionSheet">收起</text>
     </view>
-    <view class="sheet-list">
+    <scroll-view class="sheet-list" scroll-y enhanced show-scrollbar="{{false}}">
+      <text class="sheet-section">成品定课</text>
       <view
-        wx:for="{{incenseOptions}}"
-        wx:key="minutes"
-        class="sheet-row {{incenseBusy ? 'busy' : ''}}"
+        wx:for="{{planOptions}}"
+        wx:key="id"
+        class="sheet-row {{item.locked ? 'locked' : ''}}"
         hover-class="sheet-hover"
-        data-minutes="{{item.minutes}}"
-        bindtap="onLightIncense"
+        data-id="{{item.id}}"
+        bindtap="onPickPlan"
       >
-        <text class="sheet-name">{{item.minutes}} 分钟</text>
-        <text class="sheet-mark">燃尽积专注 {{item.gain}}</text>
+        <text class="sheet-name">{{item.name}}</text>
+        <text class="sheet-mark">{{item.mark}}</text>
+      </view>
+      <text class="sheet-section">自己敲</text>
+      <view
+        wx:for="{{sessionOptions}}"
+        wx:key="name"
+        class="sheet-row"
+        hover-class="sheet-hover"
+        data-kind="{{item.kind}}"
+        data-value="{{item.value}}"
+        bindtap="onPickSession"
+      >
+        <text class="sheet-name">{{item.name}}</text>
+        <text class="sheet-mark">{{item.mark}}</text>
+      </view>
+    </scroll-view>
+    <text class="incense-rule">手敲、自动都算数。离开香案时暂停，回来接着走；提前收起，已敲的照样计入。</text>
+  </view>
+
+  <!-- 定课结束：钟钵一声后的小结 -->
+  <view class="celebrate-mask" wx:if="{{sessionDoneOn && sessionDone}}" catchtouchmove="noop">
+    <view class="celebrate-card">
+      <text class="cel-kicker">{{sessionDone.title}}</text>
+      <text class="cel-name">{{sessionDone.line}}</text>
+      <text wx:if="{{sessionDone.detail}}" class="cel-goal">{{sessionDone.detail}}</text>
+      <text wx:if="{{sessionDone.closing}}" class="cel-next">{{sessionDone.closing}}</text>
+      <text wx:if="{{sessionDone.offer}}" class="cel-hint">{{sessionDone.offer}}</text>
+      <view class="cel-actions">
+        <view wx:if="{{sessionDone.trial}}" class="cel-btn primary" hover-class="cel-hover" bindtap="onSessionBuy">开启静心包</view>
+        <view wx:else class="cel-btn primary" hover-class="cel-hover" bindtap="onSessionAgain">再来一段</view>
+        <view class="cel-btn" hover-class="cel-hover" bindtap="onSessionDoneClose">好</view>
       </view>
     </view>
-    <text class="incense-rule">香燃时木鱼静置。锁屏、切到别的应用都不影响，燃尽回来即入账；中途掐灭不计。</text>
   </view>
 
   <!-- 心愿圆满 -->

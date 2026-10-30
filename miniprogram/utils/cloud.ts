@@ -52,8 +52,6 @@ export interface UserRecord {
   createdAt?: number | Date
   lastHitDate?: string | null
   settings?: UserSettings
-  /** 正在燃的香（云端时钟） */
-  incense?: { wishId: string | null; minutes: number; startMs: number } | null
 }
 
 export interface HomePayload {
@@ -152,35 +150,6 @@ export interface HitResp {
 
 export function hitKnock(wishId: string | null, by: { hand: number; auto: number }): Promise<HitResp> {
   return callCloud<HitResp>('hit', { wishId: wishId || '', n: by.hand + by.auto, by, date: todayStrLocal() })
-}
-
-export interface IncenseState {
-  wishId: string | null
-  minutes: number
-  startMs: number
-  endMs: number
-  serverNow: number
-}
-
-export function lightIncense(wishId: string | null, minutes: number): Promise<{ incense: IncenseState }> {
-  return callCloud('hit', { action: 'light', wishId: wishId || '', minutes })
-}
-
-export function snuffIncense(): Promise<{}> {
-  return callCloud('hit', { action: 'snuff' })
-}
-
-export interface SettleResp extends Partial<HitResp> {
-  settled: boolean
-  /** 还没燃尽时带回当前这炷香 */
-  incense?: IncenseState
-  gained?: number
-  minutes?: number
-  wishId?: string | null
-}
-
-export function settleIncense(): Promise<SettleResp> {
-  return callCloud<SettleResp>('hit', { action: 'settle', date: todayStrLocal() })
 }
 
 export function createWish(name: string, goal: number, deadline: string | null): Promise<{ wishId: string }> {
