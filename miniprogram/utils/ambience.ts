@@ -1,7 +1,7 @@
 // 香案氛围循环。只在香案页播放，离开即停。
-// 雨声 / 钟钵走云端文件。白噪 / 溪流 / 松风 / 炉火有录音走录音，没有就在端上合成。
+// 有录音走录音（云端文件），没配录音或下载失败（含本地模拟模式）就在端上合成。
 
-import { AmbienceId, AUDIO_FILES, isPremiumAmbience } from './audioCatalog'
+import { AmbienceId, AUDIO_FILES } from './audioCatalog'
 import { renderAmbience, SynthId } from './ambienceSynth'
 import { resolveCloudFile } from './cloudFile'
 import { applyAudioOption } from './knock'
@@ -171,16 +171,11 @@ export function startAmbience(id: AmbienceId) {
     return
   }
   const fileID = AUDIO_FILES[id]
-  if (isPremiumAmbience(id) && !fileID) {
+  if (!fileID) {
     playSynth(id)
     return
   }
   stopProc()
-  if (!fileID) {
-    destroyCtx()
-    playingId = 'off'
-    return
-  }
   if (playingId === id && ctx) {
     try {
       ctx.volume = FILE_VOLUME[id]
@@ -208,9 +203,9 @@ export function startAmbience(id: AmbienceId) {
       playingId = id
     })
     .catch((e) => {
-      console.warn('ambience load failed', e)
-      // 付费氛围的录音拿不到时退回合成，别让付了费的人听到一片安静
-      if (wanted === id && isPremiumAmbience(id)) playSynth(id)
+      console.warn('ambience load failed, using synth', id, e)
+      // 录音拿不到时退回合成，别让人听到一片安静
+      if (wanted === id) playSynth(id)
     })
 }
 
