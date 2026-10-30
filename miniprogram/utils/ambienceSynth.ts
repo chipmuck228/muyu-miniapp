@@ -1,8 +1,8 @@
-// 付费氛围的离线合成：一次算好一段首尾无缝的立体声循环，交给 WebAudio 循环播放。
-// 不依赖 wx，可以在 node 里渲染成 wav 试听（scripts/render-ambience.js）。
-// 没有上传录音时用它兜底；有录音（audioCatalog.AUDIO_FILES）时优先播录音。
+// 氛围的离线合成：一次算好一段首尾无缝的立体声循环，交给 WebAudio 循环播放。
+// 不依赖 wx，可以在 node 里渲染成 wav 试听。
+// 没有录音、录音下载失败（含本地模拟模式）时用它兜底；有录音（audioCatalog.AUDIO_FILES）时优先播录音。
 
-export type SynthId = 'noise' | 'stream' | 'pine' | 'fire'
+export type SynthId = 'rain' | 'bowl' | 'noise' | 'stream' | 'pine' | 'fire'
 
 /** 循环长度。所有慢变包络都取整数周期，保证首尾对得上 */
 export const LOOP_SECONDS = 16
@@ -10,6 +10,8 @@ const XFADE_SECONDS = 1
 
 /** 各氛围最终的响度（RMS），想整体调大调小改这里 */
 const TARGET_RMS: Record<SynthId, number> = {
+  rain: 0.03,
+  bowl: 0.02,
   noise: 0.03,
   stream: 0.034,
   pine: 0.034,
@@ -270,6 +272,114 @@ function crackles(n: number, sr: number, seed: number, perSecond: number, pans: 
   return out
 }
 
+/** 雨幕：带通过的粉噪，随一阵大一阵小的雨势起伏 */
+function rainBed(n: number, sr: number, seed: number, swell: (t: number) => number): Float32Array {
+  const r = rng(seed)
+  const pink = new Pink()
+  const svf = new Svf(sr)
+  svf.set(2400, 0.4)
+  const tmp = [0, 0]
+  const out = new Float32Array(n)
+  for (let i = 0; i < n; i++) {
+    svf.run(pink.next(r() * 2 - 1), tmp)
+    out[i] = tmp[1] * swell(i / sr)
+  }
+  return out
+}
+
+/** 雨点：打在窗上的极短噪声脉冲，夹着少数檐下滴水的「嗒」 */
+function drops(n: number, sr: number, seed: number, perSecond: number, pans: Float32Array): Float32Array {
+  const r = rng(seed)
+  const out = new Float32Array(n)
+  const count = Math.round((n / sr) * perSecond)
+  const hpA = onePoleCoef(1500, sr)
+  for (let d = 0; d < count; d++) {
+    const start = Math.floor(r() * n)
+    const pan = r()
+    if (r() < 0.08) {
+      const f = 1500 + r() * 2500
+      const tau = 0.008 + r() * 0.012
+      const len = Math.floor(tau * 5 * sr)
+      const amp = 0.2 + 0.4 * r()
+      for (let j = 0; j < len && start + j < n; j++) {
+        const t = j / sr
+        out[start + j] += Math.sin(2 * Math.PI * f * t) * Math.exp(-t / tau) * Math.min(1, t / 0.0005) * amp
+        pans[start + j] = pan
+      }
+      continue
+    }
+    const len = Math.floor((0.0003 + r() * 0.0017) * sr)
+    const amp = 0.1 + 0.9 * Math.pow(r(), 3)
+    let lp = 0
+    for (let j = 0; j < len && start + j < n; j++) {
+      const w = r() * 2 - 1
+      lp += hpA * (w - lp)
+      out[start + j] += (w - lp) * Math.exp((-4 * j) / len) * amp
+      pans[start + j] = pan
+    }
+  }
+  return out
+}
+
+/**
+ * 一声钟钵从敲下到静下去，长 len 个采样。几组不成整数倍的泛音，每组两条略错开的正弦，
+ * 听得出慢慢的「嗡嗡」起伏；spread 让左右声道的起伏不同步。
+ * 用二阶递推算衰减正弦，比逐点 Math.sin 快得多，三十多秒的余音也算得动。
+ */
+function bowlTone(len: number, sr: number, spread: number): Float32Array {
+  const f0 = 236
+  const modes = [
+    { ratio: 1, amp: 1, decay: 4.5, beat: 0.7 },
+    { ratio: 2.74, amp: 0.55, decay: 2.6, beat: 1.3 },
+    { ratio: 5.2, amp: 0.25, decay: 1.3, beat: 2.1 },
+    { ratio: 8.5, amp: 0.12, decay: 0.6, beat: 3 },
+  ]
+  const out = new Float32Array(len)
+  for (const m of modes) {
+    for (const f of [f0 * m.ratio, f0 * m.ratio + m.beat * spread]) {
+      // y[k] = ρ^k·sin(kω)：y[k] = 2ρcos(ω)·y[k-1] − ρ²·y[k-2]
+      const w = (2 * Math.PI * f) / sr
+      const rho = Math.exp(-1 / (m.decay * sr))
+      const c1 = 2 * rho * Math.cos(w)
+      const c2 = rho * rho
+      let y2 = 0
+      let y1 = rho * Math.sin(w)
+      if (len > 1) out[1] += 0.5 * m.amp * y1
+      for (let k = 2; k < len; k++) {
+        const y = c1 * y1 - c2 * y2
+        out[k] += 0.5 * m.amp * y
+        y2 = y1
+        y1 = y
+      }
+    }
+  }
+  const atk = Math.floor(0.003 * sr)
+  for (let k = 0; k < atk && k < len; k++) out[k] *= k / atk
+  return out
+}
+
+/** 钟钵氛围：每个循环敲两下。上一圈的余音叠进这一圈开头，循环接缝处余音不断 */
+function bowlStrikes(n: number, sr: number, spread: number): Float32Array {
+  const loop = Math.floor(LOOP_SECONDS * sr)
+  const tone = bowlTone(loop * 2, sr, spread)
+  const strikes = [
+    { at: Math.floor(2 * sr), amp: 1 },
+    { at: Math.floor(10 * sr), amp: 0.7 },
+  ]
+  const out = new Float32Array(n)
+  for (const s of strikes) {
+    for (let k = 0; k < 2; k++) {
+      const shift = k * loop - s.at
+      for (let i = Math.max(0, -shift); i < n; i++) {
+        const u = i + shift
+        if (u >= tone.length) break
+        out[i] += s.amp * tone[u]
+      }
+    }
+  }
+  return out
+}
+
 // ---------- 组装 ----------
 
 function addPanned(left: Float32Array, right: Float32Array, a: Float32Array, pans: Float32Array, target: number) {
@@ -284,7 +394,20 @@ function addPanned(left: Float32Array, right: Float32Array, a: Float32Array, pan
 function renderRaw(id: SynthId, n: number, sr: number): [Float32Array, Float32Array] {
   const L = new Float32Array(n)
   const R = new Float32Array(n)
-  if (id === 'noise') {
+  if (id === 'rain') {
+    const sw = slowWave([3, 7, 13], [1, 0.6, 0.3], 51)
+    const swell = (t: number) => 0.8 + 0.2 * sw(t)
+    mixIn(L, rainBed(n, sr, 52, swell), 1)
+    mixIn(R, rainBed(n, sr, 53, swell), 1)
+    const pans = new Float32Array(n).fill(0.5)
+    addPanned(L, R, drops(n, sr, 54, 90, pans), pans, 0.5)
+    const still = () => 1
+    mixIn(L, lowRumble(n, sr, 55, 180, still), 0.35)
+    mixIn(R, lowRumble(n, sr, 56, 180, still), 0.35)
+  } else if (id === 'bowl') {
+    mixIn(L, bowlStrikes(n, sr, 1), 1)
+    mixIn(R, bowlStrikes(n, sr, 1.2), 1)
+  } else if (id === 'noise') {
     mixIn(L, noiseBed(n, sr, 11), 1)
     mixIn(R, noiseBed(n, sr, 12), 1)
   } else if (id === 'stream') {

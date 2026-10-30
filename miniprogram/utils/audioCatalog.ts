@@ -1,6 +1,6 @@
 // 云端音频清单。上传 mp3 后填 cloud:// fileID，不打进主包。
-// 雨声 / 钟钵为空则静默无声。白噪 / 溪流 / 松风 / 炉火需已开启：
-// 填了录音就播录音，留空或下载失败就用 utils/ambienceSynth.ts 现场合成。
+// 白噪 / 溪流 / 松风 / 炉火需已开启。所有氛围都是填了录音就播录音，
+// 留空或下载失败就用 utils/ambienceSynth.ts 现场合成。
 
 export type AmbienceId = 'off' | 'rain' | 'bowl' | 'noise' | 'stream' | 'pine' | 'fire'
 
