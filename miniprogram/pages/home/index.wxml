@@ -126,6 +126,7 @@
     </view>
     <scroll-view class="sheet-list" scroll-y enhanced show-scrollbar="{{false}}">
       <text class="sheet-loading" wx:if="{{sheetLoading}}">正在取心愿…</text>
+      <text class="sheet-loading" wx:elif="{{sheetFailed && !sheetRows.length}}" hover-class="sheet-hover" bindtap="onSheetRetry">没能取到心愿 · 轻触重试</text>
       <!-- 还没有心愿：给几个灵感，点了直接去立愿 -->
       <view class="sheet-ideas" wx:elif="{{!sheetRows.length}}">
         <text class="sheet-ideas-label">还没有心愿 · 挑一个开始，或随机专注</text>

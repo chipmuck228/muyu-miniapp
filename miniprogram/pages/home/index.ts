@@ -7,8 +7,9 @@ import {
   settingsOf,
   bindChannelByScene,
   normalizeChannelScene,
+  rememberUser,
 } from '../../utils/cloud'
-import { CHANTS, SESSION_MINUTES, SESSION_BEADS, levelOf } from '../../utils/constants'
+import { CHANTS, SESSION_MINUTES, SESSION_BEADS, levelOf, percentOf } from '../../utils/constants'
 import { playKnock, vibrate, vibrateLong, ensureKnock, ensureBell, playBell, KnockTimbre } from '../../utils/knock'
 import { KnockQueue, TapSource } from '../../utils/knockQueue'
 import { mockEnabled } from '../../utils/devMock'
@@ -168,6 +169,8 @@ const MATERIALS = [
 ]
 /** 手指移动超过这个距离（px）就算拖动，不算敲击 */
 const DRAG_SLOP = 6
+/** 两声钟钵至少隔这么久 */
+const BELL_GAP_MS = 4000
 /** 里程碑大字飘起后，这么久内不再出「专注 +1」小字 */
 const MILESTONE_QUIET_MS = 1400
 /** 换材质后色点旁的名字停留多久 */
@@ -299,6 +302,7 @@ Page({
     sheetLoading: false,
     sheetRows: [] as SheetRow[],
     sheetRandomCur: false,
+    sheetFailed: false,
     ideas: WISH_SUGGESTIONS.slice(0, 6),
     materials: MATERIALS,
     material: savedMaterial(),
@@ -361,6 +365,7 @@ Page({
   /** 本次打开已飘过的整数里程碑，服务端回来的数偶尔会回退，别重复飘 */
   _milestones: {} as Record<string, 1>,
   _quietUntil: 0,
+  _bellAt: 0,
   onLoad(options: Record<string, string | undefined>) {
     const app = getApp<IAppOption>()
     const scene =
@@ -740,6 +745,7 @@ Page({
   },
 
   applyHome(user: UserRecord, todayCount: number) {
+    rememberUser(user)
     this._wishId = bindWishId()
     const s = settingsOf(user)
     this._userAmbience = s.ambience
@@ -1033,6 +1039,7 @@ Page({
     const app = getApp<IAppOption>()
     const curId = app.globalData.knockMode === 'wish' ? app.globalData.knockWishId : null
     let rows: SheetRow[] = []
+    let failed = false
     try {
       const res = await fetchWishes()
       rows = (res.wishes || [])
@@ -1042,13 +1049,15 @@ Page({
           name: w.name || '无名心愿',
           mark: fmtInt(w.current) + ' / ' + fmtInt(w.goal),
           cur: w._id === curId,
-          pct: w.goal > 0 ? Math.min(100, Math.round((w.current / w.goal) * 100)) : 0,
+          pct: percentOf(w.current, w.goal),
         }))
     } catch {
-      rows = []
+      // 取不到列表：别当成「还没有心愿」，给一行重试
+      rows = this.data.sheetRows
+      failed = true
     }
     if (!this._alive || !this.data.sheetOn) return
-    this.setData({ sheetLoading: false, sheetRows: rows, sheetRandomCur: !curId })
+    this.setData({ sheetLoading: false, sheetFailed: failed, sheetRows: rows, sheetRandomCur: !curId })
   },
 
   closeSheet() {
@@ -1083,6 +1092,11 @@ Page({
     wx.navigateTo({ url: '/pages/wish-form/index' })
   },
 
+  onSheetRetry() {
+    this.setData({ sheetLoading: true, sheetFailed: false })
+    this.loadSheet()
+  },
+
   onSheetIdea(e: any) {
     const name = String(e.currentTarget.dataset.name || '')
     wx.navigateTo({ url: '/pages/wish-form/index?name=' + encodeURIComponent(name) })
@@ -1095,9 +1109,8 @@ Page({
     this._celebrateId = id
     this._wishId = null
     this.stopAuto()
-    // 圆满这一下要有分量：钟钵一声，长震一下
-    playBell(this.data.soundOn)
-    vibrateLong(this.data.vibrateOn)
+    // 圆满这一下要有分量：钟钵一声，长震一下（定课收尾刚响过就不再响第二声）
+    this.ringOnce()
     if (this.data.sessionDone) {
       // 敲满念珠的同一下圆满了心愿：先庆圆满，小结等会儿再给
       this._pendingDone = this.data.sessionDone
@@ -1361,8 +1374,7 @@ Page({
       offer: plan && s.trial ? '这是' + PACK_NAME + '里的一套定课，开启后随时可用' : '',
     }
     const ring = () => {
-      playBell(this.data.soundOn)
-      vibrateLong(this.data.vibrateOn)
+      this.ringOnce()
       this.showSessionDone(info)
     }
     if (!plan) {
@@ -1374,6 +1386,15 @@ Page({
     fadeOutAmbience(plan.fadeMs).then(() => {
       if (this._alive) ring()
     })
+  },
+
+  /** 钟钵 + 长震。念珠敲满和心愿圆满可能是同一下，几秒内只响一回 */
+  ringOnce() {
+    const now = Date.now()
+    if (now - this._bellAt < BELL_GAP_MS) return
+    this._bellAt = now
+    playBell(this.data.soundOn)
+    vibrateLong(this.data.vibrateOn)
   },
 
   showSessionDone(info: SessionDone) {

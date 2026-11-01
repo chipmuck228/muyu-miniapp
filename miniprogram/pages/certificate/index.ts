@@ -2,6 +2,7 @@
 import { fetchWishes, Wish } from '../../utils/cloud'
 import { fmtInt, winInfo, concealTabBar, sourceLine, cnDate, fmtMD } from '../../utils/util'
 import { applyLesson } from '../../utils/lesson'
+import { percentOf } from '../../utils/constants'
 
 const CW = 400
 const CH = 560
@@ -32,6 +33,16 @@ interface NearVM {
 
 function doneDateOf(w: Wish): string {
   return w.fulfilledDate || w.completedDate || ''
+}
+
+/** 证书号按专注圆满的先后编，之后了结也不会让号变 */
+function orderKey(w: Wish): string {
+  return (w.completedDate || w.fulfilledDate || '') + '|' + w._id
+}
+
+/** 证书上画了什么：换了内容（比如刚了结）就得重画 */
+function sigOf(c: CertInfo): string {
+  return [c._id, c.name, c.totalText, c.sourceText, c.dateLabel, c.dateText, c.serial].join('|')
 }
 
 function toCert(w: Wish, order: number): CertInfo {
@@ -76,6 +87,8 @@ Page({
   },
 
   _alive: false,
+  /** 当前 certPath 画的是哪张证书、什么内容 */
+  _drawnSig: '',
 
   onLoad() {
     const app = getApp<IAppOption>()
@@ -100,7 +113,7 @@ Page({
       // 证书号按圆满先后编；列表最新的在前
       const done = list
         .filter((w) => w.status === 'completed' || w.status === 'fulfilled')
-        .sort((a, b) => (doneDateOf(a) < doneDateOf(b) ? -1 : doneDateOf(a) > doneDateOf(b) ? 1 : 0))
+        .sort((a, b) => (orderKey(a) < orderKey(b) ? -1 : orderKey(a) > orderKey(b) ? 1 : 0))
       const certs = done.map((w, i) => toCert(w, i + 1)).reverse()
       const app = getApp<IAppOption>()
       const focusId = app.globalData.certFocusId
@@ -111,7 +124,7 @@ Page({
         this.setData({ loading: false, hasCert: false, certs: [], cert: null, certPath: '', near: this.nearOf(list) })
         return
       }
-      const same = this.data.cert && this.data.cert._id === pick._id && this.data.certPath
+      const same = !!this.data.certPath && this._drawnSig === sigOf(pick)
       this.setData({ loading: false, hasCert: true, certs, cert: pick, certPath: same ? this.data.certPath : '' })
       if (!same) this.queueDraw(pick)
     } catch (e: any) {
@@ -129,7 +142,7 @@ Page({
     return {
       _id: best._id,
       name: best.name,
-      percent: Math.min(100, Math.round((best.current / best.goal) * 100)),
+      percent: percentOf(best.current, best.goal),
       left: fmtInt(Math.max(0, best.goal - best.current)),
     }
   },
@@ -188,6 +201,7 @@ Page({
           success: (r: any) => {
             // 画的过程中换了别的证书：这张不要了
             if (!this._alive || !this.data.cert || this.data.cert._id !== info._id) return
+            this._drawnSig = sigOf(info)
             this.setData({ certPath: r.tempFilePath, drawing: false })
           },
           fail: () => {

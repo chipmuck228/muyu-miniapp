@@ -125,6 +125,39 @@ async function credit(openid, user, date, wishId, n, by, wishExtra) {
   return { totalMerit, todayCount, wish }
 }
 
+// 记最近这么多批敲击的号，重传的那批认出来就不再记
+const RECENT_BATCHES = 30
+
+// 这一批是不是头一回来：在 users 上原子地登记批号，登记成了才记账。
+// 客户端超时重传时，上一次其实已经记过，这次登记不上，就只回当前数
+async function claimBatch(users, openid, batchId) {
+  const r = await users
+    .where({ _id: openid, recentBatches: _.nin([batchId]) })
+    .update({ data: { recentBatches: _.push({ each: [batchId], slice: -RECENT_BATCHES }) } })
+  return !!(r && r.stats && r.stats.updated === 1)
+}
+
+// 不记账，只读回当前的总数、当天计数和心愿，给重传的那批回话
+async function snapshot(openid, user, date, wishId) {
+  let todayCount = 0
+  try {
+    const r = await db.collection('daily_hits').doc(openid + '_' + date).get()
+    todayCount = (r.data && r.data.count) || 0
+  } catch (e) {
+    todayCount = 0
+  }
+  let wish = null
+  if (wishId) {
+    try {
+      const wr = await db.collection('wishes').doc(wishId).get()
+      if (wr.data && wr.data._openid === openid) wish = wr.data
+    } catch (e) {
+      wish = null
+    }
+  }
+  return { totalMerit: user.totalMerit || 0, todayCount, wish }
+}
+
 function incenseView(inc, now) {
   if (!inc || !inc.startMs || !inc.minutes) return null
   return {
@@ -156,7 +189,14 @@ exports.main = async (event) => {
         if (hand + auto > 0) by = { hand, auto }
       }
       const n = by ? by.hand + by.auto : clampInt(event && event.n, 1, 999)
-      const r = await credit(OPENID, user, date, (event && event.wishId) || null, n, by, null)
+      const wishId = (event && event.wishId) || null
+      const batchId = event && typeof event.batchId === 'string' ? event.batchId.slice(0, 40) : ''
+      if (batchId && !(await claimBatch(users, OPENID, batchId))) {
+        // 已经记过的一批（上次回包丢了）：wish 不带「刚圆满」的含义，客户端只用来刷新数字
+        const snap = await snapshot(OPENID, user, date, wishId)
+        return Object.assign({ ok: true, duplicate: true }, snap, { wish: null })
+      }
+      const r = await credit(OPENID, user, date, wishId, n, by, null)
       return Object.assign({ ok: true }, r)
     }
 

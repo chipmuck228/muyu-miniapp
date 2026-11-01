@@ -3,7 +3,7 @@ import { PRESET_GOALS } from '../../utils/constants'
 import { createWish, removeWish, updateWish } from '../../utils/cloud'
 import { getFormState, setFormState } from '../../utils/formState'
 import { todayStr, fmtInt, offsetDate, fmtFullCN, dueText } from '../../utils/util'
-import { applyLesson, loadLesson, RANDOM_LESSON } from '../../utils/lesson'
+import { applyLesson, forgetWish } from '../../utils/lesson'
 import { WISH_SUGGESTIONS } from '../../utils/wishIdeas'
 
 interface GoalOption {
@@ -261,9 +261,7 @@ Page({
         removeWish(id)
           .then(() => {
             wx.hideLoading()
-            const app = getApp<IAppOption>()
-            const last = loadLesson()
-            if (app.globalData.knockWishId === id || (last && last.wishId === id)) applyLesson(RANDOM_LESSON)
+            forgetWish(id)
             wx.showToast({ title: '已删除', icon: 'none' })
             this.clearState()
             this.resetForm()

@@ -56,3 +56,10 @@ export async function nextLesson(excludeId: string | null): Promise<LessonPick> 
   }
   return RANDOM_LESSON
 }
+
+/** 删了一个心愿：它若是今日功课（本次或记在本机的上次），香案回到随机专注 */
+export function forgetWish(wishId: string) {
+  const app = getApp<IAppOption>()
+  const last = loadLesson()
+  if (app.globalData.knockWishId === wishId || (last && last.wishId === wishId)) applyLesson(RANDOM_LESSON)
+}

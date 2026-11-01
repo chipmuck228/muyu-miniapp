@@ -1,8 +1,8 @@
 // 心愿列表：进行中在上、已圆满在下；轻触回堂敲击，长按更多操作
-import { fetchWishes, removeWish, Wish } from '../../utils/cloud'
+import { fetchWishes, removeWish, cachedSettings, Wish } from '../../utils/cloud'
 import { percentOf } from '../../utils/constants'
 import { concealTabBar, fmtInt, fmtMD, todayStr, dueText } from '../../utils/util'
-import { applyLesson, loadLesson, RANDOM_LESSON } from '../../utils/lesson'
+import { applyLesson, forgetWish } from '../../utils/lesson'
 import { setFormState } from '../../utils/formState'
 import { vibrate } from '../../utils/knock'
 import { WISH_SUGGESTIONS } from '../../utils/wishIdeas'
@@ -157,6 +157,15 @@ Page({
     wx.switchTab({ url: '/pages/home/index' })
   },
 
+  /** 已圆满那一行的「证书 ›」：直接翻到这张证书 */
+  openCert(e: any) {
+    const id = (e.currentTarget.dataset.id as string) || ''
+    if (!id) return
+    getApp<IAppOption>().globalData.certFocusId = id
+    concealTabBar(this)
+    wx.switchTab({ url: '/pages/certificate/index' })
+  },
+
   openDetail(e: any) {
     const id = e.currentTarget.dataset.id
     if (id) {
@@ -169,7 +178,7 @@ Page({
     const id = (e.currentTarget.dataset.id as string) || ''
     const w = this.find(id)
     if (!w) return
-    vibrate(true, 'light')
+    vibrate(cachedSettings().vibrateOn, 'light')
     const items = w.done ? ['详情', '删除'] : ['回堂敲击', '详情', '改愿', '删除']
     wx.showActionSheet({
       itemList: items,
@@ -206,9 +215,7 @@ Page({
         removeWish(w._id)
           .then(() => {
             wx.hideLoading()
-            // 删的正是今日功课：香案回到随机专注
-            const last = loadLesson()
-            if (currentWishId() === w._id || (last && last.wishId === w._id)) applyLesson(RANDOM_LESSON)
+            forgetWish(w._id)
             wx.showToast({ title: '已删除', icon: 'none' })
             this.load(false)
           })

@@ -7,6 +7,7 @@ import {
   UserSettings,
   settingsOf,
   channelAdminCheck,
+  rememberUser,
 } from '../../utils/cloud'
 import { AMBIENCE_OPTIONS, AmbienceId, isPremiumAmbience, parseAmbience } from '../../utils/audioCatalog'
 import { isPremiumTheme, parseTheme, ThemeId, THEMES } from '../../utils/theme'
@@ -140,6 +141,8 @@ Page({
   _resuming: false,
   _verified: false,
   _previewTimer: 0,
+  /** 每次试听 / 收起都换一个号，淡出结束时号对不上就别去停（香案可能已经在放自己的氛围） */
+  _previewSeq: 0,
 
   onLoad() {
     const app = getApp<IAppOption>()
@@ -220,6 +223,7 @@ Page({
       const map = res.map || {}
       const rows = buildHeat(map)
       const todayCount = res.todayCount || 0
+      rememberUser(res.user)
       const s = settingsOf(res.user)
       const premium = res.user.premium === true
       if (premium) writePending('')
@@ -317,15 +321,17 @@ Page({
     this.stopPreview()
     if (id === 'off' || !this.data.soundOn) return
     startAmbience(id)
+    const seq = this._previewSeq
     this._previewTimer = setTimeout(() => {
       this._previewTimer = 0
       fadeOutAmbience(1200).then(() => {
-        if (!this._previewTimer) stopAmbience()
+        if (this._previewSeq === seq) stopAmbience()
       })
     }, PREVIEW_MS) as unknown as number
   },
 
   stopPreview() {
+    this._previewSeq += 1
     if (this._previewTimer) {
       clearTimeout(this._previewTimer)
       this._previewTimer = 0
@@ -364,6 +370,9 @@ Page({
       theme: this.data.theme,
     }
     this.setData(patch)
+    // 别的页面（心愿列表的长按震动等）读的是这份缓存
+    const app = getApp<IAppOption>()
+    if (app.globalData.user) app.globalData.user.settings = Object.assign({}, settingsOf(app.globalData.user), patch)
     updateSettings(patch).catch((e: any) => {
       if (e && e.code === 'premium') {
         this.setData(prev)

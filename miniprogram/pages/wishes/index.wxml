@@ -83,7 +83,7 @@
             <text class="done-name">{{item.name}}</text>
             <text class="done-meta">{{item.nums}}{{item.doneText ? ' · ' + item.doneText : ''}}</text>
           </view>
-          <text class="done-go">证书 ›</text>
+          <text class="done-go" hover-class="hover-dim" data-id="{{item._id}}" catchtap="openCert">证书 ›</text>
         </view>
 
         <view class="wish-new" hover-class="hover-dim" bindtap="goNew">＋ 立新愿</view>
