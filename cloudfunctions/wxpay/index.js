@@ -462,6 +462,11 @@ exports.main = async (event) => {
     if (action === 'prepay') return await prepay(OPENID)
     if (action === 'query') return await confirm(OPENID, event && event.outTradeNo)
     if (action === 'verify') return await verify(OPENID)
+    // 静心包介绍面板提前显示价格：只读配置，不下单
+    if (action === 'price') {
+      const cfg = wxpayConfig()
+      return { ok: true, price: wxpayReady(cfg) ? cfg.price : 0 }
+    }
     return { ok: false, msg: '未知操作' }
   } catch (e) {
     const mchCode = e && e.mchCode

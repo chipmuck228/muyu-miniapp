@@ -233,6 +233,11 @@ export function verifyPremium(): Promise<{ premium: boolean; refunded: boolean }
   return callCloud('wxpay', { action: 'verify' })
 }
 
+/** 静心包价格（分），只读配置，不下单 */
+export function fetchPremiumPrice(): Promise<{ price: number }> {
+  return callCloud('wxpay', { action: 'price' })
+}
+
 export function normalizeChannelScene(raw: string): string {
   let s = String(raw || '').trim()
   try {

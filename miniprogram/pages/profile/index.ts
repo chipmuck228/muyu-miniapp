@@ -10,9 +10,10 @@ import {
   rememberUser,
 } from '../../utils/cloud'
 import { AMBIENCE_OPTIONS, AmbienceId, isPremiumAmbience, parseAmbience } from '../../utils/audioCatalog'
-import { isPremiumTheme, parseTheme, ThemeId, THEMES } from '../../utils/theme'
-import { buyPremium, isPaying, readPending, writePending, sleep, PACK_NAME } from '../../utils/premium'
-import { fmtInt, todayStr, offsetDate, weekdayMon0, fmtMD, concealTabBar, weekdayCN } from '../../utils/util'
+import { isPremiumTheme, parseTheme, ThemeId, THEMES, themeOf } from '../../utils/theme'
+import { buyPremium, isPaying, readPending, writePending, sleep, PACK_NAME, packPrice } from '../../utils/premium'
+import { fmtInt, todayStr, offsetDate, weekdayMon0, fmtMD, concealTabBar, weekdayCN, winInfo } from '../../utils/util'
+import { SESSION_PLANS, planMix } from '../../utils/sessionPlans'
 import { levelOf, LEVELS } from '../../utils/constants'
 import { zenOfDay } from '../../utils/zen'
 import { startAmbience, stopAmbience, fadeOutAmbience } from '../../utils/ambience'
@@ -58,9 +59,30 @@ function dressList(
     id: item.id,
     name: item.name,
     locked: !!item.premium && !premium,
-    swatch: item.swatch ? 'background: linear-gradient(180deg, ' + item.swatch[0] + ' 0%, ' + item.swatch[1] + ' 100%);' : '',
+    swatch: item.swatch ? swatchStyle(item.swatch) : '',
   }))
 }
+
+/** 主题小样下面那行字：哪一套、换了什么、能不能用 */
+function stagePatch(id: ThemeId, premium: boolean) {
+  const t = themeOf(id)
+  return { previewTheme: t.id, previewName: t.name, previewDesc: t.desc, previewLocked: t.premium && !premium }
+}
+
+const swatchStyle = (s: [string, string]) => 'background: linear-gradient(180deg, ' + s[0] + ' 0%, ' + s[1] + ' 100%);'
+
+/** 静心包面板里列的东西：付费的氛围、主题和定课 */
+const PACK_AMBIENCE = AMBIENCE_OPTIONS.filter((a) => a.premium).map((a) => ({ id: a.id, name: a.name, desc: a.desc }))
+const PACK_THEMES = THEMES.filter((t) => t.premium).map((t) => ({ id: t.id, name: t.name, desc: t.desc, swatch: swatchStyle(t.swatch) }))
+const PACK_PLANS = SESSION_PLANS.filter((p) => p.premium).map((p) => ({
+  id: p.id,
+  name: p.name,
+  minutes: p.minutes,
+  scene: p.scene,
+  mix: planMix(p),
+}))
+/** 面板升起 / 收起的动画时长 */
+const PACK_ANIM_MS = 280
 
 /** 深浅按这几周里最多的一天来分四档，几百下的日子也分得出层次 */
 function levelOfCount(c: number, max: number): number {
@@ -135,6 +157,22 @@ Page({
     premium: false,
     packName: PACK_NAME,
     showAdmin: false,
+    safeBottom: 0,
+    /** 正在试听的氛围：氛围签上画一个小声波 */
+    playingId: '',
+    // 主题小样：显示的是哪一套（没开静心包的也能看，只是不存）
+    previewTheme: 'dawn' as ThemeId,
+    previewName: '晨',
+    previewDesc: '',
+    previewLocked: false,
+    // 静心包介绍面板
+    packOn: false,
+    packShow: false,
+    packTheme: 'night' as ThemeId,
+    packPriceText: '',
+    packAmbience: PACK_AMBIENCE,
+    packThemes: PACK_THEMES,
+    packPlans: PACK_PLANS,
   },
 
   _alive: false,
@@ -143,12 +181,25 @@ Page({
   _previewTimer: 0,
   /** 每次试听 / 收起都换一个号，淡出结束时号对不上就别去停（香案可能已经在放自己的氛围） */
   _previewSeq: 0,
+  _packTimer: 0,
 
   onLoad() {
     const app = getApp<IAppOption>()
     this._alive = true
     const zen = zenOfDay(todayStr())
-    this.setData({ statusBarHeight: app.globalData.statusBarHeight || 20, zenText: zen.text, zenFrom: zen.from })
+    let safeBottom = 0
+    try {
+      const win: any = winInfo()
+      if (win.safeArea && win.screenHeight) safeBottom = Math.max(0, win.screenHeight - win.safeArea.bottom)
+    } catch {
+      safeBottom = 0
+    }
+    this.setData(
+      Object.assign(
+        { statusBarHeight: app.globalData.statusBarHeight || 20, zenText: zen.text, zenFrom: zen.from, safeBottom },
+        stagePatch('dawn', false)
+      )
+    )
   },
 
   onShow() {
@@ -160,11 +211,13 @@ Page({
 
   onHide() {
     this.stopPreview()
+    if (this.data.packOn) this.closePack()
   },
 
   onUnload() {
     this._alive = false
     this.stopPreview()
+    if (this._packTimer) clearTimeout(this._packTimer)
   },
 
   // 上一笔付款没能当场确认发货时的续查。每次回到本页都继续追，直到开启或过期，
@@ -236,7 +289,7 @@ Page({
         })
       )
       const sel = this.data.selDate || today
-      this.setData({
+      this.setData(Object.assign({
         loading: false,
         totalText: fmtInt(total),
         wishCount: res.wishes.length,
@@ -266,7 +319,7 @@ Page({
         theme: s.theme,
         themeOptions: dressList(THEMES, premium),
         premium,
-      })
+      }, stagePatch(s.theme, premium)))
       this.loadChannelFlags()
     } catch (e: any) {
       if (!this._alive) return
@@ -298,21 +351,26 @@ Page({
   },
   onPickAmbience(e: any) {
     const ambience = parseAmbience(e.currentTarget.dataset.id)
-    if (ambience === this.data.ambience) return
     if (isPremiumAmbience(ambience) && !this.data.premium) {
-      this.askUnlock()
+      // 没开静心包：先听听，再看看静心包里还有什么
+      this.openPack()
+      this.listen(ambience)
+      return
+    }
+    if (ambience === this.data.ambience) {
+      // 再点一下已选的：再听一遍
+      if (this.data.playingId !== ambience) this.preview(ambience)
       return
     }
     this.saveSetting({ ambience })
     this.preview(ambience)
   },
+  /** 点色块：小样马上换成这一套；开得了的顺手存下，没开静心包的只看不存 */
   onPickTheme(e: any) {
     const theme = parseTheme(e.currentTarget.dataset.id)
+    this.setData(stagePatch(theme, this.data.premium))
     if (theme === this.data.theme) return
-    if (isPremiumTheme(theme) && !this.data.premium) {
-      this.askUnlock()
-      return
-    }
+    if (isPremiumTheme(theme) && !this.data.premium) return
     this.saveSetting({ theme })
   },
 
@@ -321,11 +379,14 @@ Page({
     this.stopPreview()
     if (id === 'off' || !this.data.soundOn) return
     startAmbience(id)
+    this.setData({ playingId: id })
     const seq = this._previewSeq
     this._previewTimer = setTimeout(() => {
       this._previewTimer = 0
       fadeOutAmbience(1200).then(() => {
-        if (this._previewSeq === seq) stopAmbience()
+        if (this._previewSeq !== seq) return
+        stopAmbience()
+        if (this._alive) this.setData({ playingId: '' })
       })
     }, PREVIEW_MS) as unknown as number
   },
@@ -337,10 +398,71 @@ Page({
       this._previewTimer = 0
     }
     stopAmbience()
+    if (this._alive && this.data.playingId) this.setData({ playingId: '' })
   },
 
-  askUnlock() {
+  /** 试听一种氛围（不存设置）；音效关着时说一声，不然点了没声音像是坏了 */
+  listen(id: AmbienceId) {
+    if (!this.data.soundOn) {
+      wx.showToast({ title: '音效关着 · 打开后可试听', icon: 'none' })
+      return
+    }
+    this.preview(id)
+  },
+
+  // ===== 静心包介绍 =====
+  noop() {},
+
+  openPack(e?: any) {
+    const want = e && e.currentTarget && e.currentTarget.dataset ? e.currentTarget.dataset.theme : ''
+    const theme = want && isPremiumTheme(want) ? parseTheme(want) : this.data.packTheme
+    if (this._packTimer) {
+      clearTimeout(this._packTimer)
+      this._packTimer = 0
+    }
+    this.setData({ packOn: true, packTheme: theme })
+    this._packTimer = setTimeout(() => {
+      this._packTimer = 0
+      if (this._alive) this.setData({ packShow: true })
+    }, 30) as unknown as number
+    if (!this.data.premium && !this.data.packPriceText) {
+      packPrice().then((p) => {
+        if (this._alive && p) this.setData({ packPriceText: '¥' + p })
+      })
+    }
+  },
+
+  closePack() {
+    this.stopPreview()
+    if (this._packTimer) clearTimeout(this._packTimer)
+    this.setData({ packShow: false })
+    this._packTimer = setTimeout(() => {
+      this._packTimer = 0
+      if (this._alive) this.setData({ packOn: false })
+    }, PACK_ANIM_MS) as unknown as number
+  },
+
+  onPackListen(e: any) {
+    const id = parseAmbience(e.currentTarget.dataset.id)
+    if (this.data.playingId === id) {
+      this.stopPreview()
+      return
+    }
+    this.listen(id)
+  },
+
+  onPackTheme(e: any) {
+    this.setData({ packTheme: parseTheme(e.currentTarget.dataset.id) })
+  },
+
+  onPackBuy() {
+    this.stopPreview()
     this.beginUnlock()
+  },
+
+  /** 云端说这项要静心包（比如本机缓存还当它开着）：打开介绍面板 */
+  askUnlock() {
+    this.openPack()
   },
 
   markPremium() {
@@ -348,6 +470,7 @@ Page({
       premium: true,
       ambienceOptions: dressList(AMBIENCE_OPTIONS, true),
       themeOptions: dressList(THEMES, true),
+      previewLocked: false,
     })
   },
 
@@ -356,6 +479,7 @@ Page({
     if (!this._alive) return
     if (r === 'opened') {
       this.markPremium()
+      if (this.data.packOn) this.closePack()
       wx.showToast({ title: '静心包已开启', icon: 'none' })
     } else if (r === 'pending') {
       // 不要提示“刷新”：用户在回到本页时会由 resumePending 自动续查

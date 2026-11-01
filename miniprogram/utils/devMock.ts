@@ -513,6 +513,7 @@ function handle(name: string, data: any): any {
       }
       return { ok: true, premium: db.user.premium === true }
     }
+    if (action === 'price') return { ok: true, price: PREMIUM_PRICE }
     if (action === 'verify') {
       if (db.refundPending && db.user.premium === true) {
         db.user.premium = false

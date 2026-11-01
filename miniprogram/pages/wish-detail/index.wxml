@@ -1,13 +1,10 @@
 <!-- 心愿详情：侧殿里的一纸，叩击回堂 -->
 <view class="page wing-page detail-page">
+  <!-- 顶栏右端在微信右上角胶囊下面，点不到：只放返回，改愿放到进度那一行 -->
   <view class="wing-head has-kicker" style="padding-top: {{statusBarHeight}}px;">
-    <text class="wing-kicker" hover-class="hover-dim" bindtap="goBack">‹ 返回</text>
+    <view class="wing-kicker" hover-class="hover-dim" bindtap="goBack">‹ 返回</view>
     <text class="wing-title slim">{{wish ? wish.name : ''}}</text>
-    <text
-      class="wing-kicker {{canEdit ? '' : 'ghost'}}"
-      hover-class="hover-dim"
-      bindtap="goEdit"
-    >改愿</text>
+    <view class="wing-kicker ghost"></view>
   </view>
 
   <scroll-view wx:if="{{!loading && wish}}" class="wing-scroll" scroll-y enhanced show-scrollbar="{{false}}">
@@ -19,6 +16,7 @@
           <text class="status-date" wx:if="{{wish.status === 'completed' && wish.completedDate}}">圆满于 {{wish.completedText}}</text>
           <text class="status-date" wx:elif="{{wish.status === 'fulfilled' && wish.fulfilledDate}}">了结于 {{wish.fulfilledText}}</text>
           <text wx:elif="{{wish.due}}" class="due-chip {{wish.late ? 'late' : ''}}">{{wish.due}}</text>
+          <view wx:if="{{canEdit}}" class="hero-edit" hover-class="hero-edit-hover" bindtap="goEdit">改愿</view>
         </view>
         <view class="hero-nums">
           <text class="hero-pct mono-num">{{wish.percent}}</text>

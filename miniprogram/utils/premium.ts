@@ -1,9 +1,9 @@
 // 静心包：一次付款开启（users.premium）。静心页和香案的定课面板共用这一套付款流程。
-import { preparePremiumPay, confirmPremiumPay } from './cloud'
+import { preparePremiumPay, confirmPremiumPay, fetchPremiumPrice } from './cloud'
 import { mockEnabled, mockMarkPaid } from './devMock'
 
 export const PACK_NAME = '静心包'
-export const PACK_DESC = '松间慢叩、夜里收心两套定课 · 高级氛围与主题'
+export const PACK_DESC = '四种氛围：白噪、溪流、松风、炉火\n三套主题：夜、墨、霞\n两套定课：松间慢叩、夜里收心\n一次开启，永久可用'
 
 // 普通微信支付走 JSAPI，openid 由云函数从 getWXContext() 直接拿到，
 // 不再需要 wx.login 换 session_key（那是虚拟支付做用户态签名才要的）。
@@ -125,6 +125,19 @@ function yuanText(fen: number): string {
   return Number.isInteger(y) ? String(y) : y.toFixed(2)
 }
 
+let priceCache = ''
+
+/** 静心包的价格（元），给介绍面板提前显示；云端没配好或旧版云函数不认这个动作时返回空串 */
+export function packPrice(): Promise<string> {
+  if (priceCache) return Promise.resolve(priceCache)
+  return fetchPremiumPrice()
+    .then((r) => {
+      priceCache = yuanText(r.price || 0)
+      return priceCache
+    })
+    .catch(() => '')
+}
+
 // 轮询确认发货。requestPayment 的 success 只代表支付流程结束，
 // 微信的发货推送首推通常在 15s 左右，这里退避轮询，覆盖到约 25s。
 async function waitDelivered(outTradeNo: string, alive: () => boolean): Promise<boolean> {
@@ -184,7 +197,7 @@ export async function buyPremium(alive: () => boolean): Promise<BuyResult> {
       const go = await new Promise<boolean>((resolve) => {
         wx.showModal({
           title: PACK_NAME,
-          content: PACK_DESC + ' · ¥' + price,
+          content: PACK_DESC + '\n价格 ¥' + price,
           confirmText: '支付',
           cancelText: '取消',
           confirmColor: '#e0b577',

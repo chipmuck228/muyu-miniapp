@@ -1,9 +1,10 @@
 <!-- 心愿：侧殿列表。进行中在上、已圆满在下；轻触回堂敲击，长按更多 -->
 <view class="page wing-page wishes-page">
   <view class="wing-head has-kicker" style="padding-top: {{statusBarHeight}}px;">
-    <text class="wing-kicker ghost">＋</text>
+    <!-- 右端在微信右上角胶囊下面，点不到：立愿放左边 -->
+    <view class="wing-kicker add-kicker" hover-class="hover-dim" bindtap="goNew">＋ 立愿</view>
     <text class="wing-title">心 愿</text>
-    <text class="wing-kicker add-kicker" hover-class="hover-dim" bindtap="goNew">＋ 立愿</text>
+    <view class="wing-kicker ghost"></view>
   </view>
 
   <scroll-view

@@ -7,7 +7,6 @@
 }
 
 .add-kicker {
-  text-align: right;
   white-space: nowrap;
   color: rgba(224, 181, 119, 0.8);
 }

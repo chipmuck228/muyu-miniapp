@@ -53,8 +53,11 @@ page {
   color: rgba(243, 234, 220, 0.92);
   font-weight: 600;
 }
+/* 顶栏左右的文字按钮：字小，点按区域上下各放出 24rpx，约 46px 高 */
 .wing-kicker {
   width: 140rpx;
+  padding: 24rpx 0;
+  margin: -24rpx 0;
   font-size: 28rpx;
   letter-spacing: 4rpx;
   white-space: nowrap;

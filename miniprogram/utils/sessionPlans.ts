@@ -1,7 +1,7 @@
 // 成品定课：声音、主题、木鱼音色、自动敲节奏、时长和收尾都配好，点一下就开始。
 // 雨窗片刻免费；另两套属于静心包，没开的人每套可以完整试一次。
-import { AmbienceId } from './audioCatalog'
-import { ThemeId } from './theme'
+import { AmbienceId, AMBIENCE_OPTIONS } from './audioCatalog'
+import { ThemeId, themeOf } from './theme'
 import { KnockTimbre } from './knock'
 
 export type PlanId = 'rain' | 'pine' | 'night'
@@ -69,6 +69,15 @@ export const SESSION_PLANS: SessionPlan[] = [
     closing: '今天到这里，好好睡',
   },
 ]
+
+const TIMBRE_TEXT: Record<KnockTimbre, string> = { default: '木鱼原声', low: '低沉的木鱼声', soft: '轻柔的木鱼声' }
+
+/** 「松风 · 墨 · 低沉的木鱼声 · 自动 1.2 秒一下」：这套定课里都配了什么 */
+export function planMix(p: SessionPlan): string {
+  const amb = AMBIENCE_OPTIONS.find((a) => a.id === p.ambience)
+  const pace = p.gapFrom === p.gapTo ? '自动 ' + p.gapFrom / 1000 + ' 秒一下' : '自动敲，越敲越慢'
+  return [amb ? amb.name : '', themeOf(p.theme).name, TIMBRE_TEXT[p.timbre], pace].filter(Boolean).join(' · ')
+}
 
 export function planOf(id: string): SessionPlan | null {
   return SESSION_PLANS.find((p) => p.id === id) || null

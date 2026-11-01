@@ -1,0 +1,31 @@
+<view class="tp tp-{{theme}}">
+  <!-- 四套天色叠着，只亮当前那套，换主题时淡入淡出 -->
+  <view class="tp-bg dawn"></view>
+  <view class="tp-bg night"></view>
+  <view class="tp-bg ink"></view>
+  <view class="tp-bg dusk"></view>
+
+  <view class="tp-head">
+    <text class="tp-name">顺利上岸</text>
+    <view class="tp-nums"><text class="tp-cur">326</text><text class="tp-goal"> / 1,000</text></view>
+    <view class="tp-bar"><view class="tp-fill"></view></view>
+  </view>
+
+  <view class="tp-title">
+    <text>顺</text>
+    <text>利</text>
+    <text>上</text>
+    <text>岸</text>
+  </view>
+
+  <view class="tp-smoke">
+    <view class="tp-wisp w1"></view>
+    <view class="tp-wisp w2"></view>
+    <view class="tp-wisp w3"></view>
+  </view>
+
+  <view class="tp-fish">
+    <view class="tp-stand"></view>
+    <view class="tp-bowl"><view class="tp-slit"></view></view>
+  </view>
+</view>

@@ -87,14 +87,14 @@
         </view>
       </view>
 
-      <!-- 静心包：没开时一张卡介绍；开了显示一行 -->
-      <view wx:if="{{!premium && !loading}}" class="pack-card" hover-class="pack-hover" bindtap="askUnlock">
+      <!-- 静心包：没开时一张卡，点开看里面都有什么、能试听试看；开了显示一行 -->
+      <view wx:if="{{!premium && !loading}}" class="pack-card" hover-class="pack-hover" bindtap="openPack">
         <view class="pack-text">
           <text class="pack-title">{{packName}}</text>
-          <text class="pack-desc">两套成品定课 · 四种氛围 · 三套主题</text>
-          <text class="pack-note">一次开启，永久可用</text>
+          <text class="pack-desc">多四种背景声、三套香案配色、两套配好的定课</text>
+          <text class="pack-note">可以先试听、先看看 · 一次开启，永久可用</text>
         </view>
-        <text class="pack-go">开启</text>
+        <text class="pack-go">看看 ›</text>
       </view>
 
       <view class="sets">
@@ -124,6 +124,7 @@
               data-id="{{item.id}}"
               bindtap="onPickAmbience"
             >
+              <view wx:if="{{playingId === item.id}}" class="wave"><view class="wb"></view><view class="wb"></view><view class="wb"></view></view>
               <text>{{item.name}}</text>
               <view wx:if="{{item.locked}}" class="lock"></view>
             </view>
@@ -132,13 +133,25 @@
         <view class="set-item col last">
           <view class="set-head">
             <text class="set-name">主题</text>
-            <text class="set-hint">香案的天色与烟色</text>
+            <text class="set-hint">香案的天色、青烟和字色</text>
+          </view>
+          <!-- 主题小样：点一下色块马上看到香案换成什么样；没开静心包的主题也能看，只是不存 -->
+          <view class="stage">
+            <theme-preview theme="{{previewTheme}}" />
+            <view class="stage-cap">
+              <text class="stage-name">{{previewName}}</text>
+              <text class="stage-desc">{{previewDesc}}</text>
+            </view>
+            <view wx:if="{{previewLocked}}" class="stage-lock" hover-class="pack-hover" data-theme="{{previewTheme}}" bindtap="openPack">
+              <view class="lock dark"></view>
+              <text>静心包 ›</text>
+            </view>
           </view>
           <view class="theme-row">
             <view
               wx:for="{{themeOptions}}"
               wx:key="id"
-              class="theme-opt {{theme === item.id ? 'on' : ''}} {{item.locked ? 'locked' : ''}}"
+              class="theme-opt {{previewTheme === item.id ? 'on' : ''}} {{item.locked ? 'locked' : ''}}"
               hover-class="hover-dim"
               data-id="{{item.id}}"
               bindtap="onPickTheme"
@@ -147,12 +160,13 @@
                 <view wx:if="{{item.locked}}" class="lock on-swatch"></view>
               </view>
               <text class="theme-name">{{item.name}}</text>
+              <text class="theme-using">{{theme === item.id ? '在用' : ''}}</text>
             </view>
           </view>
         </view>
       </view>
 
-      <text wx:if="{{premium}}" class="pack-owned">{{packName}} · 已开启</text>
+      <text wx:if="{{premium}}" class="pack-owned" hover-class="hover-dim" bindtap="openPack">{{packName}} · 已开启 ›</text>
 
       <text class="partner-entry" hover-class="hover-dim" bindtap="openPartner">渠道合作</text>
       <text class="partner-entry" wx:if="{{showAdmin}}" hover-class="hover-dim" bindtap="openAdmin">渠道管理</text>
@@ -161,4 +175,89 @@
   </scroll-view>
 
   <hall-dock mode="wing" current="{{3}}" />
+
+  <!-- 静心包介绍：里面有什么，氛围能试听，主题能看，定课说清配了什么 -->
+  <block wx:if="{{packOn}}">
+    <view class="ps-mask {{packShow ? 'show' : ''}}" catchtouchmove="noop" bindtap="closePack"></view>
+    <view class="ps {{packShow ? 'show' : ''}}" style="padding-bottom: {{safeBottom + 16}}px;">
+      <view class="ps-grip" bindtap="closePack"></view>
+      <scroll-view class="ps-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+        <view class="ps-body">
+          <view class="ps-top">
+            <text class="ps-title">{{packName}}</text>
+            <text class="ps-price" wx:if="{{packPriceText && !premium}}">{{packPriceText}}</text>
+          </view>
+          <text class="ps-lead">让敲木鱼多几种心境：更多背景声、香案配色，和两套配好的定课。一次开启，永久可用。</text>
+
+          <view class="ps-sec">
+            <view class="ps-sec-head">
+              <text class="ps-sec-name">四种氛围</text>
+              <text class="ps-sec-hint">敲木鱼时的背景声 · 轻触试听</text>
+            </view>
+            <view class="ps-ambi">
+              <view
+                wx:for="{{packAmbience}}"
+                wx:key="id"
+                class="ps-ambi-opt {{playingId === item.id ? 'playing' : ''}}"
+                hover-class="ambi-hover"
+                data-id="{{item.id}}"
+                bindtap="onPackListen"
+              >
+                <view class="ps-ambi-top">
+                  <text class="ps-ambi-name">{{item.name}}</text>
+                  <view wx:if="{{playingId === item.id}}" class="wave"><view class="wb"></view><view class="wb"></view><view class="wb"></view></view>
+                  <text wx:else class="ps-play">▶</text>
+                </view>
+                <text class="ps-ambi-desc">{{item.desc}}</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="ps-sec">
+            <view class="ps-sec-head">
+              <text class="ps-sec-name">三套主题</text>
+              <text class="ps-sec-hint">香案的天色、青烟和字色 · 轻触看看</text>
+            </view>
+            <theme-preview theme="{{packTheme}}" />
+            <view class="ps-themes">
+              <view
+                wx:for="{{packThemes}}"
+                wx:key="id"
+                class="ps-theme {{packTheme === item.id ? 'on' : ''}}"
+                hover-class="hover-dim"
+                data-id="{{item.id}}"
+                bindtap="onPackTheme"
+              >
+                <view class="ps-swatch" style="{{item.swatch}}"></view>
+                <view class="ps-theme-text">
+                  <text class="ps-theme-name">{{item.name}}</text>
+                  <text class="ps-theme-desc">{{item.desc}}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+
+          <view class="ps-sec">
+            <view class="ps-sec-head">
+              <text class="ps-sec-name">两套定课</text>
+              <text class="ps-sec-hint">声音、主题、节奏和时长都配好</text>
+            </view>
+            <view wx:for="{{packPlans}}" wx:key="id" class="ps-plan">
+              <view class="ps-plan-top">
+                <text class="ps-plan-name">{{item.name}}</text>
+                <text class="ps-plan-min">{{item.minutes}} 分钟</text>
+              </view>
+              <text class="ps-plan-scene">{{item.scene}}</text>
+              <text class="ps-plan-mix">{{item.mix}}</text>
+            </view>
+            <text wx:if="{{!premium}}" class="ps-note">没开也能各完整试一次：在香案右下角点「定课」</text>
+          </view>
+        </view>
+      </scroll-view>
+      <view class="ps-foot">
+        <view wx:if="{{!premium}}" class="ps-buy" hover-class="pack-hover" bindtap="onPackBuy">开启{{packName}}{{packPriceText ? ' · ' + packPriceText : ''}}</view>
+        <view wx:else class="ps-owned">已开启 · 永久可用</view>
+      </view>
+    </view>
+  </block>
 </view>

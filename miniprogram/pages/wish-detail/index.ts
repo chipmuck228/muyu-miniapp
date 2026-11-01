@@ -230,8 +230,9 @@ Page({
   },
 
   goBack() {
-    if (getCurrentPages().length > 1) wx.navigateBack({ delta: 1 })
-    else wx.switchTab({ url: '/pages/wishes/index' })
+    const toList = () => wx.switchTab({ url: '/pages/wishes/index' })
+    if (getCurrentPages().length > 1) wx.navigateBack({ delta: 1, fail: toList })
+    else toList()
   },
 
   async load() {

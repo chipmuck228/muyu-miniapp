@@ -1,0 +1,213 @@
+/* 颜色取自香案（pages/home/index.wxss 的天色、光晕、主题点缀，utils/theme.ts 的字色和烟色） */
+.tp {
+  position: relative;
+  width: 100%;
+  height: 400rpx;
+  overflow: hidden;
+  border-radius: 20rpx;
+  background: #0a0806;
+  border: 1rpx solid rgba(224, 181, 119, 0.16);
+  box-sizing: border-box;
+}
+.tp-bg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.tp-dawn .tp-bg.dawn,
+.tp-night .tp-bg.night,
+.tp-ink .tp-bg.ink,
+.tp-dusk .tp-bg.dusk {
+  opacity: 1;
+}
+/* 每套：顶上一道光、木鱼后面的光晕、天色 */
+.tp-bg.dawn {
+  background:
+    radial-gradient(ellipse 6% 90% at 50% 0%, rgba(255, 214, 150, 0.26), rgba(255, 214, 150, 0) 100%),
+    radial-gradient(ellipse 80% 46% at 50% 86%, rgba(200, 138, 74, 0.32) 0%, rgba(200, 138, 74, 0.08) 52%, rgba(200, 138, 74, 0) 100%),
+    linear-gradient(180deg, #1c140c 0%, #120d08 46%, #0a0806 100%);
+}
+.tp-bg.night {
+  background:
+    radial-gradient(circle at 82% 20%, rgba(214, 228, 248, 0.5) 0%, rgba(196, 216, 246, 0.12) 7%, rgba(196, 216, 246, 0) 22%),
+    radial-gradient(ellipse 6% 90% at 50% 0%, rgba(190, 215, 245, 0.16), rgba(190, 215, 245, 0) 100%),
+    radial-gradient(ellipse 80% 46% at 50% 86%, rgba(111, 147, 196, 0.28) 0%, rgba(111, 147, 196, 0.07) 52%, rgba(111, 147, 196, 0) 100%),
+    linear-gradient(180deg, #0c1626 0%, #08101c 50%, #05070c 100%);
+}
+.tp-bg.ink {
+  background:
+    radial-gradient(ellipse 6% 90% at 50% 0%, rgba(238, 235, 228, 0.14), rgba(238, 235, 228, 0) 100%),
+    radial-gradient(ellipse 80% 46% at 50% 86%, rgba(206, 202, 192, 0.2) 0%, rgba(206, 202, 192, 0.05) 52%, rgba(206, 202, 192, 0) 100%),
+    linear-gradient(180deg, #1e1e1d 0%, #141414 48%, #0b0b0b 100%);
+}
+.tp-bg.dusk {
+  background:
+    radial-gradient(ellipse 6% 90% at 50% 0%, rgba(255, 190, 140, 0.22), rgba(255, 190, 140, 0) 100%),
+    radial-gradient(ellipse 96% 50% at 50% 84%, rgba(224, 120, 74, 0.38) 0%, rgba(224, 120, 74, 0.1) 54%, rgba(224, 120, 74, 0) 100%),
+    linear-gradient(180deg, #2a1210 0%, #3a1a12 30%, #1a0d0a 64%, #0e0807 100%);
+}
+
+/* 左上角：功课名、进度数字、进度条 */
+.tp-head {
+  position: absolute;
+  left: 28rpx;
+  top: 26rpx;
+  display: flex;
+  flex-direction: column;
+}
+.tp-name {
+  font-size: 22rpx;
+  letter-spacing: 2rpx;
+  color: rgba(243, 234, 220, 0.86);
+}
+.tp-nums {
+  margin-top: 4rpx;
+  line-height: 1.2;
+}
+.tp-cur {
+  font-size: 30rpx;
+  color: #e8c98a;
+  transition: color 0.5s ease;
+}
+.tp-goal {
+  font-size: 20rpx;
+  color: rgba(224, 181, 119, 0.55);
+  transition: color 0.5s ease;
+}
+.tp-bar {
+  width: 150rpx;
+  height: 3rpx;
+  margin-top: 10rpx;
+  background-color: rgba(224, 181, 119, 0.16);
+  transition: background-color 0.5s ease;
+}
+.tp-fill {
+  width: 33%;
+  height: 100%;
+  background-color: #e0b577;
+  box-shadow: 0 0 6rpx rgba(240, 207, 142, 0.6);
+  transition: background-color 0.5s ease, box-shadow 0.5s ease;
+}
+.tp-night .tp-cur { color: #d3e3f6; }
+.tp-night .tp-goal { color: rgba(184, 208, 236, 0.6); }
+.tp-night .tp-bar { background-color: rgba(170, 200, 236, 0.16); }
+.tp-night .tp-fill { background-color: #b8cfea; box-shadow: 0 0 6rpx rgba(190, 215, 245, 0.6); }
+.tp-ink .tp-cur { color: #eeebe4; }
+.tp-ink .tp-goal { color: rgba(222, 218, 210, 0.55); }
+.tp-ink .tp-bar { background-color: rgba(230, 228, 222, 0.14); }
+.tp-ink .tp-fill { background-color: #d6d3cc; box-shadow: 0 0 6rpx rgba(238, 235, 228, 0.45); }
+.tp-dusk .tp-cur { color: #ffcfa8; }
+.tp-dusk .tp-goal { color: rgba(246, 176, 136, 0.65); }
+.tp-dusk .tp-bar { background-color: rgba(240, 150, 110, 0.18); }
+.tp-dusk .tp-fill { background-color: #f4a87c; box-shadow: 0 0 6rpx rgba(255, 180, 130, 0.6); }
+
+/* 中间竖排功课名：字色是进度三成时的颜色 */
+.tp-title {
+  position: absolute;
+  left: 50%;
+  top: 58rpx;
+  width: 40rpx;
+  margin-left: -20rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: 'Songti SC', 'STSong', 'Noto Serif CJK SC', 'Source Han Serif SC', serif;
+  font-size: 26rpx;
+  line-height: 1.4;
+  color: rgb(247, 231, 200);
+  transition: color 0.5s ease;
+}
+.tp-night .tp-title { color: rgb(190, 211, 234); }
+.tp-ink .tp-title { color: rgb(223, 219, 212); }
+.tp-dusk .tp-title { color: rgb(247, 200, 170); }
+
+/* 青烟：几团糊开的烟从木鱼后面往上飘，越飘越大、越淡 */
+.tp-smoke {
+  position: absolute;
+  left: 57%;
+  bottom: 140rpx;
+  width: 0;
+  height: 0;
+}
+.tp-wisp {
+  position: absolute;
+  bottom: 0;
+  left: -8rpx;
+  width: 16rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  filter: blur(7rpx);
+  opacity: 0;
+  background-color: rgb(204, 209, 214);
+  transition: background-color 0.5s ease;
+  animation: tp-rise 4.8s linear infinite;
+}
+.tp-wisp.w2 {
+  animation-delay: -1.6s;
+}
+.tp-wisp.w3 {
+  animation-delay: -3.2s;
+}
+.tp-night .tp-wisp { background-color: rgb(173, 194, 219); }
+.tp-ink .tp-wisp { background-color: rgb(191, 189, 184); }
+.tp-dusk .tp-wisp { background-color: rgb(230, 179, 148); }
+@keyframes tp-rise {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.7, 1);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.42;
+  }
+  60% {
+    transform: translate3d(12rpx, -150rpx, 0) scale(1.6, 1.4) rotate(8deg);
+    opacity: 0.22;
+  }
+  100% {
+    transform: translate3d(-8rpx, -250rpx, 0) scale(2.4, 1.8) rotate(-6deg);
+    opacity: 0;
+  }
+}
+
+/* 木鱼：木碗 + 一道口 + 底座，四套主题都一样 */
+.tp-fish {
+  position: absolute;
+  left: 50%;
+  bottom: 40rpx;
+  width: 176rpx;
+  height: 130rpx;
+  margin-left: -88rpx;
+}
+.tp-stand {
+  position: absolute;
+  left: 16rpx;
+  right: 16rpx;
+  bottom: 0;
+  height: 62rpx;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 30%, #3c3833 0%, #1c1a17 72%);
+}
+.tp-bowl {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 28rpx;
+  height: 90rpx;
+  border-radius: 50% / 46% 46% 54% 54%;
+  background: radial-gradient(ellipse 70% 62% at 50% 34%, #f6c28c 0%, #d8813f 42%, #9c4b1c 80%, #6a3010 100%);
+  box-shadow: 0 6rpx 14rpx rgba(0, 0, 0, 0.5);
+}
+.tp-slit {
+  position: absolute;
+  left: 30%;
+  top: 22%;
+  width: 46%;
+  height: 13rpx;
+  border-radius: 8rpx;
+  background: #2a160c;
+  transform: rotate(-6deg);
+}

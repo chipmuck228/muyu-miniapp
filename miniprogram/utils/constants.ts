@@ -69,10 +69,11 @@ export const PAPER_TIERS: { id: string; min: number; max: number }[] = [
   { id: 'ji', min: 5000, max: 1e9 },
 ]
 
-/** 心愿状态：进度条展示百分比封顶 */
+/** 心愿状态：进度条展示百分比封顶；没敲满时最多显示 99，免得 499 / 500 看着像已圆满 */
 export function percentOf(current: number, goal: number): number {
   if (!goal || goal <= 0) return 0
-  return Math.max(0, Math.min(100, Math.round((current / goal) * 100)))
+  const pct = Math.max(0, Math.min(100, Math.round((current / goal) * 100)))
+  return current < goal ? Math.min(99, pct) : pct
 }
 
 /**
