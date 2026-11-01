@@ -335,7 +335,8 @@ function handle(name: string, data: any): any {
       const w = db.wishes.find((x) => x._id === (data && data.wishId))
       if (!w) return fail('心愿不存在')
       const out = publicWish(w)
-      if (isDone(w)) out.thumbUrl = PAPER_DIR + w.paperId + '-thumb.jpg'
+      // 进行中的也给：香案背景随进度从雾里显出它
+      if (w.paperId) out.thumbUrl = PAPER_DIR + w.paperId + '-thumb.jpg'
       return { ok: true, wish: out }
     }
     if (action === 'profile') {

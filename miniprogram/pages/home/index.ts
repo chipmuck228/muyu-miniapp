@@ -9,7 +9,7 @@ import {
   normalizeChannelScene,
   rememberUser,
 } from '../../utils/cloud'
-import { CHANTS, SESSION_MINUTES, SESSION_BEADS, levelOf, percentOf } from '../../utils/constants'
+import { CHANTS, SESSION_MINUTES, SESSION_BEADS, levelOf, percentOf, paperReveal } from '../../utils/constants'
 import { playKnock, vibrate, vibrateLong, ensureKnock, ensureBell, playBell, KnockTimbre } from '../../utils/knock'
 import { KnockQueue, TapSource } from '../../utils/knockQueue'
 import { mockEnabled } from '../../utils/devMock'
@@ -225,12 +225,21 @@ function mixTitleColor(cur: number, goal: number, theme?: ThemeId): string {
 
 function scenePatch(cur: number, goal: number, theme?: ThemeId) {
   const t = progressT(cur, goal)
+  const veil = paperReveal(t)
   return {
     lessonColor: mixTitleColor(cur, goal, theme),
-    dawnSky: Number(t.toFixed(3)),
+    paperMist: veil.mist,
+    paperClear: veil.clear,
     smokeFade: Number((1 - t * 0.92).toFixed(3)),
   }
 }
+
+/** 换背景图时旧图先淡出这么久，再换上新图 */
+const PAPER_SWAP_MS = 600
+/** 心愿 id → 壁纸缩略图地址。本次打开里同一个心愿一直用同一个地址，换回来时不必重新加载 */
+const paperUrls: Record<string, string> = {}
+/** 心愿壁纸加载失败的次数：临时地址过期会失败一次，换个地址再试；失败两次就改用晨曦图 */
+const paperFails: Record<string, number> = {}
 
 function lessonTitleOf(): string {
   const app = getApp<IAppOption>()
@@ -271,9 +280,15 @@ Page({
     lessonChars: [] as string[],
     lessonTitleOn: false,
     lessonColor: mixTitleColor(0, 1, 'dawn'),
-    dawnSky: 0,
     smokeFade: 1,
     dawnSrc: '',
+    // 香案背景图：心愿自己的壁纸，没有时用晨曦图；随进度从雾里浮现
+    paperSrc: '',
+    paperKind: 'dawn' as 'dawn' | 'wish',
+    /** 图已加载好，整层淡入 */
+    paperOn: false,
+    paperMist: paperReveal(0).mist,
+    paperClear: 0,
     // 顶部当前功课：心愿显示 进度/目标，随机专注显示今日次数
     headWish: false,
     headReady: false,
@@ -330,6 +345,9 @@ Page({
   _alive: false,
   _hasEntered: false,
   _titleTimer: 0,
+  _paperTimer: 0,
+  /** 已加载好的那张背景图；淡出途中又换回同一张时不会再触发 load，靠它重新显出 */
+  _paperLoaded: '',
   _titleCurrent: 0,
   _titleGoal: RANDOM_GOAL,
   _randomHits: 0,
@@ -410,11 +428,56 @@ Page({
   loadDawn() {
     resolveCloudFile(DAWN_FILE_ID)
       .then((src) => {
-        if (this._alive) this.setData({ dawnSrc: src })
+        if (!this._alive) return
+        this.setData({ dawnSrc: src })
+        this.applyPaper()
       })
       .catch((e) => {
         console.warn('dawn load failed', e)
       })
+  },
+
+  /** 该铺哪张背景图：心愿有自己的壁纸就用它；随机专注、没有壁纸或壁纸加载不了时用晨曦图 */
+  paperPick(): { src: string; kind: 'dawn' | 'wish' } {
+    // 心愿进度还没拉回来：先不铺，免得先闪一下晨曦再换成壁纸
+    if (!this._lessonKind) return { src: '', kind: 'dawn' }
+    const id = this._lessonKind === 'wish' ? this._wishId : null
+    if (id && paperUrls[id]) return { src: paperUrls[id], kind: 'wish' }
+    return { src: this.data.dawnSrc, kind: 'dawn' }
+  },
+
+  applyPaper() {
+    // 正在淡出旧图：到点会再来一次
+    if (!this._alive || this._paperTimer) return
+    const next = this.paperPick()
+    if (next.src === this.data.paperSrc && next.kind === this.data.paperKind) {
+      if (next.src && !this.data.paperOn && this._paperLoaded === next.src) this.setData({ paperOn: true })
+      return
+    }
+    if (this.data.paperOn && this.data.paperSrc) {
+      this.setData({ paperOn: false })
+      this._paperTimer = setTimeout(() => {
+        this._paperTimer = 0
+        this.applyPaper()
+      }, PAPER_SWAP_MS) as unknown as number
+      return
+    }
+    this.setData({ paperSrc: next.src, paperKind: next.kind, paperOn: false })
+  },
+
+  onPaperLoad() {
+    this._paperLoaded = this.data.paperSrc
+    if (!this.data.paperOn) this.setData({ paperOn: true })
+  },
+
+  onPaperError() {
+    const src = this.data.paperSrc
+    const id = Object.keys(paperUrls).find((k) => paperUrls[k] === src)
+    if (!id) return
+    delete paperUrls[id]
+    paperFails[id] = (paperFails[id] || 0) + 1
+    this.setData({ paperOn: false })
+    this.applyPaper()
   },
 
   onShow() {
@@ -430,6 +493,7 @@ Page({
       // 从今日功课换了心愿：旧进度作废，等新心愿拉回来再显示数字
       this._lessonKind = ''
       this._titleCurrent = 0
+      this.applyPaper()
     }
     this.setData({ readyToKnock: true })
     if (!this.data.dawnSrc) this.loadDawn()
@@ -497,6 +561,7 @@ Page({
     stopAmbience()
     this.clearEnterTimer()
     this.clearTitleTimer()
+    if (this._paperTimer) clearTimeout(this._paperTimer)
     if (this._queue) {
       this._queue.destroy()
       this._queue = null
@@ -616,12 +681,16 @@ Page({
         this._lessonKind = 'wish'
         this._titleGoal = Math.max(1, res.wish.goal || 1)
         this._titleCurrent = Math.max(0, Math.min(this._titleGoal, res.wish.current || 0))
+        const thumb = res.wish.thumbUrl || ''
+        if (thumb && !paperUrls[id] && (paperFails[id] || 0) < 2) paperUrls[id] = thumb
         const due = dueText(res.wish.deadline)
         this.setData(Object.assign(lessonTitlePatch(name), this.titleColorPatch(), { headDue: due.text, headLate: due.late }))
         this.drawLessonTitle()
+        this.applyPaper()
       } catch {
         this._lessonKind = 'wish'
         this.applyTitleProgress()
+        this.applyPaper()
       }
       return
     }
@@ -631,6 +700,7 @@ Page({
     this._titleCurrent = this._randomHits
     this.setData(Object.assign(lessonTitlePatch(lessonTitleOf()), this.titleColorPatch(), { headDue: '', headLate: false }))
     this.drawLessonTitle()
+    this.applyPaper()
   },
 
   onSmokeRisen() {
@@ -661,12 +731,26 @@ Page({
     ctx.font = size.toFixed(1) + 'px "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
+    // 背景图显得越清楚，字后面的暗晕越浓；亮的壁纸（日出、佛光）正好在标题后面
+    const halo = this.data.paperSrc ? this.data.paperClear : 0
     const total = chars.length * line
-    let y = (h - total) / 2 + line / 2
-    for (let i = 0; i < chars.length; i++) {
-      ctx.fillText(chars[i], w / 2, y)
-      y += line
+    const passes = halo > 0.05 ? 2 : 1
+    for (let pass = 0; pass < passes; pass++) {
+      if (pass === 0 && halo > 0.05) {
+        ctx.shadowColor = 'rgba(12, 8, 4, ' + (0.45 + 0.4 * halo).toFixed(2) + ')'
+        ctx.shadowBlur = size * 0.55
+      } else {
+        ctx.shadowColor = 'rgba(0, 0, 0, 0)'
+        ctx.shadowBlur = 0
+      }
+      let y = (h - total) / 2 + line / 2
+      for (let i = 0; i < chars.length; i++) {
+        ctx.fillText(chars[i], w / 2, y)
+        y += line
+      }
     }
+    ctx.shadowColor = 'rgba(0, 0, 0, 0)'
+    ctx.shadowBlur = 0
     ctx.globalAlpha = 1
     if (t < 1 && !this._titleFadeRaf) {
       const next = () => {
@@ -1015,6 +1099,7 @@ Page({
     this._randomHits = 0
     this._titleCurrent = 0
     this._titleGoal = p.mode === 'wish' ? 1 : RANDOM_GOAL
+    this.applyPaper()
     this.syncTitleProgress()
   },
 

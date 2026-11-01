@@ -75,6 +75,19 @@ export function percentOf(current: number, goal: number): number {
   return Math.max(0, Math.min(100, Math.round((current / goal) * 100)))
 }
 
+/**
+ * 心愿壁纸随进度浮现，t 为 0–1。两层叠着：mist 是糊开的一层，一开始就隐约有一点，前快后慢地浓起来，
+ * 头几十下也看得出变化；clear 是清楚的一层，过了三成才开始显，敲满时正好完全清楚
+ */
+export function paperReveal(t: number): { mist: number; clear: number } {
+  const p = Math.max(0, Math.min(1, t || 0))
+  const x = Math.max(0, Math.min(1, (p - 0.3) / 0.7))
+  return {
+    mist: Number((0.16 + 0.84 * Math.sqrt(p)).toFixed(3)),
+    clear: Number((x * x * (3 - 2 * x)).toFixed(3)),
+  }
+}
+
 /** 心情彩色 */
 export const STATUS_CLS: Record<string, string> = {
   ongoing: 'ongoing',

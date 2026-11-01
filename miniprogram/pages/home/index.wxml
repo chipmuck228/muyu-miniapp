@@ -4,11 +4,19 @@
 
   <block wx:if="{{readyToKnock}}">
     <view class="home-stage">
-      <view class="dawn">
-        <!-- 主题天色：常驻，不随进度变；进度推进时天空图再叠上来 -->
+      <view class="dawn {{pulsing ? 'breathing' : ''}}">
+        <!-- 主题天色：常驻，不随进度变；进度推进时背景图再叠上来 -->
         <view class="theme-sky"></view>
         <view class="theme-glow"></view>
-        <image wx:if="{{dawnSrc}}" class="dawn-paper" src="{{dawnSrc}}" mode="aspectFill" style="opacity: {{dawnSky}};" />
+        <!-- 背景图随进度从雾里浮现：糊开的一层先隐约显出，清楚的一层过了三成才显，敲满时完全清楚；每敲一下雾里亮一下 -->
+        <view wx:if="{{paperSrc}}" class="paper paper-{{paperKind}} {{paperOn ? 'on' : ''}}">
+          <image class="paper-mist" src="{{paperSrc}}" mode="aspectFill" style="opacity: {{paperMist}};" bindload="onPaperLoad" binderror="onPaperError" />
+          <image class="paper-breath" src="{{paperSrc}}" mode="aspectFill" />
+          <image class="paper-clear" src="{{paperSrc}}" mode="aspectFill" style="opacity: {{paperClear}};" />
+          <view class="paper-scrim" style="opacity: {{paperMist}};"></view>
+          <!-- 竖排功课名后面一团淡淡的暗，壁纸中间亮的时候字也看得清 -->
+          <view class="paper-title-veil" style="opacity: {{paperClear}};"></view>
+        </view>
       </view>
       <smoke-gl class="smoke-gl-fill" theme="{{theme}}" fade="{{celebrateOn || sheetOn || sessionSheetOn || sessionDoneOn ? 0 : smokeFade}}" bind:risen="onSmokeRisen" />
 

@@ -1,6 +1,6 @@
 // 心愿详情
 import { fetchWishDetail, fetchPaperOrigin, fulfillWish, Wish } from '../../utils/cloud'
-import { STATUS_TEXT, STATUS_CLS, percentOf } from '../../utils/constants'
+import { STATUS_TEXT, STATUS_CLS, percentOf, paperReveal } from '../../utils/constants'
 import { setFormState } from '../../utils/formState'
 import { applyLesson } from '../../utils/lesson'
 import {
@@ -181,6 +181,8 @@ Page({
     revealed: false,
     thumbUrl: '',
     revealOn: false,
+    /** 进行中时壁纸显到哪一步 */
+    veil: paperReveal(0),
     savingPaper: false,
     localToday: 0,
     /** 图表上点中的那一天 */
@@ -266,6 +268,7 @@ Page({
         revealed,
         thumbUrl,
         revealOn: false,
+        veil: paperReveal(vm.goal > 0 ? vm.current / vm.goal : 0),
         localToday: map[todayStr()] || 0,
       })
       if (revealed && thumbUrl) {

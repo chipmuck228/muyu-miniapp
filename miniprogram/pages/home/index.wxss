@@ -50,13 +50,14 @@
 .theme-dusk .theme-glow {
   background: radial-gradient(ellipse 96% 46% at 50% 76%, rgba(224, 120, 74, 0.3) 0%, rgba(224, 120, 74, 0.09) 54%, rgba(224, 120, 74, 0) 100%);
 }
-.theme-night .dawn-paper {
+/* 晨曦图跟着主题换色；心愿自己的壁纸是圆满时的奖励，保持原色 */
+.theme-night .paper-dawn {
   filter: brightness(0.42) saturate(0.55) hue-rotate(200deg);
 }
-.theme-ink .dawn-paper {
+.theme-ink .paper-dawn {
   filter: grayscale(1) brightness(0.5) contrast(1.08);
 }
-.theme-dusk .dawn-paper {
+.theme-dusk .paper-dawn {
   filter: sepia(0.45) saturate(1.35) brightness(0.62) hue-rotate(-12deg);
 }
 .theme-night .knock-pad {
@@ -155,14 +156,86 @@
   overflow: hidden;
   pointer-events: none;
 }
-.dawn-paper {
+.paper {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.paper.on {
+  opacity: 1;
+}
+.paper-mist,
+.paper-breath,
+.paper-clear,
+.paper-scrim {
   position: absolute;
   left: 0;
   top: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
+}
+.paper-mist,
+.paper-clear,
+.paper-scrim {
   transition: opacity 0.42s ease;
+}
+/* 雾里的一层：糊开、压暗；放大一点，糊开的边不露出来 */
+.paper-mist {
+  transform: scale(1.12);
+  filter: blur(32rpx) brightness(0.78);
+}
+/* 每敲一下雾里亮一下；连敲时一直亮着，停手慢慢暗回去 */
+.paper-breath {
+  opacity: 0;
+  transform: scale(1.12);
+  filter: blur(32rpx) brightness(1.1);
+  transition: opacity 0.9s ease-out;
+}
+.breathing .paper-breath {
+  opacity: 0.3;
+  transition: opacity 0.08s ease-out;
+}
+/* 亮的壁纸上压一层暗，顶部功课名和底部按钮要看得清 */
+.paper-scrim {
+  background: linear-gradient(
+    180deg,
+    rgba(8, 6, 4, 0.62) 0%,
+    rgba(8, 6, 4, 0.2) 24%,
+    rgba(8, 6, 4, 0.12) 50%,
+    rgba(8, 6, 4, 0.34) 74%,
+    rgba(8, 6, 4, 0.6) 100%
+  );
+}
+.paper-title-veil {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 320rpx;
+  height: 680rpx;
+  margin-left: -160rpx;
+  margin-top: -340rpx;
+  pointer-events: none;
+  background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(8, 6, 4, 0.58) 0%, rgba(8, 6, 4, 0.34) 46%, rgba(8, 6, 4, 0) 100%);
+  transition: opacity 0.42s ease;
+}
+.paper-dawn .paper-scrim,
+.paper-dawn .paper-title-veil {
+  display: none;
+}
+/* 壁纸显亮以后，木鱼两侧的小字落在雾或天光上：加一圈暗影托住 */
+.auto-text,
+.incense-entry-text,
+.knock-hint,
+.session-big,
+.session-small,
+.session-end,
+.mat-label {
+  text-shadow: 0 0 10rpx rgba(8, 6, 4, 0.7), 0 2rpx 4rpx rgba(8, 6, 4, 0.5);
 }
 .smoke-gl-fill {
   position: absolute;

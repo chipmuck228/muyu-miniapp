@@ -193,6 +193,38 @@
   color: rgba(224, 181, 119, 0.45);
 }
 
+/* 进行中的壁纸：两层叠着，糊的一层先显，清楚的一层后显，和香案背景同一条曲线 */
+.veiled {
+  border-style: solid;
+  border-color: rgba(224, 181, 119, 0.16);
+}
+.veil-pic {
+  position: relative;
+  flex-shrink: 0;
+  width: 132rpx;
+  height: 234rpx;
+  margin-right: 28rpx;
+  border-radius: 12rpx;
+  overflow: hidden;
+  background: #0d0a07;
+  box-shadow: 0 12rpx 32rpx rgba(0, 0, 0, 0.5);
+}
+.veil-mist,
+.veil-clear {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+.veil-mist {
+  transform: scale(1.14);
+  filter: blur(10rpx) brightness(0.8);
+}
+.veiled .sealed-sub {
+  margin-top: 10rpx;
+}
+
 /* ===== 统计 ===== */
 .stats {
   margin-top: 40rpx;

@@ -44,10 +44,21 @@
         <text class="fulfill-go">了结 ›</text>
       </view>
 
-      <!-- 惊喜：圆满后显出壁纸；未满时是一枚封着的签 -->
+      <!-- 惊喜：圆满后显出壁纸；未满时壁纸在雾里，和香案背景一样随进度浮现；没有壁纸时是一枚封着的签 -->
       <view class="reveal" wx:if="{{revealed && thumbUrl}}">
         <image class="reveal-img {{revealOn ? 'on' : ''}}" src="{{thumbUrl}}" mode="aspectFill" />
         <text class="reveal-hint">惊喜已启</text>
+      </view>
+      <view class="sealed veiled" wx:elif="{{wish.status === 'ongoing' && thumbUrl}}">
+        <view class="veil-pic">
+          <image class="veil-mist" src="{{thumbUrl}}" mode="aspectFill" style="opacity: {{veil.mist}};" />
+          <image class="veil-clear" src="{{thumbUrl}}" mode="aspectFill" style="opacity: {{veil.clear}};" />
+        </view>
+        <view class="sealed-text">
+          <text class="sealed-title">壁纸正在浮现</text>
+          <text class="sealed-sub">已显 {{wish.percent}}% · 敲得越多越清楚</text>
+          <text class="sealed-sub">圆满时完整显出，可存相册</text>
+        </view>
       </view>
       <view class="sealed" wx:elif="{{wish.status === 'ongoing'}}">
         <view class="sealed-mark"><text>启</text></view>
