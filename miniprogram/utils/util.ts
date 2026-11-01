@@ -79,6 +79,15 @@ export function diffToday(dateStr: string): number {
   return Math.round((b - a) / 86400000)
 }
 
+/** 期限的说法：还剩 N 天 / 今日截止 / 已过期限 N 天。没设期限返回空串 */
+export function dueText(deadline?: string | null): { text: string; late: boolean } {
+  if (!deadline || !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) return { text: '', late: false }
+  const n = diffToday(deadline)
+  if (n > 0) return { text: '还剩 ' + n + ' 天', late: false }
+  if (n === 0) return { text: '今日截止', late: false }
+  return { text: '已过期限 ' + -n + ' 天', late: true }
+}
+
 export function safeBottomPx(): number {
   try {
     const win: any = winInfo()

@@ -185,16 +185,27 @@ export function playBell(on: boolean) {
   }
 }
 
-export function vibrate(on: boolean) {
+/** 亲手敲用重震；自动敲每 0.8 秒一下，用轻震，免得手里一直嗡嗡响 */
+export function vibrate(on: boolean, type: 'heavy' | 'medium' | 'light' = 'heavy') {
   if (!on) return
   const anyWx: any = wx
   try {
-    anyWx.vibrateShort && anyWx.vibrateShort({ type: 'heavy' })
+    anyWx.vibrateShort && anyWx.vibrateShort({ type })
   } catch {
     try {
       anyWx.vibrateShort && anyWx.vibrateShort({ type: 'medium' })
     } catch {
       // ignore
     }
+  }
+}
+
+/** 心愿圆满、定课收尾这类大时刻：长震一下 */
+export function vibrateLong(on: boolean) {
+  if (!on) return
+  try {
+    wx.vibrateLong({})
+  } catch {
+    vibrate(on)
   }
 }

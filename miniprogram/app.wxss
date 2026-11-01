@@ -4,6 +4,8 @@
  * 字体栈：优先系统默认 PingFang SC
  */
 page {
+  /* 标题用宋体，像经折上的字；没有宋体的机型退回系统字 */
+  --serif: 'Songti SC', 'STSong', 'Noto Serif CJK SC', 'Source Han Serif SC', 'Noto Serif SC', serif;
   background: #16110d;
   color: #f0e6d8;
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', 'Microsoft YaHei', sans-serif;
@@ -44,6 +46,7 @@ page {
   justify-content: space-between;
 }
 .wing-title {
+  font-family: var(--serif);
   font-size: 44rpx;
   letter-spacing: 16rpx;
   padding-right: 16rpx;

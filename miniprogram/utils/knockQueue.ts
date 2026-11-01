@@ -12,10 +12,15 @@ export interface KnockResult {
   active: boolean
 }
 
+/** 上传失败后隔多久重传；用完了才提示用户，敲下的数仍留着，下一次敲击会一起带上 */
+const RETRY_MS = [1500, 4000, 10000]
+
 export class KnockQueue {
   private pending: { hand: number; auto: number }
   private running: boolean
   private alive: boolean
+  private retries: number
+  private retryTimer: number
 
   constructor(
     private readonly wishIdProvider: () => string | null,
@@ -25,6 +30,8 @@ export class KnockQueue {
     this.pending = { hand: 0, auto: 0 }
     this.running = false
     this.alive = true
+    this.retries = 0
+    this.retryTimer = 0
   }
 
   tap(source: TapSource, n = 1) {
@@ -38,7 +45,8 @@ export class KnockQueue {
   }
 
   private async flush() {
-    if (this.running) return
+    // 正在等重传时新敲的先攒着，到点一起传
+    if (this.running || this.retryTimer) return
     this.running = true
     while (this.hasPending() && this.alive) {
       const by = this.pending
@@ -47,6 +55,7 @@ export class KnockQueue {
       try {
         const res: HitResp = await hitKnock(wishId, by)
         if (!this.alive) return
+        this.retries = 0
         this.onResult({
           totalMerit: res.totalMerit,
           todayCount: res.todayCount,
@@ -54,8 +63,21 @@ export class KnockQueue {
           active: !!(res.wish && res.wish.status === 'ongoing'),
         })
       } catch {
-        if (this.alive) this.onError()
-        // 失败即终止，避免死循环
+        if (!this.alive) return
+        // 放回去，别丢：网络抖一下就重传
+        this.pending.hand += by.hand
+        this.pending.auto += by.auto
+        if (this.retries < RETRY_MS.length) {
+          const wait = RETRY_MS[this.retries]
+          this.retries += 1
+          this.retryTimer = setTimeout(() => {
+            this.retryTimer = 0
+            this.flush()
+          }, wait) as unknown as number
+        } else {
+          this.retries = 0
+          this.onError()
+        }
         break
       }
     }
@@ -64,6 +86,10 @@ export class KnockQueue {
 
   destroy() {
     this.alive = false
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer)
+      this.retryTimer = 0
+    }
     this.pending = { hand: 0, auto: 0 }
   }
 }

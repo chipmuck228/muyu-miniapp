@@ -8,11 +8,11 @@ import {
   bindChannelByScene,
   normalizeChannelScene,
 } from '../../utils/cloud'
-import { CHANTS, SESSION_MINUTES, SESSION_BEADS } from '../../utils/constants'
-import { playKnock, vibrate, ensureKnock, ensureBell, playBell, KnockTimbre } from '../../utils/knock'
+import { CHANTS, SESSION_MINUTES, SESSION_BEADS, levelOf } from '../../utils/constants'
+import { playKnock, vibrate, vibrateLong, ensureKnock, ensureBell, playBell, KnockTimbre } from '../../utils/knock'
 import { KnockQueue, TapSource } from '../../utils/knockQueue'
 import { mockEnabled } from '../../utils/devMock'
-import { concealTabBar, winInfo } from '../../utils/util'
+import { concealTabBar, winInfo, fmtInt, dueText } from '../../utils/util'
 import { DAWN_FILE_ID, resolveCloudFile } from '../../utils/cloudFile'
 import { startAmbience, stopAmbience, fadeOutAmbience } from '../../utils/ambience'
 import { AmbienceId } from '../../utils/audioCatalog'
@@ -25,7 +25,7 @@ interface FloatItem {
   key: number
   text: string
   left: number
-  kind: 'score' | 'chant' | 'celebrate'
+  kind: 'score' | 'chant' | 'celebrate' | 'milestone'
 }
 
 type EnterPhase = 'cover' | 'reveal' | 'done'
@@ -36,6 +36,8 @@ interface SheetRow {
   name: string
   mark: string
   cur: boolean
+  /** 进度百分比，面板里每行底下一道细线 */
+  pct: number
 }
 
 interface CelebrateInfo {
@@ -55,8 +57,15 @@ interface SessionOption {
   kind: SessionKind
   /** 分钟 / 下 */
   value: number
+  /** 选项上的字：3 分钟 / 108 下 */
+  label: string
+}
+
+interface SessionGroup {
+  kind: SessionKind
   name: string
   mark: string
+  options: SessionOption[]
 }
 
 interface PlanOption {
@@ -64,6 +73,8 @@ interface PlanOption {
   name: string
   mark: string
   locked: boolean
+  /** 右侧小签：免费 / 可试一次 / 静心包 */
+  tag: string
 }
 
 interface SessionState {
@@ -101,22 +112,35 @@ const AUTO_GAP_MS = 800
 /** 右下角香身图标的长度（rpx），定时时随燃烧变短 */
 const STICK_ICON_LEN = 56
 
-function sessionOptions(): SessionOption[] {
+// 「自己敲」按一炷香 / 一串念珠分两行，时长和颗数做成小签，一眼看完不用往下翻
+function sessionGroups(): SessionGroup[] {
   // 开发版本地多一个 1 分钟 / 10 下，方便看结束
   const mins = mockEnabled() ? [1].concat(SESSION_MINUTES) : SESSION_MINUTES
   const beads = mockEnabled() ? [10, SESSION_BEADS] : [SESSION_BEADS]
-  const timed: SessionOption[] = mins.map((m) => ({ kind: 'time', value: m, name: '一炷香 · ' + m + ' 分钟', mark: '到点即止' }))
-  const counted: SessionOption[] = beads.map((n) => ({ kind: 'count', value: n, name: '一串念珠 · ' + n + ' 下', mark: '敲满即止' }))
-  return timed.concat(counted)
+  return [
+    {
+      kind: 'time',
+      name: '一炷香',
+      mark: '到点即止',
+      options: mins.map((m) => ({ kind: 'time' as SessionKind, value: m, label: m + ' 分钟' })),
+    },
+    {
+      kind: 'count',
+      name: '一串念珠',
+      mark: '敲满即止',
+      options: beads.map((n) => ({ kind: 'count' as SessionKind, value: n, label: n + ' 下' })),
+    },
+  ]
 }
 
 function planOptions(premium: boolean): PlanOption[] {
   const tried = triedPlans()
   return SESSION_PLANS.map((p) => {
     const locked = p.premium && !premium
-    let mark = p.scene + ' · ' + p.minutes + ' 分钟'
-    if (locked) mark = tried[p.id] ? PACK_NAME : '可试一次 · ' + p.minutes + ' 分钟'
-    return { id: p.id, name: p.name, mark, locked }
+    const mark = p.scene + ' · ' + p.minutes + ' 分钟'
+    let tag = ''
+    if (locked) tag = tried[p.id] ? PACK_NAME : '可试一次'
+    return { id: p.id, name: p.name, mark, locked, tag }
   })
 }
 
@@ -142,6 +166,17 @@ const MATERIALS = [
 ]
 /** 手指移动超过这个距离（px）就算拖动，不算敲击 */
 const DRAG_SLOP = 6
+/** 里程碑大字飘起后，这么久内不再出「专注 +1」小字 */
+const MILESTONE_QUIET_MS = 1400
+/** 换材质后色点旁的名字停留多久 */
+const MAT_LABEL_MS = 1400
+
+/** 今日叩数的整百、一百零八这些数，敲到时飘一句大字 */
+function todayMilestone(n: number): string {
+  if (n === 108) return '一百零八叩'
+  if (n > 0 && n % 100 === 0) return '今日 ' + fmtInt(n) + ' 叩'
+  return ''
+}
 
 function savedMaterial(): string {
   try {
@@ -151,6 +186,10 @@ function savedMaterial(): string {
     // 用默认
   }
   return 'zitan'
+}
+
+function shareTitleOf(name: string, isWish: boolean): string {
+  return isWish ? '我在为「' + name + '」轻叩木鱼，一起静一静' : '轻叩一声，万缘放下'
 }
 
 function nextTextOf(p: LessonPick): string {
@@ -236,6 +275,16 @@ Page({
     headCur: 0,
     headGoal: 0,
     headPct: 0,
+    headCurText: '0',
+    headGoalText: '0',
+    /** 心愿的期限：还剩 N 天 / 已过期限 */
+    headDue: '',
+    headLate: false,
+    /** 今天还没敲过：木鱼周围一圈呼吸的光，提示轻触 */
+    knockHint: false,
+    /** 换材质时在色点旁边亮一下名字 */
+    matLabel: '',
+    matLabelOn: false,
     celebrateOn: false,
     celebrate: null as CelebrateInfo | null,
     /** 圆满后切到下一个功课时，顶部短暂提示 */
@@ -257,7 +306,7 @@ Page({
     sessionSmall: '',
     sessionStick: STICK_ICON_LEN,
     sessionSheetOn: false,
-    sessionOptions: [] as SessionOption[],
+    sessionGroups: [] as SessionGroup[],
     planOptions: [] as PlanOption[],
     sessionDoneOn: false,
     sessionDone: null as SessionDone | null,
@@ -303,6 +352,12 @@ Page({
   _scenePlan: null as SessionPlan | null,
   /** 成品定课收尾后声音已淡出，小结关掉前不再响 */
   _sceneQuiet: false,
+  /** 连续敲了几天（不含今天）；今天第一下时飘一句「连续第 N 天」 */
+  _streak: 0,
+  _matTimer: 0,
+  /** 本次打开已飘过的整数里程碑，服务端回来的数偶尔会回退，别重复飘 */
+  _milestones: {} as Record<string, 1>,
+  _quietUntil: 0,
   onLoad(options: Record<string, string | undefined>) {
     const app = getApp<IAppOption>()
     const scene =
@@ -337,7 +392,7 @@ Page({
       },
       () => {
         if (this._alive) {
-          wx.showToast({ title: '专注未能上传，请重试', icon: 'none' })
+          wx.showToast({ title: '网络不稳 · 下一次敲击会一并补传', icon: 'none' })
         }
       }
     )
@@ -374,10 +429,9 @@ Page({
     startAmbience(this.data.ambience)
     this.armLessonTitle()
     concealTabBar(this)
-    if (this._session) {
-      ensureBell()
-      this.startSessionTick()
-    }
+    // 心愿圆满、定课收尾都要响钟钵，先把声音备好
+    ensureBell()
+    if (this._session) this.startSessionTick()
     this.refresh()
     this.tryEnter()
     // 自动敲只在本次打开内有效：切页、锁屏回来接着敲，重开小程序从手敲开始
@@ -423,6 +477,7 @@ Page({
   onUnload() {
     this._alive = false
     if (this._hintTimer) clearTimeout(this._hintTimer)
+    if (this._matTimer) clearTimeout(this._matTimer)
     this.stopSessionTick()
     this.stopAuto()
     stopAmbience()
@@ -504,6 +559,8 @@ Page({
       headCur: isWish ? this._titleCurrent : 0,
       headGoal: isWish ? this._titleGoal : 0,
       headPct: isWish ? Math.round(progressT(this._titleCurrent, this._titleGoal) * 1000) / 10 : 0,
+      headCurText: fmtInt(isWish ? this._titleCurrent : 0),
+      headGoalText: fmtInt(isWish ? this._titleGoal : 0),
     })
   },
 
@@ -545,7 +602,8 @@ Page({
         this._lessonKind = 'wish'
         this._titleGoal = Math.max(1, res.wish.goal || 1)
         this._titleCurrent = Math.max(0, Math.min(this._titleGoal, res.wish.current || 0))
-        this.setData(Object.assign(lessonTitlePatch(name), this.titleColorPatch()))
+        const due = dueText(res.wish.deadline)
+        this.setData(Object.assign(lessonTitlePatch(name), this.titleColorPatch(), { headDue: due.text, headLate: due.late }))
         this.drawLessonTitle()
       } catch {
         this._lessonKind = 'wish'
@@ -557,7 +615,7 @@ Page({
     this._lessonKind = 'random'
     this._titleGoal = RANDOM_GOAL
     this._titleCurrent = this._randomHits
-    this.setData(Object.assign(lessonTitlePatch(lessonTitleOf()), this.titleColorPatch()))
+    this.setData(Object.assign(lessonTitlePatch(lessonTitleOf()), this.titleColorPatch(), { headDue: '', headLate: false }))
     this.drawLessonTitle()
   },
 
@@ -585,7 +643,8 @@ Page({
     // 画布宽 88rpx：字号 34rpx、行高 1.45，随屏宽缩放
     const size = (w * 34) / 88
     const line = size * 1.45
-    ctx.font = size.toFixed(1) + 'px sans-serif'
+    // 竖排功课名用宋体，像经折上的字；没有宋体的机型退回系统字
+    ctx.font = size.toFixed(1) + 'px "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     const total = chars.length * line
@@ -660,6 +719,8 @@ Page({
     try {
       const res = await fetchHome()
       if (!this._alive) return
+      // 今天还没敲时云端的连续天数不含今天；敲过了就含，先减掉，第一下再加回来
+      this._streak = Math.max(0, (res.streak || 0) - (res.todayCount > 0 ? 1 : 0))
       this.applyHome(res.user, res.todayCount)
     } catch (e: any) {
       if (this._alive) {
@@ -684,6 +745,7 @@ Page({
           ambience: scene.ambience,
           theme: scene.theme,
           premium: user.premium === true,
+          knockHint: todayCount === 0 && !this.data.strikeSeq,
         },
         this.levelPatch(user.totalMerit || 0, todayCount),
         scenePatch(this._titleCurrent, this._titleGoal, scene.theme)
@@ -770,33 +832,72 @@ Page({
     const id = (e.currentTarget.dataset.id as string) || ''
     const m = MATERIALS.find((x) => x.id === id)
     if (!m || m.id === this.data.material) return
-    this.setData({ material: m.id })
+    this.setData({ material: m.id, matLabel: m.name, matLabelOn: true })
     try {
       wx.setStorageSync(MATERIAL_KEY, m.id)
     } catch {
       // 下次启动回到默认材质
     }
-    wx.showToast({ title: m.name, icon: 'none', duration: 900 })
+    vibrate(this.data.vibrateOn, 'light')
+    if (this._matTimer) clearTimeout(this._matTimer)
+    this._matTimer = setTimeout(() => {
+      this._matTimer = 0
+      if (this._alive) this.setData({ matLabelOn: false })
+    }, MAT_LABEL_MS) as unknown as number
   },
 
   knock(source: TapSource) {
     if (!this._alive || this.entering() || !this.data.readyToKnock || this.overlayOn()) return
     const d = this.data
     playKnock(d.soundOn, this.knockTimbre())
-    vibrate(d.vibrateOn)
-    this.spawnFloat()
+    vibrate(d.vibrateOn, source === 'auto' ? 'light' : 'heavy')
+    const nextTotal = d.totalMerit + 1
+    const nextToday = d.todayCount + 1
+    const prevCur = this._titleCurrent
+    const milestone = this.milestoneOf(nextTotal, nextToday, prevCur)
+    if (milestone) {
+      this.spawnText(milestone, 'milestone')
+      this._quietUntil = Date.now() + MILESTONE_QUIET_MS
+    } else if (Date.now() > this._quietUntil) {
+      // 大字还在飘时不再出小字，免得叠在一起
+      this.spawnFloat()
+    }
     this.pulse()
     this.ripple()
 
-    const nextTotal = d.totalMerit + 1
     this._titleCurrent = Math.min(this._titleGoal, this._titleCurrent + 1)
     if (this._lessonKind === 'random') this._randomHits = this._titleCurrent
     this.setData(
-      Object.assign(this.levelPatch(nextTotal, d.todayCount + 1), this.titleColorPatch(), { strikeSeq: d.strikeSeq + 1 })
+      Object.assign(this.levelPatch(nextTotal, nextToday), this.titleColorPatch(), {
+        strikeSeq: d.strikeSeq + 1,
+        knockHint: false,
+      })
     )
     this.drawLessonTitle()
     if (this._queue) this._queue.tap(source)
     this.countSession(source)
+  },
+
+  /**
+   * 这一下是不是值得飘一句大字：今天第一下、整百、一百零八、心愿过半、升了称号。
+   * 同一句本次打开只飘一次
+   */
+  milestoneOf(nextTotal: number, nextToday: number, prevCur: number): string {
+    let text = ''
+    const before = levelOf(nextTotal - 1)
+    const after = levelOf(nextTotal)
+    if (after.level > before.level) text = '晋 · ' + after.title
+    else if (nextToday === 1) text = this._streak > 0 ? '连续第 ' + (this._streak + 1) + ' 天' : '今日第一叩'
+    else if (todayMilestone(nextToday)) text = todayMilestone(nextToday)
+    else if (this._lessonKind === 'wish' && this._titleGoal >= 20) {
+      const half = Math.ceil(this._titleGoal / 2)
+      if (prevCur < half && prevCur + 1 >= half && prevCur + 1 < this._titleGoal) text = '心愿过半'
+    }
+    if (!text) return ''
+    const key = text + '@' + (text === '心愿过半' ? this._wishId : '')
+    if (this._milestones[key]) return ''
+    this._milestones[key] = 1
+    return text
   },
 
   /** 右下角「自动」开关：随时切换，不存云端 */
@@ -856,10 +957,11 @@ Page({
     this._floatSeq += 1
     const floats = this.data.floats.slice()
     if (floats.length > 5) floats.shift()
+    const big = kind === 'celebrate' || kind === 'milestone'
     floats.push({
       key: this._floatSeq,
       text,
-      left: kind === 'celebrate' ? 50 : 26 + Math.random() * 44,
+      left: big ? 50 : 30 + Math.random() * 40,
       kind,
     })
     this.setData({ floats })
@@ -869,7 +971,7 @@ Page({
         if (!this._alive) return
         this.setData({ floats: this.data.floats.filter((f) => f.key !== key) })
       },
-      kind === 'celebrate' ? 2400 : 1000
+      big ? 2400 : 1000
     )
   },
 
@@ -930,8 +1032,9 @@ Page({
         .map((w) => ({
           _id: w._id,
           name: w.name || '无名心愿',
-          mark: w.current + ' / ' + w.goal,
+          mark: fmtInt(w.current) + ' / ' + fmtInt(w.goal),
           cur: w._id === curId,
+          pct: w.goal > 0 ? Math.min(100, Math.round((w.current / w.goal) * 100)) : 0,
         }))
     } catch {
       rows = []
@@ -979,6 +1082,9 @@ Page({
     this._celebrateId = id
     this._wishId = null
     this.stopAuto()
+    // 圆满这一下要有分量：钟钵一声，长震一下
+    playBell(this.data.soundOn)
+    vibrateLong(this.data.vibrateOn)
     if (this.data.sessionDone) {
       // 敲满念珠的同一下圆满了心愿：先庆圆满，小结等会儿再给
       this._pendingDone = this.data.sessionDone
@@ -1067,7 +1173,7 @@ Page({
     ensureBell()
     this.setData({
       sessionSheetOn: true,
-      sessionOptions: sessionOptions(),
+      sessionGroups: sessionGroups(),
       planOptions: planOptions(this.data.premium),
     })
     this.drawLessonTitle()
@@ -1234,7 +1340,7 @@ Page({
     }
     const ring = () => {
       playBell(this.data.soundOn)
-      vibrate(this.data.vibrateOn)
+      vibrateLong(this.data.vibrateOn)
       this.showSessionDone(info)
     }
     if (!plan) {
@@ -1316,6 +1422,15 @@ Page({
         this.restoreScene()
       },
     })
+  },
+
+  onShareAppMessage() {
+    const isWish = getApp<IAppOption>().globalData.knockMode === 'wish'
+    return { title: shareTitleOf(this.data.lessonTitle, isWish), path: '/pages/gate/index' }
+  },
+
+  onShareTimeline() {
+    return { title: '小叩木鱼 · 轻叩一声，万缘放下' }
   },
 
   noop() {},
