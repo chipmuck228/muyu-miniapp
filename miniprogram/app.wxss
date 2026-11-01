@@ -174,14 +174,14 @@ page {
   border: 1rpx solid rgba(224, 181, 119, 0.35);
 }
 .status-chip.completed {
-  color: #9fe0b0;
-  background: rgba(120, 220, 150, 0.10);
-  border: 1rpx solid rgba(120, 220, 150, 0.35);
+  color: #1b130c;
+  background: linear-gradient(135deg, #f0cf8e, #d9a866);
+  border: 1rpx solid transparent;
 }
 .status-chip.fulfilled {
-  color: rgba(240, 230, 216, 0.6);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1rpx solid rgba(255, 255, 255, 0.16);
+  color: #e9a08c;
+  background: rgba(196, 72, 56, 0.14);
+  border: 1rpx solid rgba(196, 72, 56, 0.5);
 }
 
 /* 进度条 */

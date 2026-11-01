@@ -54,7 +54,7 @@ export const CHANTS: string[] = ['静心', '专注', '一步', '加油', '心愿
 
 export const STATUS_TEXT: Record<string, string> = {
   ongoing: '进行中',
-  completed: '已成',
+  completed: '已圆满',
   fulfilled: '已了结',
 }
 

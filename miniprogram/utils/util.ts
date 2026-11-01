@@ -66,6 +66,14 @@ export function fmtFullCN(dateStr: string): string {
   return y + '年' + m + '月' + d + '日'
 }
 
+const WEEKDAY_CN = ['日', '一', '二', '三', '四', '五', '六']
+
+/** '2026-09-07' -> '周一' */
+export function weekdayCN(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  return '周' + WEEKDAY_CN[d.getDay()]
+}
+
 /** 周一为 0 的星期索引 */
 export function weekdayMon0(dateStr: string): number {
   const d = new Date(dateStr + 'T00:00:00')
