@@ -8,5 +8,4 @@
     <view class="puff p3"></view>
     <view class="puff p4"></view>
   </view>
-  <text class="smoke-rev">{{smokeRev}}</text>
 </view>

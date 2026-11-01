@@ -68,10 +68,10 @@ function publicWish(w) {
   return stripPaper(w)
 }
 
+// 进行中的心愿也给缩略图：香案背景随进度从雾里慢慢显出它，圆满时完全清楚。原图仍只在圆满后给
 async function publicWishDetail(cloud, w) {
   if (!w) return w
   const out = stripPaper(w)
-  if (!isDone(w.status)) return out
   const files = filesOf(w.paperId)
   out.thumbUrl = await signUrl(cloud, files.thumbFileId)
   return out

@@ -8,36 +8,66 @@
     <view class="wing-body">
       <block wx:if="{{hasCert && cert}}">
         <view class="congrats">
-          <text class="cong-title">心愿已成</text>
-          <text class="cong-sub">{{cert.name}}</text>
+          <text class="cong-title">已得证书 {{certs.length}} 张</text>
         </view>
-        <view class="cert-list" wx:if="{{certs.length > 1}}">
-          <text
-            wx:for="{{certs}}"
-            wx:key="_id"
-            class="cert-name {{cert._id === item._id ? 'on' : ''}}"
-            hover-class="hover-dim"
-            data-id="{{item._id}}"
-            bindtap="pickCert"
-          >{{item.name}}</text>
-        </view>
+        <scroll-view
+          wx:if="{{certs.length > 1}}"
+          class="cert-tabs"
+          scroll-x
+          enhanced
+          show-scrollbar="{{false}}"
+          scroll-with-animation
+          scroll-into-view="{{'tab-' + cert._id}}"
+        >
+          <view class="cert-tabs-inner">
+            <view
+              wx:for="{{certs}}"
+              wx:key="_id"
+              id="tab-{{item._id}}"
+              class="cert-tab {{cert._id === item._id ? 'on' : ''}}"
+              hover-class="hover-dim"
+              data-id="{{item._id}}"
+              bindtap="pickCert"
+            >
+              <text class="tab-name">{{item.name}}</text>
+              <text class="tab-date">{{item.chip}}</text>
+            </view>
+          </view>
+        </scroll-view>
 
         <view class="paper-frame">
-          <view class="paper-placeholder" wx:if="{{!certPath}}"></view>
-          <image wx:else class="paper-img" src="{{certPath}}" mode="widthFix"></image>
+          <view class="paper-placeholder" wx:if="{{!certPath}}">
+            <text class="ph-text">正在落款…</text>
+          </view>
+          <image wx:else class="paper-img" src="{{certPath}}" mode="widthFix" show-menu-by-longpress></image>
         </view>
 
         <view class="actions">
-          <text class="act" hover-class="hover-dim" bindtap="saveAlbum">保存相册</text>
-          <text class="act" hover-class="hover-dim" bindtap="shareCert">转发</text>
+          <view class="act primary" hover-class="act-hover" bindtap="saveAlbum">保存相册</view>
+          <view class="act" hover-class="act-hover" bindtap="shareCert">分享</view>
         </view>
-        <text class="tip">长按亦可截取</text>
+        <text class="tip">长按证书也可发给朋友</text>
       </block>
 
       <block wx:else>
         <view class="empty" wx:if="{{!loading}}">
-          <text class="empty-title">待心愿完成</text>
+          <view class="ghost-paper">
+            <view class="gp-line w40"></view>
+            <view class="gp-line w70"></view>
+            <view class="gp-line w50"></view>
+            <view class="gp-seal"></view>
+          </view>
+          <text class="empty-title">待心愿圆满</text>
           <text class="empty-sub">专注既满，证书自现</text>
+          <view wx:if="{{near}}" class="near" hover-class="hover-dim" bindtap="goNear">
+            <view class="near-top">
+              <text class="near-name">{{near.name}}</text>
+              <text class="near-pct mono-num">{{near.percent}}%</text>
+            </view>
+            <view class="near-bar"><view class="near-fill" style="width: {{near.percent}}%;"></view></view>
+            <text class="near-sub">离圆满最近 · 还差 {{near.left}} 叩，回堂敲击 ›</text>
+          </view>
+          <view wx:else class="near-go" hover-class="hover-dim" bindtap="goNear">立一个心愿</view>
         </view>
       </block>
     </view>

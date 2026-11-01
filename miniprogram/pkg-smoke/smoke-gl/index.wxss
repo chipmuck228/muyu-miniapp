@@ -61,14 +61,6 @@
   background: radial-gradient(circle, #ff8a3d 0%, rgba(120, 40, 0, 0) 70%);
 }
 .theme-dusk .puff { background: rgba(232, 186, 160, 0.55); }
-.smoke-rev {
-  position: absolute;
-  left: 16rpx;
-  top: 88rpx;
-  z-index: 8;
-  font-size: 22rpx;
-  color: rgba(224, 181, 119, 0.55);
-}
 @keyframes ember-breathe {
   0%, 100% { opacity: 0.65; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.18); }

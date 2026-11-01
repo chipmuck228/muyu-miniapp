@@ -6,6 +6,8 @@
         wx:for="{{links}}"
         wx:key="index"
         class="exit-item {{current === item.index ? 'current' : ''}}"
+        aria-role="link"
+        aria-label="{{item.name}}"
         hover-class="{{current === item.index ? '' : 'exit-hover'}}"
         data-index="{{item.index}}"
         data-url="{{item.url}}"

@@ -1,23 +1,37 @@
 <!-- 立 / 改心愿 -->
 <view class="page wing-page form-page">
   <view class="wing-head has-kicker" style="padding-top: {{statusBarHeight}}px;">
-    <text class="wing-kicker" hover-class="hover-dim" bindtap="doCancel">返回</text>
+    <view class="wing-kicker" hover-class="hover-dim" bindtap="doCancel">‹ 返回</view>
     <text class="wing-title">{{isEdit ? '改 愿' : '立 愿'}}</text>
     <text class="wing-kicker ghost"></text>
   </view>
 
   <scroll-view class="wing-scroll" scroll-y enhanced show-scrollbar="{{false}}">
-    <view class="wing-body">
+    <view class="wing-body form-body">
       <view class="field">
-        <text class="field-label">心愿</text>
+        <view class="field-head">
+          <text class="field-label">心愿</text>
+          <text class="field-count {{nameLen >= nameMax ? 'full' : ''}}">{{nameLen}} / {{nameMax}}</text>
+        </view>
         <input
-          class="field-input"
+          class="field-input name-input"
           value="{{name}}"
           placeholder="默念所求，最多二十字"
           placeholder-class="ph"
           maxlength="20"
+          confirm-type="next"
           bindinput="onNameInput"
         />
+        <view wx:if="{{!isEdit}}" class="ideas">
+          <text
+            wx:for="{{ideas}}"
+            wx:key="*this"
+            class="idea {{name === item ? 'on' : ''}}"
+            hover-class="idea-hover"
+            data-name="{{item}}"
+            bindtap="onIdea"
+          >{{item}}</text>
+        </view>
       </view>
 
       <view class="field">
@@ -27,37 +41,56 @@
             wx:for="{{goalOptions}}"
             wx:key="value"
             class="goal-opt {{selectedGoal === item.value ? 'on' : ''}}"
+            hover-class="goal-hover"
             data-value="{{item.value}}"
             bindtap="onPickPreset"
           >{{item.label}}</view>
+          <view class="goal-opt custom {{customGoal ? 'on' : ''}}">
+            <input
+              class="custom-input"
+              type="number"
+              value="{{customGoal}}"
+              placeholder="自定"
+              placeholder-class="ph"
+              maxlength="6"
+              bindinput="onCustomInput"
+            />
+          </view>
         </view>
-        <input
-          class="field-input"
-          type="digit"
-          value="{{customGoal}}"
-          placeholder="或自定其数"
-          placeholder-class="ph"
-          bindinput="onCustomInput"
-        />
+        <text class="estimate" wx:if="{{estimate}}">{{estimate}}</text>
       </view>
 
       <view class="field">
-        <text class="field-label">期限</text>
+        <view class="field-head">
+          <text class="field-label">期限</text>
+          <text class="field-count">可不设</text>
+        </view>
         <picker mode="date" value="{{deadline}}" start="{{minDate}}" bindchange="onPickDeadline">
           <view class="deadline-row">
-            <text class="dl-text {{deadline ? '' : 'ph'}}">{{deadline || '未设期限'}}</text>
+            <text class="dl-text {{deadline ? '' : 'ph'}}">{{deadlineText || '未设期限'}}</text>
+            <text class="dl-due" wx:if="{{deadlineDue}}">{{deadlineDue}}</text>
             <text class="dl-clear" wx:if="{{deadline}}" catchtap="clearDeadline">清除</text>
           </view>
         </picker>
+        <view class="due-quick">
+          <text
+            wx:for="{{dueQuick}}"
+            wx:key="days"
+            class="idea"
+            hover-class="idea-hover"
+            data-days="{{item.days}}"
+            bindtap="onDueQuick"
+          >{{item.label}}</text>
+        </view>
       </view>
 
       <text class="form-hint" wx:if="{{!isEdit}}">完成后另有惊喜</text>
       <view
-        class="submit {{submitting ? 'off' : ''}}"
-        hover-class="hover-dim"
+        class="submit {{canSubmit ? '' : 'idle'}} {{submitting ? 'off' : ''}}"
+        hover-class="submit-hover"
         bindtap="doSubmit"
       >{{isEdit ? '保 存' : '立 愿'}}</view>
+      <text wx:if="{{isEdit}}" class="remove" hover-class="hover-dim" bindtap="doRemove">删除这个心愿</text>
     </view>
   </scroll-view>
-
 </view>

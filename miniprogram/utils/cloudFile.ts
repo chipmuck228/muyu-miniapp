@@ -8,12 +8,17 @@ const inflight: Record<string, Promise<string>> = {}
 export const DAWN_FILE_ID =
   'cloud://cloud1-d5gcfyv8v980774aa.636c-cloud1-d5gcfyv8v980774aa-1485006126/assets/home/dawn.png'
 
+/** 本地模拟模式下用包里的这份（上传时不打包） */
+const LOCAL_COPY: Record<string, string> = { [DAWN_FILE_ID]: '/assets/home/dawn.png' }
+
 export function resolveCloudFile(fileID: string): Promise<string> {
   if (!fileID) return Promise.reject(new Error('empty fileID'))
-  // 本地模拟模式没有云存储权限：直接失败，不白等下载超时
-  if (mockEnabled()) return Promise.reject(new Error('mock: no cloud file'))
+  // 本地模拟模式没有云存储权限：有本地副本用副本，没有直接失败，不白等下载超时
+  if (mockEnabled()) {
+    return LOCAL_COPY[fileID] ? Promise.resolve(LOCAL_COPY[fileID]) : Promise.reject(new Error('mock: no cloud file'))
+  }
   if (cache[fileID]) return Promise.resolve(cache[fileID])
-  if (inflight[fileID]) return inflight[fileID]
+  if (fileID in inflight) return inflight[fileID]
   inflight[fileID] = wx.cloud
     .downloadFile({ fileID })
     .then((r) => {

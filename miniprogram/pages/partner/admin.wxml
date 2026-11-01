@@ -1,7 +1,7 @@
 <!-- 渠道管理：申请授权 / 解绑 -->
 <view class="page wing-page partner-page">
   <view class="wing-head has-kicker" style="padding-top: {{statusBarHeight}}px;">
-    <text class="wing-kicker" hover-class="hover-dim" bindtap="goHall">回堂</text>
+    <view class="wing-kicker" hover-class="hover-dim" bindtap="goHall">回堂</view>
     <text class="wing-title">管 理</text>
     <text class="wing-kicker ghost"></text>
   </view>

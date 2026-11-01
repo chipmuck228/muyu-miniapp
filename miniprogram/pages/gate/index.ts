@@ -1,6 +1,7 @@
 // 入堂页：冷启动仪式。轻触随时打断。
 // 首次打开：约 4s 后进香案并弹出「今日功课」面板；之后再打开：只闪一下，直接接着上次的心愿。
 import { applyLesson, loadLesson, LessonPick, RANDOM_LESSON } from '../../utils/lesson'
+import { gateLine } from '../../utils/lunar'
 
 const AUTO_ENTER_MS = 4000
 const RETURN_ENTER_MS = 700
@@ -9,6 +10,10 @@ const LEAVE_FADE_MS = 680
 Page({
   data: {
     leaving: false,
+    /** 农历日子和时辰：丙午年 九月廿三 · 黄昏 */
+    dayLine: '',
+    /** 头一回打开：底下提示轻触进入 */
+    first: false,
   },
 
   _timer: 0,
@@ -17,6 +22,7 @@ Page({
 
   onLoad() {
     this._last = loadLesson()
+    this.setData({ dayLine: gateLine(new Date()), first: !this._last })
     this._timer = setTimeout(() => {
       this.enterHall()
     }, this._last ? RETURN_ENTER_MS : AUTO_ENTER_MS)

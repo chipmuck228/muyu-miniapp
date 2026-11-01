@@ -1,50 +1,91 @@
 <!-- 心愿详情：侧殿里的一纸，叩击回堂 -->
 <view class="page wing-page detail-page">
+  <!-- 顶栏右端在微信右上角胶囊下面，点不到：只放返回，改愿放到进度那一行 -->
   <view class="wing-head has-kicker" style="padding-top: {{statusBarHeight}}px;">
-    <text class="wing-kicker" hover-class="hover-dim" bindtap="goBack">返回</text>
+    <view class="wing-kicker" hover-class="hover-dim" bindtap="goBack">‹ 返回</view>
     <text class="wing-title slim">{{wish ? wish.name : ''}}</text>
-    <text
-      class="wing-kicker {{canEdit ? '' : 'ghost'}}"
-      hover-class="hover-dim"
-      bindtap="goEdit"
-    >改愿</text>
+    <view class="wing-kicker ghost"></view>
   </view>
 
   <scroll-view wx:if="{{!loading && wish}}" class="wing-scroll" scroll-y enhanced show-scrollbar="{{false}}">
     <view class="wing-body detail-body">
-      <text class="status-word">{{wish.statusText}}</text>
-      <text class="status-date" wx:if="{{wish.status === 'completed' && wish.completedDate}}">已成于 {{wish.completedDate}}</text>
-      <text class="status-date" wx:elif="{{wish.status === 'fulfilled' && wish.fulfilledDate}}">已了结于 {{wish.fulfilledDate}}</text>
+      <!-- 进度 -->
+      <view class="hero">
+        <view class="hero-top">
+          <text class="status-chip {{wish.statusCls}}">{{wish.statusText}}</text>
+          <text class="status-date" wx:if="{{wish.status === 'completed' && wish.completedDate}}">圆满于 {{wish.completedText}}</text>
+          <text class="status-date" wx:elif="{{wish.status === 'fulfilled' && wish.fulfilledDate}}">了结于 {{wish.fulfilledText}}</text>
+          <text wx:elif="{{wish.due}}" class="due-chip {{wish.late ? 'late' : ''}}">{{wish.due}}</text>
+          <view wx:if="{{canEdit}}" class="hero-edit" hover-class="hero-edit-hover" bindtap="goEdit">改愿</view>
+        </view>
+        <view class="hero-nums">
+          <text class="hero-pct mono-num">{{wish.percent}}</text>
+          <text class="hero-pct-sign">%</text>
+          <view class="hero-right">
+            <text class="num-cur mono-num">{{wish.currentText}}</text>
+            <text class="num-goal mono-num"> / {{wish.goalText}}</text>
+          </view>
+        </view>
+        <view class="hero-bar">
+          <view class="hero-fill" style="width: {{wish.percent}}%;"></view>
+        </view>
+        <text class="source-line" wx:if="{{wish.sourceText}}">{{wish.sourceText}}</text>
+        <text class="pace" wx:if="{{pace}}">{{pace}}</text>
+      </view>
 
-      <view class="reveal" wx:if="{{revealed}}">
-        <image
-          wx:if="{{thumbUrl}}"
-          class="reveal-img {{revealOn ? 'on' : ''}}"
-          src="{{thumbUrl}}"
-          mode="aspectFill"
-        />
+      <!-- 专注已满：现实里也成了，就了结它 -->
+      <view wx:if="{{canFulfill}}" class="fulfill" hover-class="fulfill-hover" bindtap="askFulfill">
+        <view class="fulfill-text">
+          <text class="fulfill-title">愿已成真？</text>
+          <text class="fulfill-sub">了结此愿，证书上记下这一天</text>
+        </view>
+        <text class="fulfill-go">了结 ›</text>
+      </view>
+
+      <!-- 惊喜：圆满后显出壁纸；未满时壁纸在雾里，和香案背景一样随进度浮现；没有壁纸时是一枚封着的签 -->
+      <view class="reveal" wx:if="{{revealed && thumbUrl}}">
+        <image class="reveal-img {{revealOn ? 'on' : ''}}" src="{{thumbUrl}}" mode="aspectFill" />
         <text class="reveal-hint">惊喜已启</text>
       </view>
-      <text class="blind-hint" wx:elif="{{wish.status === 'ongoing'}}">完成后另有惊喜</text>
+      <view class="sealed veiled" wx:elif="{{wish.status === 'ongoing' && thumbUrl}}">
+        <view class="veil-pic">
+          <image class="veil-mist" src="{{thumbUrl}}" mode="aspectFill" style="opacity: {{veil.mist}};" />
+          <image class="veil-clear" src="{{thumbUrl}}" mode="aspectFill" style="opacity: {{veil.clear}};" />
+        </view>
+        <view class="sealed-text">
+          <text class="sealed-title">壁纸正在浮现</text>
+          <text class="sealed-sub">已显 {{wish.percent}}% · 敲得越多越清楚</text>
+          <text class="sealed-sub">圆满时完整显出，可存相册</text>
+        </view>
+      </view>
+      <view class="sealed" wx:elif="{{wish.status === 'ongoing'}}">
+        <view class="sealed-mark"><text>启</text></view>
+        <view class="sealed-text">
+          <text class="sealed-title">一份惊喜封存中</text>
+          <text class="sealed-sub">专注圆满时开启</text>
+        </view>
+      </view>
 
-      <view class="wish-line">
-        <view class="wish-fill" style="width: {{wish.percent}}%;"></view>
+      <!-- 统计 -->
+      <view class="stats">
+        <view class="stat" wx:for="{{stats}}" wx:key="label">
+          <view class="stat-val">
+            <text class="mono-num">{{item.value}}</text>
+            <text class="stat-unit">{{item.unit}}</text>
+          </view>
+          <text class="stat-label">{{item.label}}</text>
+        </view>
       </view>
-      <view class="nums">
-        <text class="num-cur mono-num">{{wish.currentText}}</text>
-        <text class="num-slash">/</text>
-        <text class="num-goal mono-num">{{wish.goalText}}</text>
-      </view>
-      <text class="source-line" wx:if="{{wish.sourceText}}">{{wish.sourceText}}</text>
 
       <view class="block">
         <view class="block-head">
           <text class="block-label">近十四日</text>
-          <text class="block-sub" wx:if="{{localToday}}">今日 {{localToday}}</text>
+          <text class="block-sub">{{selBarText || (localToday ? '今日 ' + localToday : '轻触柱子看当天')}}</text>
         </view>
         <view class="chart">
-          <view class="chart-col" wx:for="{{bars}}" wx:key="key">
+          <view class="chart-col {{selBar === item.key ? 'sel' : ''}}" wx:for="{{bars}}" wx:key="key" data-key="{{item.key}}" bindtap="onPickBar">
             <view class="bar-wrap">
+              <text wx:if="{{selBar === item.key || (!selBar && item.tip)}}" class="bar-tip mono-num">{{item.count}}</text>
               <view class="bar {{item.hasValue ? 'val' : ''}} {{item.isToday ? 'today' : ''}}" style="height: {{item.ratio}}%;"></view>
             </view>
             <text class="bar-label {{item.isToday ? 'today' : ''}}">{{item.label}}</text>
@@ -57,17 +98,22 @@
         <block wx:if="{{records.length > 0}}">
           <view class="record-row" wx:for="{{records}}" wx:key="date">
             <text class="record-date">{{item.text}}</text>
-            <text class="record-count mono-num">{{item.count}}</text>
+            <text class="record-week">{{item.week}}</text>
+            <view class="record-bar"><view class="record-fill" style="width: {{item.ratio}}%;"></view></view>
+            <text class="record-count mono-num">{{item.countText}}</text>
           </view>
         </block>
-        <text class="no-record" wx:else>尚未叩击</text>
+        <text class="no-record" wx:else>尚未叩击 · 回堂敲下第一下</text>
       </view>
     </view>
   </scroll-view>
 
-  <view class="foot" wx:if="{{!loading && wish && (canKnock || canSave)}}" style="padding-bottom: {{safeBottom}}px;">
-    <text wx:if="{{canKnock}}" class="foot-act" hover-class="hover-dim" bindtap="goAltar">回堂叩击</text>
-    <text wx:if="{{canSave}}" class="foot-act {{savingPaper ? 'off' : ''}}" hover-class="hover-dim" bindtap="savePaper">存入相册</text>
+  <view class="foot" wx:if="{{!loading && wish}}" style="padding-bottom: {{safeBottom + 12}}px;">
+    <view wx:if="{{canKnock}}" class="foot-btn primary" hover-class="foot-hover" bindtap="goAltar">回堂叩击</view>
+    <block wx:else>
+      <view class="foot-btn primary" hover-class="foot-hover" bindtap="goCert">查看证书</view>
+      <view wx:if="{{canSave}}" class="foot-btn {{savingPaper ? 'off' : ''}}" hover-class="foot-hover" bindtap="savePaper">存壁纸</view>
+    </block>
   </view>
 
   <view wx:if="{{!loading && !wish}}" class="empty">

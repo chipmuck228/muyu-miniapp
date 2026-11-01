@@ -16,6 +16,8 @@ export interface SmokeTint {
 export interface ThemeDef {
   id: ThemeId
   name: string
+  /** 一句话说清这套主题换了什么 */
+  desc: string
   premium: boolean
   /** 静心页的色块预览，取香案背景的天色和光晕色 */
   swatch: [string, string]
@@ -28,6 +30,7 @@ export const THEMES: ThemeDef[] = [
   {
     id: 'dawn',
     name: '晨',
+    desc: '暖金晨光，烟色灰白',
     premium: false,
     swatch: ['#1c140c', '#c88a4a'],
     from: { r: 255, g: 246, b: 230 },
@@ -37,6 +40,7 @@ export const THEMES: ThemeDef[] = [
   {
     id: 'night',
     name: '夜',
+    desc: '月下银蓝，字色清冷',
     premium: true,
     swatch: ['#0c1626', '#6f93c4'],
     from: { r: 206, g: 224, b: 246 },
@@ -46,6 +50,7 @@ export const THEMES: ThemeDef[] = [
   {
     id: 'ink',
     name: '墨',
+    desc: '黑白水墨，只留骨白',
     premium: true,
     swatch: ['#161616', '#a8a49a'],
     from: { r: 236, g: 233, b: 226 },
@@ -55,6 +60,7 @@ export const THEMES: ThemeDef[] = [
   {
     id: 'dusk',
     name: '霞',
+    desc: '落日霞红，烟色也暖',
     premium: true,
     swatch: ['#2a1210', '#e0784a'],
     from: { r: 255, g: 222, b: 198 },

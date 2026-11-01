@@ -12,15 +12,17 @@ export const LEVELS: LevelDef[] = [
   { level: 3, need: 500, title: '日有所进' },
   { level: 4, need: 1000, title: '心愿渐明' },
   { level: 5, need: 3000, title: '专注日深' },
-  { level: 6, need: 8000, title: '自我提升' },
-  { level: 7, need: 20000, title: '心愿管理' },
-  { level: 8, need: 50000, title: '静心有恒' },
-  { level: 9, need: 100000, title: '心愿得所' },
+  { level: 6, need: 8000, title: '心如止水' },
+  { level: 7, need: 20000, title: '持之以恒' },
+  { level: 8, need: 50000, title: '静水流深' },
+  { level: 9, need: 100000, title: '自在从容' },
 ]
 
 export interface LevelInfo {
   level: number
   title: string
+  /** 下一级的称号；满级为空 */
+  nextTitle: string
   curNeed: number
   nextNeed: number
   /** 当前等级内进度 0-1 */
@@ -36,10 +38,10 @@ export function levelOf(totalMerit: number): LevelInfo {
   const cur = LEVELS[idx]
   const next = LEVELS[idx + 1]
   if (!next) {
-    return { level: cur.level, title: cur.title, curNeed: cur.need, nextNeed: cur.need, progress: 1, isMax: true }
+    return { level: cur.level, title: cur.title, nextTitle: '', curNeed: cur.need, nextNeed: cur.need, progress: 1, isMax: true }
   }
   const progress = Math.max(0, Math.min(1, (totalMerit - cur.need) / (next.need - cur.need)))
-  return { level: cur.level, title: cur.title, curNeed: cur.need, nextNeed: next.need, progress, isMax: false }
+  return { level: cur.level, title: cur.title, nextTitle: next.title, curNeed: cur.need, nextNeed: next.need, progress, isMax: false }
 }
 
 /** 心愿目标预设 */
@@ -54,7 +56,7 @@ export const CHANTS: string[] = ['静心', '专注', '一步', '加油', '心愿
 
 export const STATUS_TEXT: Record<string, string> = {
   ongoing: '进行中',
-  completed: '已成',
+  completed: '已圆满',
   fulfilled: '已了结',
 }
 
@@ -67,10 +69,24 @@ export const PAPER_TIERS: { id: string; min: number; max: number }[] = [
   { id: 'ji', min: 5000, max: 1e9 },
 ]
 
-/** 心愿状态：进度条展示百分比封顶 */
+/** 心愿状态：进度条展示百分比封顶；没敲满时最多显示 99，免得 499 / 500 看着像已圆满 */
 export function percentOf(current: number, goal: number): number {
   if (!goal || goal <= 0) return 0
-  return Math.max(0, Math.min(100, Math.round((current / goal) * 100)))
+  const pct = Math.max(0, Math.min(100, Math.round((current / goal) * 100)))
+  return current < goal ? Math.min(99, pct) : pct
+}
+
+/**
+ * 心愿壁纸随进度浮现，t 为 0–1。两层叠着：mist 是糊开的一层，一开始就隐约有一点，前快后慢地浓起来，
+ * 头几十下也看得出变化；clear 是清楚的一层，过了三成才开始显，敲满时正好完全清楚
+ */
+export function paperReveal(t: number): { mist: number; clear: number } {
+  const p = Math.max(0, Math.min(1, t || 0))
+  const x = Math.max(0, Math.min(1, (p - 0.3) / 0.7))
+  return {
+    mist: Number((0.16 + 0.84 * Math.sqrt(p)).toFixed(3)),
+    clear: Number((x * x * (3 - 2 * x)).toFixed(3)),
+  }
 }
 
 /** 心情彩色 */

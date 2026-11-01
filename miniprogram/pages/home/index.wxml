@@ -4,11 +4,19 @@
 
   <block wx:if="{{readyToKnock}}">
     <view class="home-stage">
-      <view class="dawn">
-        <!-- 主题天色：常驻，不随进度变；进度推进时天空图再叠上来 -->
+      <view class="dawn {{pulsing ? 'breathing' : ''}}">
+        <!-- 主题天色：常驻，不随进度变；进度推进时背景图再叠上来 -->
         <view class="theme-sky"></view>
         <view class="theme-glow"></view>
-        <image wx:if="{{dawnSrc}}" class="dawn-paper" src="{{dawnSrc}}" mode="aspectFill" style="opacity: {{dawnSky}};" />
+        <!-- 背景图随进度从雾里浮现：糊开的一层先隐约显出，清楚的一层过了三成才显，敲满时完全清楚；每敲一下雾里亮一下 -->
+        <view wx:if="{{paperSrc}}" class="paper paper-{{paperKind}} {{paperOn ? 'on' : ''}}">
+          <image class="paper-mist" src="{{paperSrc}}" mode="aspectFill" style="opacity: {{paperMist}};" bindload="onPaperLoad" binderror="onPaperError" />
+          <image class="paper-breath" src="{{paperSrc}}" mode="aspectFill" />
+          <image class="paper-clear" src="{{paperSrc}}" mode="aspectFill" style="opacity: {{paperClear}};" />
+          <view class="paper-scrim" style="opacity: {{paperMist}};"></view>
+          <!-- 竖排功课名后面一团淡淡的暗，壁纸中间亮的时候字也看得清 -->
+          <view class="paper-title-veil" style="opacity: {{paperClear}};"></view>
+        </view>
       </view>
       <smoke-gl class="smoke-gl-fill" theme="{{theme}}" fade="{{celebrateOn || sheetOn || sessionSheetOn || sessionDoneOn ? 0 : smokeFade}}" bind:risen="onSmokeRisen" />
 
@@ -24,10 +32,14 @@
         </view>
         <block wx:if="{{headWish && headReady}}">
           <view class="lh-count">
-            <text class="lh-cur">{{headCur}}</text>
-            <text class="lh-goal"> / {{headGoal}}</text>
+            <text class="lh-cur">{{headCurText}}</text>
+            <text class="lh-goal"> / {{headGoalText}}</text>
           </view>
           <view class="lh-bar"><view class="lh-fill" style="width: {{headPct}}%;"></view></view>
+          <view class="lh-meta">
+            <text>今日 {{todayCount}}</text>
+            <text wx:if="{{headDue}}" class="lh-due {{headLate ? 'late' : ''}}">{{headDue}}</text>
+          </view>
         </block>
         <text wx:if="{{switchHint}}" class="lh-hint">{{switchHint}}</text>
       </view>
@@ -42,18 +54,24 @@
           <muyu-gl id="muyu" class="muyu-gl" strike="{{strikeSeq}}" material="{{material}}" paused="{{celebrateOn || sheetOn || sessionSheetOn || sessionDoneOn}}" />
         </view>
         <view
-          class="knock-pad {{pulsing ? 'pulsing' : ''}}"
+          class="knock-pad {{pulsing ? 'pulsing' : ''}} {{knockHint ? 'hinting' : ''}}"
           hover-class="knock-hover"
           hover-stay-time="60"
+          aria-role="button"
+          aria-label="敲木鱼"
           bindtap="onKnockTap"
           bindtouchstart="onPadTouchStart"
           bindtouchmove="onPadTouchMove"
           bindtouchend="onPadTouchEnd"
           bindtouchcancel="onPadTouchEnd"
         >
+          <view class="knock-halo"></view>
+          <view class="knock-glow {{rippleOn ? 'on' : ''}}"></view>
           <view class="ripple-ring {{rippleOn ? 'on' : ''}}"></view>
+          <view class="ripple-ring r2 {{rippleOn ? 'on' : ''}}"></view>
         </view>
-        <!-- 木鱼材质：紫檀 / 黄花梨 / 琉璃 / 玉 -->
+        <text class="knock-hint" wx:if="{{knockHint}}">轻 触 木 鱼</text>
+        <!-- 木鱼材质：紫檀 / 黄花梨 / 琉璃 / 玉；换了以后名字在色点旁亮一下 -->
         <view class="mat-dots">
           <view
             wx:for="{{materials}}"
@@ -61,9 +79,13 @@
             class="mat-dot {{material === item.id ? 'on' : ''}}"
             style="background: {{item.dot}};"
             hover-class="mat-dot-hover"
+            aria-role="button"
+            aria-label="{{item.name}}"
             data-id="{{item.id}}"
             catchtap="onPickMaterial"
-          ></view>
+          >
+            <text wx:if="{{material === item.id}}" class="mat-label {{matLabelOn ? 'on' : ''}}">{{matLabel}}</text>
+          </view>
         </view>
         <!-- 右下角：自动敲开关 + 定课入口；定课中换成剩余时间 / 已敲次数，点一下可提前收起 -->
         <view class="side-tools">
@@ -102,6 +124,7 @@
   <!-- 今日功课：底部面板，切换心愿 / 随机专注 / 立新愿 -->
   <view class="sheet-mask" wx:if="{{sheetOn}}" catchtouchmove="noop" bindtap="closeSheet"></view>
   <view class="lesson-sheet" wx:if="{{sheetOn}}" catchtouchmove="noop">
+    <view class="sheet-grip"></view>
     <view class="sheet-head">
       <view class="sheet-titles">
         <text class="sheet-title">今日功课</text>
@@ -111,23 +134,45 @@
     </view>
     <scroll-view class="sheet-list" scroll-y enhanced show-scrollbar="{{false}}">
       <text class="sheet-loading" wx:if="{{sheetLoading}}">正在取心愿…</text>
+      <text class="sheet-loading" wx:elif="{{sheetFailed && !sheetRows.length}}" hover-class="sheet-hover" bindtap="onSheetRetry">没能取到心愿 · 轻触重试</text>
+      <!-- 还没有心愿：给几个灵感，点了直接去立愿 -->
+      <view class="sheet-ideas" wx:elif="{{!sheetRows.length}}">
+        <text class="sheet-ideas-label">还没有心愿 · 挑一个开始，或随机专注</text>
+        <view class="idea-row">
+          <text
+            wx:for="{{ideas}}"
+            wx:key="*this"
+            class="chip"
+            hover-class="chip-hover"
+            data-name="{{item}}"
+            bindtap="onSheetIdea"
+          >{{item}}</text>
+        </view>
+      </view>
       <view
         wx:for="{{sheetRows}}"
         wx:key="_id"
-        class="sheet-row {{item.cur ? 'cur' : ''}}"
+        class="sheet-row has-bar {{item.cur ? 'cur' : ''}}"
         hover-class="sheet-hover"
         data-id="{{item._id}}"
         bindtap="onSheetPick"
       >
-        <text class="sheet-name">{{item.name}}</text>
-        <text class="sheet-mark">{{item.cur ? '当前 · ' : ''}}{{item.mark}}</text>
+        <view class="sheet-line">
+          <text class="sheet-name">{{item.name}}</text>
+          <text class="sheet-mark">{{item.cur ? '当前 · ' : ''}}{{item.mark}}</text>
+        </view>
+        <view class="sheet-bar"><view class="sheet-bar-fill" style="width: {{item.pct}}%;"></view></view>
       </view>
       <view class="sheet-row {{sheetRandomCur ? 'cur' : ''}}" hover-class="sheet-hover" bindtap="onSheetRandom">
-        <text class="sheet-name">随机专注</text>
-        <text class="sheet-mark">{{sheetRandomCur ? '当前 · ' : ''}}不记心愿，随缘叩击</text>
+        <view class="sheet-line">
+          <text class="sheet-name">随机专注</text>
+          <text class="sheet-mark">{{sheetRandomCur ? '当前 · ' : ''}}不记心愿，随缘叩击</text>
+        </view>
       </view>
       <view class="sheet-row sheet-new" hover-class="sheet-hover" bindtap="onSheetNew">
-        <text class="sheet-name">＋ 立新愿</text>
+        <view class="sheet-line">
+          <text class="sheet-name">＋ 立新愿</text>
+        </view>
       </view>
     </scroll-view>
   </view>
@@ -135,6 +180,7 @@
   <!-- 定课：成品定课 + 一炷香定时 / 一串念珠定数，选了就开始 -->
   <view class="sheet-mask" wx:if="{{sessionSheetOn}}" catchtouchmove="noop" bindtap="closeSessionSheet"></view>
   <view class="lesson-sheet" wx:if="{{sessionSheetOn}}" catchtouchmove="noop">
+    <view class="sheet-grip"></view>
     <view class="sheet-head">
       <view class="sheet-titles">
         <text class="sheet-title">定课</text>
@@ -147,26 +193,37 @@
       <view
         wx:for="{{planOptions}}"
         wx:key="id"
-        class="sheet-row {{item.locked ? 'locked' : ''}}"
+        class="sheet-row plan-row plan-{{item.id}} {{item.locked ? 'locked' : ''}}"
         hover-class="sheet-hover"
         data-id="{{item.id}}"
         bindtap="onPickPlan"
       >
-        <text class="sheet-name">{{item.name}}</text>
-        <text class="sheet-mark">{{item.mark}}</text>
+        <view class="plan-mark"></view>
+        <view class="plan-text">
+          <view class="sheet-line">
+            <text class="sheet-name">{{item.name}}</text>
+            <text wx:if="{{item.tag}}" class="plan-tag">{{item.tag}}</text>
+          </view>
+          <text class="plan-sub">{{item.mark}}</text>
+        </view>
       </view>
       <text class="sheet-section">自己敲</text>
-      <view
-        wx:for="{{sessionOptions}}"
-        wx:key="name"
-        class="sheet-row"
-        hover-class="sheet-hover"
-        data-kind="{{item.kind}}"
-        data-value="{{item.value}}"
-        bindtap="onPickSession"
-      >
-        <text class="sheet-name">{{item.name}}</text>
-        <text class="sheet-mark">{{item.mark}}</text>
+      <view wx:for="{{sessionGroups}}" wx:for-item="group" wx:key="kind" class="sheet-row self-row">
+        <view class="self-head">
+          <text class="sheet-name">{{group.name}}</text>
+          <text class="plan-sub">{{group.mark}}</text>
+        </view>
+        <view class="chip-row">
+          <text
+            wx:for="{{group.options}}"
+            wx:key="value"
+            class="chip"
+            hover-class="chip-hover"
+            data-kind="{{item.kind}}"
+            data-value="{{item.value}}"
+            bindtap="onPickSession"
+          >{{item.label}}</text>
+        </view>
       </view>
     </scroll-view>
     <text class="incense-rule">手敲、自动都算数。离开香案时暂停，回来接着走；提前收起，已敲的照样计入。</text>
@@ -174,7 +231,8 @@
 
   <!-- 定课结束：钟钵一声后的小结 -->
   <view class="celebrate-mask" wx:if="{{sessionDoneOn && sessionDone}}" catchtouchmove="noop">
-    <view class="celebrate-card">
+    <view class="celebrate-card done-card">
+      <view class="bell-mark"><view class="bell-ring"></view></view>
       <text class="cel-kicker">{{sessionDone.title}}</text>
       <text class="cel-name">{{sessionDone.line}}</text>
       <text wx:if="{{sessionDone.detail}}" class="cel-goal">{{sessionDone.detail}}</text>
@@ -190,10 +248,19 @@
 
   <!-- 心愿圆满 -->
   <view class="celebrate-mask" wx:if="{{celebrateOn && celebrate}}" catchtouchmove="noop">
-    <view class="celebrate-card">
+    <view class="petals">
+      <view wx:for="{{[0,1,2,3,4,5,6,7,8,9,10,11]}}" wx:key="*this" class="petal p{{item}}"></view>
+    </view>
+    <view class="celebrate-card wish-card">
+      <view class="cel-halo"></view>
+      <view class="cel-lotus">
+        <view class="cl-petal l"></view>
+        <view class="cl-petal r"></view>
+        <view class="cl-petal m"></view>
+      </view>
       <text class="cel-kicker">心愿圆满</text>
       <text class="cel-name">{{celebrate.name}}</text>
-      <text class="cel-goal">专注 {{celebrate.goalText}}</text>
+      <text class="cel-goal">{{celebrate.goalText}}</text>
       <image wx:if="{{celebrate.thumbUrl}}" class="cel-thumb" src="{{celebrate.thumbUrl}}" mode="aspectFill" />
       <text wx:if="{{celebrate.thumbUrl}}" class="cel-hint">惊喜已启 · 可在心愿详情存入相册</text>
       <text wx:if="{{celebrate.nextText}}" class="cel-next">{{celebrate.nextText}}</text>

@@ -4,6 +4,8 @@
  * 字体栈：优先系统默认 PingFang SC
  */
 page {
+  /* 标题用宋体，像经折上的字；没有宋体的机型退回系统字 */
+  --serif: 'Songti SC', 'STSong', 'Noto Serif CJK SC', 'Source Han Serif SC', 'Noto Serif SC', serif;
   background: #16110d;
   color: #f0e6d8;
   font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', 'Microsoft YaHei', sans-serif;
@@ -44,17 +46,25 @@ page {
   justify-content: space-between;
 }
 .wing-title {
+  font-family: var(--serif);
   font-size: 44rpx;
   letter-spacing: 16rpx;
   padding-right: 16rpx;
   color: rgba(243, 234, 220, 0.92);
   font-weight: 600;
 }
+/* 顶栏左右的文字按钮：字小，点按区域上下各放出 24rpx，约 46px 高 */
 .wing-kicker {
-  width: 88rpx;
+  width: 140rpx;
+  padding: 24rpx 0;
+  margin: -24rpx 0;
   font-size: 28rpx;
   letter-spacing: 4rpx;
-  color: rgba(224, 181, 119, 0.55);
+  white-space: nowrap;
+  color: rgba(224, 181, 119, 0.65);
+}
+.wing-kicker:last-child {
+  text-align: right;
 }
 .wing-kicker.ghost {
   visibility: hidden;
@@ -62,6 +72,9 @@ page {
 .wing-scroll {
   flex: 1;
   min-height: 0;
+  /* 上下边缘淡出：列表滑到标题和底部导航下面时不是一刀切 */
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 28rpx, #000 calc(100% - 56rpx), transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 28rpx, #000 calc(100% - 56rpx), transparent 100%);
 }
 .wing-body {
   padding: 8rpx 40rpx calc(280rpx + env(safe-area-inset-bottom));
@@ -167,14 +180,14 @@ page {
   border: 1rpx solid rgba(224, 181, 119, 0.35);
 }
 .status-chip.completed {
-  color: #9fe0b0;
-  background: rgba(120, 220, 150, 0.10);
-  border: 1rpx solid rgba(120, 220, 150, 0.35);
+  color: #1b130c;
+  background: linear-gradient(135deg, #f0cf8e, #d9a866);
+  border: 1rpx solid transparent;
 }
 .status-chip.fulfilled {
-  color: rgba(240, 230, 216, 0.6);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1rpx solid rgba(255, 255, 255, 0.16);
+  color: #e9a08c;
+  background: rgba(196, 72, 56, 0.14);
+  border: 1rpx solid rgba(196, 72, 56, 0.5);
 }
 
 /* 进度条 */

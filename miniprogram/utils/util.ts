@@ -66,6 +66,35 @@ export function fmtFullCN(dateStr: string): string {
   return y + '年' + m + '月' + d + '日'
 }
 
+const WEEKDAY_CN = ['日', '一', '二', '三', '四', '五', '六']
+
+/** '2026-09-07' -> '周一' */
+export function weekdayCN(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  return '周' + WEEKDAY_CN[d.getDay()]
+}
+
+const CN_DIGIT = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九']
+
+function cnSmall(n: number): string {
+  if (n <= 10) return n === 10 ? '十' : CN_DIGIT[n]
+  if (n < 20) return '十' + CN_DIGIT[n - 10]
+  const t = Math.floor(n / 10)
+  const u = n % 10
+  return CN_DIGIT[t] + '十' + (u ? CN_DIGIT[u] : '')
+}
+
+/** '2026-10-20' -> '二〇二六年十月二十日'，证书落款用 */
+export function cnDate(dateStr: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return ''
+  const y = dateStr
+    .slice(0, 4)
+    .split('')
+    .map((c) => CN_DIGIT[Number(c)])
+    .join('')
+  return y + '年' + cnSmall(parseInt(dateStr.slice(5, 7), 10)) + '月' + cnSmall(parseInt(dateStr.slice(8, 10), 10)) + '日'
+}
+
 /** 周一为 0 的星期索引 */
 export function weekdayMon0(dateStr: string): number {
   const d = new Date(dateStr + 'T00:00:00')
@@ -77,6 +106,15 @@ export function diffToday(dateStr: string): number {
   const a = new Date(todayStr() + 'T00:00:00').getTime()
   const b = new Date(dateStr + 'T00:00:00').getTime()
   return Math.round((b - a) / 86400000)
+}
+
+/** 期限的说法：还剩 N 天 / 今日截止 / 已过期限 N 天。没设期限返回空串 */
+export function dueText(deadline?: string | null): { text: string; late: boolean } {
+  if (!deadline || !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) return { text: '', late: false }
+  const n = diffToday(deadline)
+  if (n > 0) return { text: '还剩 ' + n + ' 天', late: false }
+  if (n === 0) return { text: '今日截止', late: false }
+  return { text: '已过期限 ' + -n + ' 天', late: true }
 }
 
 export function safeBottomPx(): number {

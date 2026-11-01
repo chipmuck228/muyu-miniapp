@@ -90,6 +90,19 @@ export function settingsOf(u?: UserRecord | null): UserSettings {
   }
 }
 
+/** 上次从云端拿到的用户设置（登录、香案、静心页都会刷新）；没有就是默认值 */
+export function cachedSettings(): UserSettings {
+  const app = getApp<IAppOption>()
+  return settingsOf(app && app.globalData ? app.globalData.user : null)
+}
+
+/** 记下云端最新的用户，别的页面读设置时用 */
+export function rememberUser(u: UserRecord | null | undefined) {
+  if (!u) return
+  const app = getApp<IAppOption>()
+  if (app && app.globalData) app.globalData.user = u
+}
+
 type CloudResult<T> = { ok: boolean; msg?: string; code?: string } & T
 
 function callCloud<T>(name: string, data: Record<string, any> = {}): Promise<CloudResult<T>> {
@@ -148,8 +161,23 @@ export interface HitResp {
   wish: Wish | null
 }
 
-export function hitKnock(wishId: string | null, by: { hand: number; auto: number }): Promise<HitResp> {
-  return callCloud<HitResp>('hit', { wishId: wishId || '', n: by.hand + by.auto, by, date: todayStrLocal() })
+/**
+ * batchId：这批敲击的号。网络超时后重传同一个号，云端已记过就只回当前数，不会记两遍。
+ * date：这批敲下的那天，重传跨了零点也记在原来那天
+ */
+export function hitKnock(
+  wishId: string | null,
+  by: { hand: number; auto: number },
+  batchId = '',
+  date = ''
+): Promise<HitResp> {
+  return callCloud<HitResp>('hit', {
+    wishId: wishId || '',
+    n: by.hand + by.auto,
+    by,
+    batchId,
+    date: date || todayStrLocal(),
+  })
 }
 
 export function createWish(name: string, goal: number, deadline: string | null): Promise<{ wishId: string }> {
@@ -203,6 +231,11 @@ export function confirmPremiumPay(outTradeNo: string): Promise<{ premium: boolea
 // 退款复核：商户平台退款后，微信侧订单会变成 REFUND，这里确认是否要收回权益
 export function verifyPremium(): Promise<{ premium: boolean; refunded: boolean }> {
   return callCloud('wxpay', { action: 'verify' })
+}
+
+/** 静心包价格（分），只读配置，不下单 */
+export function fetchPremiumPrice(): Promise<{ price: number }> {
+  return callCloud('wxpay', { action: 'price' })
 }
 
 export function normalizeChannelScene(raw: string): string {

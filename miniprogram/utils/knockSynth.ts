@@ -121,13 +121,14 @@ function bufferOf(key: string, render: (rate: number) => Float32Array): any {
   }
 }
 
-function play(buffer: any, volume: number) {
+function play(buffer: any, volume: number, speed = 1) {
   const a = audio
   if (!a || !buffer) return
   try {
     if (a.state === 'suspended' && typeof a.resume === 'function') a.resume()
     const src = a.createBufferSource()
     src.buffer = buffer
+    if (speed !== 1 && src.playbackRate) src.playbackRate.value = speed
     const gain = a.createGain()
     gain.gain.value = volume
     src.connect(gain)
@@ -147,8 +148,9 @@ export function prepareSynthKnock(pitch: number, hardness: number) {
   knockBuffer(pitch, hardness)
 }
 
-export function playSynthKnock(pitch: number, hardness: number, volume: number) {
-  play(knockBuffer(pitch, hardness), volume)
+/** speed：每一下微微变一点快慢（音高跟着动），连敲时不像同一个采样在复读 */
+export function playSynthKnock(pitch: number, hardness: number, volume: number, speed = 1) {
+  play(knockBuffer(pitch, hardness), volume, speed)
 }
 
 export function prepareSynthBell() {

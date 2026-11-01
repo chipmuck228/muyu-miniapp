@@ -77,7 +77,8 @@
 }
 
 .exit-item.current {
-  color: #e8c98a;
+  color: #f0cf8e;
+  text-shadow: 0 0 16rpx rgba(240, 207, 142, 0.45);
 }
 
 .exit-hover {

@@ -24,14 +24,14 @@ export const AUDIO_FILES: Record<
   fire: '',
 }
 
-export const AMBIENCE_OPTIONS: { id: AmbienceId; name: string; premium?: boolean }[] = [
-  { id: 'off', name: '无' },
-  { id: 'rain', name: '雨声' },
-  { id: 'bowl', name: '钟钵' },
-  { id: 'noise', name: '白噪', premium: true },
-  { id: 'stream', name: '溪流', premium: true },
-  { id: 'pine', name: '松风', premium: true },
-  { id: 'fire', name: '炉火', premium: true },
+export const AMBIENCE_OPTIONS: { id: AmbienceId; name: string; desc: string; premium?: boolean }[] = [
+  { id: 'off', name: '无', desc: '只有木鱼声' },
+  { id: 'rain', name: '雨声', desc: '窗外的雨' },
+  { id: 'bowl', name: '钟钵', desc: '隔一会儿一声钵响' },
+  { id: 'noise', name: '白噪', desc: '均匀的沙沙声，盖住杂音', premium: true },
+  { id: 'stream', name: '溪流', desc: '山涧流水', premium: true },
+  { id: 'pine', name: '松风', desc: '风过松林', premium: true },
+  { id: 'fire', name: '炉火', desc: '炉里柴火轻响', premium: true },
 ]
 
 const PREMIUM_AMBIENCE: Record<string, 1> = { noise: 1, stream: 1, pine: 1, fire: 1 }

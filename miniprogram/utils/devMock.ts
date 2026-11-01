@@ -65,6 +65,8 @@ interface MockDb {
   refundPending?: boolean
   /** 已放入过试壁纸心愿 */
   paperTests?: boolean
+  /** 最近记过的敲击批号，和云端一样去重 */
+  batches?: string[]
 }
 
 let enabled: boolean | null = null
@@ -333,7 +335,8 @@ function handle(name: string, data: any): any {
       const w = db.wishes.find((x) => x._id === (data && data.wishId))
       if (!w) return fail('心愿不存在')
       const out = publicWish(w)
-      if (isDone(w)) out.thumbUrl = PAPER_DIR + w.paperId + '-thumb.jpg'
+      // 进行中的也给：香案背景随进度从雾里显出它
+      if (w.paperId) out.thumbUrl = PAPER_DIR + w.paperId + '-thumb.jpg'
       return { ok: true, wish: out }
     }
     if (action === 'profile') {
@@ -387,6 +390,15 @@ function handle(name: string, data: any): any {
       }
       const rawN = parseInt(data && data.n, 10)
       const n = by ? by.hand + by.auto : Math.max(1, Math.min(999, isNaN(rawN) ? 1 : rawN))
+      const batchId = data && typeof data.batchId === 'string' ? data.batchId : ''
+      const seen = (db.batches = db.batches || [])
+      if (batchId && seen.indexOf(batchId) >= 0) {
+        return { ok: true, duplicate: true, totalMerit: db.user.totalMerit, todayCount: db.daily[today] || 0, wish: null }
+      }
+      if (batchId) {
+        seen.push(batchId)
+        if (seen.length > 30) seen.splice(0, seen.length - 30)
+      }
       return Object.assign({ ok: true }, credit((data && data.wishId) || null, n, by))
     }
     return fail('未知操作')
@@ -501,6 +513,7 @@ function handle(name: string, data: any): any {
       }
       return { ok: true, premium: db.user.premium === true }
     }
+    if (action === 'price') return { ok: true, price: PREMIUM_PRICE }
     if (action === 'verify') {
       if (db.refundPending && db.user.premium === true) {
         db.user.premium = false
