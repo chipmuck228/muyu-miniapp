@@ -237,7 +237,7 @@
       </view>
       <text class="cel-kicker">心愿圆满</text>
       <text class="cel-name">{{celebrate.name}}</text>
-      <text class="cel-goal">专注 {{celebrate.goalText}}</text>
+      <text class="cel-goal">{{celebrate.goalText}}</text>
       <image wx:if="{{celebrate.thumbUrl}}" class="cel-thumb" src="{{celebrate.thumbUrl}}" mode="aspectFill" />
       <text wx:if="{{celebrate.thumbUrl}}" class="cel-hint">惊喜已启 · 可在心愿详情存入相册</text>
       <text wx:if="{{celebrate.nextText}}" class="cel-next">{{celebrate.nextText}}</text>

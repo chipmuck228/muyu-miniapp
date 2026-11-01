@@ -15,5 +15,7 @@
     </view>
     <text class="gate-title">木 鱼</text>
     <text class="gate-sub">轻叩一声 · 万缘放下</text>
+    <text wx:if="{{dayLine}}" class="gate-day">{{dayLine}}</text>
   </view>
+  <text wx:if="{{first}}" class="gate-tap">轻 触 进 入</text>
 </view>

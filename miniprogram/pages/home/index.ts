@@ -20,6 +20,7 @@ import { parseTheme, themeEnds, ThemeId } from '../../utils/theme'
 import { applyLesson, nextLesson, LessonPick, RANDOM_NAME, RANDOM_LESSON } from '../../utils/lesson'
 import { SESSION_PLANS, SessionPlan, PlanId, planOf, triedPlans, markPlanTried } from '../../utils/sessionPlans'
 import { buyPremium, PACK_NAME } from '../../utils/premium'
+import { randomZen } from '../../utils/zen'
 
 interface FloatItem {
   key: number
@@ -861,24 +862,28 @@ Page({
     const nextToday = d.todayCount + 1
     const prevCur = this._titleCurrent
     const milestone = this.milestoneOf(nextTotal, nextToday, prevCur)
+    let floats: FloatItem[] | null = null
     if (milestone) {
-      this.spawnText(milestone, 'milestone')
+      floats = this.pushFloat(milestone, 'milestone')
       this._quietUntil = Date.now() + MILESTONE_QUIET_MS
     } else if (Date.now() > this._quietUntil) {
       // 大字还在飘时不再出小字，免得叠在一起
-      this.spawnFloat()
+      const f = this.pickFloat()
+      floats = this.pushFloat(f.text, f.kind)
     }
-    this.pulse()
-    this.ripple()
 
     this._titleCurrent = Math.min(this._titleGoal, this._titleCurrent + 1)
     if (this._lessonKind === 'random') this._randomHits = this._titleCurrent
-    this.setData(
-      Object.assign(this.levelPatch(nextTotal, nextToday), this.titleColorPatch(), {
-        strikeSeq: d.strikeSeq + 1,
-        knockHint: false,
-      })
-    )
+    // 飘字、回弹、涟漪和数字并成一次 setData，连敲时少走几趟渲染层
+    const patch: Record<string, any> = Object.assign(this.levelPatch(nextTotal, nextToday), this.titleColorPatch(), {
+      strikeSeq: d.strikeSeq + 1,
+      knockHint: false,
+      pulsing: false,
+      rippleOn: false,
+    })
+    if (floats) patch.floats = floats
+    this.setData(patch)
+    this.replayStrikeFx()
     this.drawLessonTitle()
     if (this._queue) this._queue.tap(source)
     this.countSession(source)
@@ -954,12 +959,13 @@ Page({
     return plan ? plan.timbre : 'default'
   },
 
-  spawnFloat() {
-    const text = Math.random() < 0.55 ? '专注 +1' : CHANTS[Math.floor(Math.random() * CHANTS.length)]
-    this.spawnText(text, text.indexOf('+') >= 0 ? 'score' : 'chant')
+  pickFloat(): { text: string; kind: FloatItem['kind'] } {
+    if (Math.random() < 0.55) return { text: '专注 +1', kind: 'score' }
+    return { text: CHANTS[Math.floor(Math.random() * CHANTS.length)], kind: 'chant' }
   },
 
-  spawnText(text: string, kind: FloatItem['kind']) {
+  /** 加一条飘字，返回新的列表交给调用方一并 setData；到时自己摘掉 */
+  pushFloat(text: string, kind: FloatItem['kind']): FloatItem[] {
     this._floatSeq += 1
     const floats = this.data.floats.slice()
     if (floats.length > 5) floats.shift()
@@ -970,7 +976,6 @@ Page({
       left: big ? 50 : 30 + Math.random() * 40,
       kind,
     })
-    this.setData({ floats })
     const key = this._floatSeq
     setTimeout(
       () => {
@@ -979,19 +984,13 @@ Page({
       },
       big ? 2400 : 1000
     )
+    return floats
   },
 
-  ripple() {
-    if (this.data.rippleOn) this.setData({ rippleOn: false })
+  /** pulsing / rippleOn 已随这一下复位，下一帧再点亮，CSS 动画就会从头播 */
+  replayStrikeFx() {
     wx.nextTick(() => {
-      if (this._alive) this.setData({ rippleOn: true })
-    })
-  },
-
-  pulse() {
-    this.setData({ pulsing: false })
-    wx.nextTick(() => {
-      if (this._alive) this.setData({ pulsing: true })
+      if (this._alive) this.setData({ pulsing: true, rippleOn: true })
     })
     if (this._pulseTimer) clearTimeout(this._pulseTimer)
     this._pulseTimer = setTimeout(() => {
@@ -1100,7 +1099,7 @@ Page({
       celebrateOn: true,
       celebrate: {
         name: this.data.lessonTitle || '心愿',
-        goalText: String(this._titleGoal),
+        goalText: '专注 ' + fmtInt(this._titleGoal),
         thumbUrl: '',
         nextText: '',
       },
@@ -1116,10 +1115,17 @@ Page({
     })
     fetchWishDetail(id)
       .then((res) => {
+        if (!this._alive || this._celebrateId !== id || !this.data.celebrate) return
+        const patch: Record<string, string> = {}
         const thumbUrl = (res.wish && res.wish.thumbUrl) || ''
-        if (this._alive && thumbUrl && this._celebrateId === id && this.data.celebrate) {
-          this.setData({ 'celebrate.thumbUrl': thumbUrl })
+        if (thumbUrl) patch['celebrate.thumbUrl'] = thumbUrl
+        // 立愿到圆满走了几天
+        const born = res.wish ? new Date(res.wish.createdAt as any).getTime() : NaN
+        if (born > 0) {
+          const days = Math.max(1, Math.ceil((Date.now() - born) / 86400000))
+          patch['celebrate.goalText'] = '历时 ' + days + ' 天 · 专注 ' + fmtInt(this._titleGoal)
         }
+        if (Object.keys(patch).length) this.setData(patch)
       })
       .catch(() => {})
   },
@@ -1333,6 +1339,7 @@ Page({
     if (s.kind === 'time') parts.push(s.value + ' 分钟')
     if (s.hand) parts.push('手敲 ' + s.hand)
     if (s.auto) parts.push('自动 ' + s.auto)
+    if (this.data.todayCount > 0) parts.push('今日共 ' + fmtInt(this.data.todayCount))
     const info: SessionDone = {
       kind: s.kind,
       value: s.value,
@@ -1341,7 +1348,8 @@ Page({
       title: plan ? plan.name : s.kind === 'time' ? '一炷香尽' : '念珠一串',
       line: s.kind === 'time' ? '敲了 ' + n + ' 下' : n + ' 下圆满',
       detail: parts.join(' · '),
-      closing: plan ? plan.closing : '',
+      // 自己敲的没有配好的收尾语，送一句
+      closing: plan ? plan.closing : randomZen().text,
       offer: plan && s.trial ? '这是' + PACK_NAME + '里的一套定课，开启后随时可用' : '',
     }
     const ring = () => {

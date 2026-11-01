@@ -132,6 +132,47 @@
   to { opacity: 1; transform: none; }
 }
 
+.gate-day {
+  margin-top: 40rpx;
+  font-family: var(--serif);
+  font-size: 22rpx;
+  letter-spacing: 6rpx;
+  color: rgba(243, 234, 220, 0.42);
+  opacity: 0;
+  animation: fade-up 1.2s ease 2.2s forwards;
+}
+
+.gate-tap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(96rpx + env(safe-area-inset-bottom));
+  z-index: 2;
+  text-align: center;
+  font-size: 22rpx;
+  letter-spacing: 8rpx;
+  color: rgba(224, 181, 119, 0.6);
+  opacity: 0;
+  animation: tap-hint 2.6s ease-in-out 2.6s infinite;
+}
+@keyframes tap-hint {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.8; }
+}
+
+.gate-title {
+  font-family: var(--serif);
+}
+
+.lotus {
+  animation: fade-up 1.15s ease 0.4s forwards, lotus-breathe 4.8s ease-in-out 1.6s infinite;
+}
+@keyframes lotus-breathe {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.35); }
+}
+
+.gate.leaving .gate-tap,
 .gate.leaving .gate-brand,
 .gate.leaving .gate-bloom,
 .gate.leaving .gate-shade,

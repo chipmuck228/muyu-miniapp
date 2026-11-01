@@ -47,3 +47,7 @@ function hashDate(date: string): number {
 export function zenOfDay(date: string): ZenLine {
   return LINES[hashDate(date) % LINES.length]
 }
+
+export function randomZen(): ZenLine {
+  return LINES[Math.floor(Math.random() * LINES.length)]
+}
