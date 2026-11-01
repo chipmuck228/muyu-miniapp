@@ -198,7 +198,6 @@ export function startIncensePlume(
   let fade = 1
   let fadeTarget = 1
   const growMs = (stemH / CONFIG.riseSpeed) * 16.67
-  const vortexSpan = CONFIG.holdMs + CONFIG.scatterMs
   const strandN = CONFIG.strands
   const stemN = CONFIG.stemPts
   const vortexN = CONFIG.vortexPts

@@ -13,7 +13,7 @@ export function resolveCloudFile(fileID: string): Promise<string> {
   // 本地模拟模式没有云存储权限：直接失败，不白等下载超时
   if (mockEnabled()) return Promise.reject(new Error('mock: no cloud file'))
   if (cache[fileID]) return Promise.resolve(cache[fileID])
-  if (inflight[fileID]) return inflight[fileID]
+  if (fileID in inflight) return inflight[fileID]
   inflight[fileID] = wx.cloud
     .downloadFile({ fileID })
     .then((r) => {

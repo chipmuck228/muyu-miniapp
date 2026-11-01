@@ -238,15 +238,6 @@
   }
 }
 
-.smoke-rev {
-  position: absolute;
-  left: 16rpx;
-  z-index: 6;
-  font-size: 18rpx;
-  letter-spacing: 0.04em;
-  color: rgba(224, 181, 119, 0.38);
-  pointer-events: none;
-}
 .lesson-title-canvas {
   position: absolute;
   left: 50%;

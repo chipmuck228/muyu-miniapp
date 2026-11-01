@@ -2,10 +2,7 @@ import { winInfo } from '../../utils/util'
 import { tintOf } from '../../utils/theme'
 import { startIncensePlume, SMOKE_REV } from '../incensePlume'
 
-function errText(e: any): string {
-  const raw = (e && (e.message || e.errMsg || e.errMsg || e.stack)) || String(e || 'err')
-  return String(raw).replace(/\s+/g, ' ').slice(0, 42)
-}
+const MAX_RETRY = 8
 
 Component({
   properties: {
@@ -27,44 +24,45 @@ Component({
 
   data: {
     smokeFallback: false,
-    smokeRev: '',
     canvasOn: true,
   },
 
   observers: {
     theme(id: string) {
-      if (this._smoke && typeof this._smoke.setTint === 'function') {
-        this._smoke.setTint(tintOf(id))
-      }
+      const smoke = (this as any)._smoke
+      if (smoke && typeof smoke.setTint === 'function') smoke.setTint(tintOf(id))
     },
     sink(r: number) {
-      if (this._smoke && typeof this._smoke.setSink === 'function') this._smoke.setSink(r)
+      const smoke = (this as any)._smoke
+      if (smoke && typeof smoke.setSink === 'function') smoke.setSink(r)
     },
     fade(a: number) {
-      if (this._smoke && typeof this._smoke.setFade === 'function') this._smoke.setFade(a)
+      const smoke = (this as any)._smoke
+      if (smoke && typeof smoke.setFade === 'function') smoke.setFade(a)
     },
   },
 
   lifetimes: {
     attached() {
-      this._alive = true
-      this._smoke = null
-      this._booting = false
-      this._retry = 0
+      const self: any = this
+      self._alive = true
+      self._smoke = null
+      self._booting = false
+      self._retry = 0
     },
     ready() {
       this.bootSmoke()
     },
     detached() {
-      this._alive = false
+      ;(this as any)._alive = false
       this.teardown()
     },
   },
 
   pageLifetimes: {
     show() {
-      if (!this._alive) return
-      if (this._smoke || this._booting) return
+      const self: any = this
+      if (!self._alive || self._smoke || self._booting) return
       this.setData({ canvasOn: true }, () => this.bootSmoke())
     },
     hide() {
@@ -74,17 +72,19 @@ Component({
 
   methods: {
     teardown() {
-      this._booting = false
-      if (this._smoke) {
-        this._smoke.stop()
-        this._smoke = null
+      const self: any = this
+      self._booting = false
+      if (self._smoke) {
+        self._smoke.stop()
+        self._smoke = null
       }
       if (this.data.canvasOn) this.setData({ canvasOn: false })
     },
 
     bootSmoke() {
-      if (!this._alive || this._smoke || this._booting) return
-      this._booting = true
+      const self: any = this
+      if (!self._alive || self._smoke || self._booting) return
+      self._booting = true
       if (!this.data.canvasOn) {
         this.setData({ canvasOn: true }, () => this.queryAndStart())
         return
@@ -92,10 +92,21 @@ Component({
       this.queryAndStart()
     },
 
+    /** WebGL 起不来：退回 CSS 版青烟，也照样通知页面「烟已升起」 */
+    fallBack(why: string, e?: any) {
+      const self: any = this
+      self._booting = false
+      if (e) console.error('[smoke] ' + why, e)
+      else console.warn('[smoke] ' + why)
+      this.setData({ smokeFallback: true })
+      this.triggerEvent('risen')
+    },
+
     queryAndStart() {
+      const self: any = this
       wx.nextTick(() => {
-        if (!this._alive) {
-          this._booting = false
+        if (!self._alive) {
+          self._booting = false
           return
         }
         const q: any = this.createSelectorQuery().in(this)
@@ -103,24 +114,23 @@ Component({
           .fields({ node: true, size: true })
           .exec((res: any) => {
             const item = res && res[0]
-            if (!this._alive) {
-              this._booting = false
+            if (!self._alive) {
+              self._booting = false
               return
             }
             if (!item || !item.node || !item.width || !item.height) {
-              this._booting = false
-              if (this._retry < 8) {
-                this._retry += 1
+              self._booting = false
+              if (self._retry < MAX_RETRY) {
+                self._retry += 1
                 setTimeout(() => {
-                  if (this._alive) this.bootSmoke()
+                  if (self._alive) this.bootSmoke()
                 }, 80)
               } else {
-                this.setData({ smokeFallback: true, smokeRev: 'fallback-canvas' })
-                this.triggerEvent('risen')
+                this.fallBack('canvas not found')
               }
               return
             }
-            this._retry = 0
+            self._retry = 0
             let dpr = 2
             try {
               dpr = Math.max(1, Math.min(Number(winInfo().pixelRatio) || 2, 2))
@@ -128,28 +138,24 @@ Component({
               dpr = 2
             }
             try {
-              this._smoke = startIncensePlume(
+              self._smoke = startIncensePlume(
                 item.node,
                 item.width,
                 item.height,
                 dpr,
                 () => {
-                  if (this._alive) this.triggerEvent('risen')
+                  if (self._alive) this.triggerEvent('risen')
                 },
                 tintOf(this.data.theme)
               )
-              if (this.data.sink) this._smoke.setSink(this.data.sink)
-              this._smoke.setFade(this.data.fade, true)
-              this._booting = false
-              this.setData({
-                smokeFallback: false,
-                smokeRev: SMOKE_REV + ' ' + Math.round(item.width) + 'x' + Math.round(item.height),
-              })
+              if (this.data.sink) self._smoke.setSink(this.data.sink)
+              self._smoke.setFade(this.data.fade, true)
+              self._booting = false
+              // 版本号只进日志：以前画在香案左上角，用户也看得见
+              console.log('[smoke]', SMOKE_REV, Math.round(item.width) + 'x' + Math.round(item.height))
+              if (this.data.smokeFallback) this.setData({ smokeFallback: false })
             } catch (e) {
-              this._booting = false
-              console.error('[smoke] start failed', e)
-              this.setData({ smokeFallback: true, smokeRev: 'e:' + errText(e) })
-              this.triggerEvent('risen')
+              this.fallBack('start failed', e)
             }
           })
       })
