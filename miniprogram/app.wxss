@@ -54,10 +54,14 @@ page {
   font-weight: 600;
 }
 .wing-kicker {
-  width: 88rpx;
+  width: 140rpx;
   font-size: 28rpx;
   letter-spacing: 4rpx;
-  color: rgba(224, 181, 119, 0.55);
+  white-space: nowrap;
+  color: rgba(224, 181, 119, 0.65);
+}
+.wing-kicker:last-child {
+  text-align: right;
 }
 .wing-kicker.ghost {
   visibility: hidden;

@@ -22,6 +22,8 @@ interface IAppOption {
     openLessonSheet?: boolean
     /** 圆满弹窗点「查看证书」：证书页优先展示这张 */
     certFocusId?: string | null
+    /** 在香案面板里点「立新愿」并立好：回到香案时收起面板，接着为新心愿敲 */
+    newWishPicked?: boolean
     /** 扫码进入时的 scene，供首页首次触点归因 */
     pendingChannelScene?: string | null
   }

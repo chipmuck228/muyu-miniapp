@@ -6,9 +6,6 @@
   color: rgba(224, 181, 119, 0.38);
 }
 
-.wishes-page .wing-kicker {
-  width: 140rpx;
-}
 .add-kicker {
   text-align: right;
   white-space: nowrap;

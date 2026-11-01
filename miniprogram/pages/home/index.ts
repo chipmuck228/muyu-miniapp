@@ -442,10 +442,16 @@ Page({
       setTimeout(() => {
         if (this._alive) this.openSheet(true)
       }, 700)
+    } else if (this.data.sheetOn && app.globalData.newWishPicked) {
+      // 从面板去立愿，新心愿已设成今日功课：收起面板，接着敲
+      this.setData({ sheetFirst: false })
+      this.closeSheet()
+      this.showSwitchHint('新心愿已设为今日功课')
     } else if (this.data.sheetOn) {
       // 从面板去立愿后回来：刷新列表，新心愿就在里面
       this.loadSheet()
     }
+    app.globalData.newWishPicked = false
   },
 
   onHide() {
