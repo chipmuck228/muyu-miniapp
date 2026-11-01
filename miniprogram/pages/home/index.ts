@@ -900,7 +900,8 @@ Page({
     const before = levelOf(nextTotal - 1)
     const after = levelOf(nextTotal)
     if (after.level > before.level) text = '晋 · ' + after.title
-    else if (nextToday === 1) text = this._streak > 0 ? '连续第 ' + (this._streak + 1) + ' 天' : '今日第一叩'
+    // 今日叩数还没从云端拉回来时别急着说「第一叩」
+    else if (nextToday === 1 && !this.data.loading) text = this._streak > 0 ? '连续第 ' + (this._streak + 1) + ' 天' : '今日第一叩'
     else if (todayMilestone(nextToday)) text = todayMilestone(nextToday)
     else if (this._lessonKind === 'wish' && this._titleGoal >= 20) {
       const half = Math.ceil(this._titleGoal / 2)
