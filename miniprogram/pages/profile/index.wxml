@@ -13,7 +13,7 @@
       </view>
 
       <!-- 称号：总专注走到哪一境 -->
-      <view class="level-card">
+      <view class="level-card {{ladderOn ? 'open' : ''}}" hover-class="level-hover" bindtap="toggleLadder">
         <view class="level-top">
           <view class="level-badge"><text class="mono-num">{{level}}</text></view>
           <view class="level-text">
@@ -26,6 +26,14 @@
           </view>
         </view>
         <view class="level-bar"><view class="level-fill" style="width: {{levelPct}}%;"></view></view>
+        <view wx:if="{{ladderOn}}" class="ladder">
+          <view wx:for="{{ladder}}" wx:key="level" class="ladder-row {{item.reached ? 'reached' : ''}} {{item.cur ? 'cur' : ''}}">
+            <text class="ladder-lv mono-num">{{item.level}}</text>
+            <text class="ladder-title">{{item.title}}</text>
+            <text class="ladder-need mono-num">{{item.need}}</text>
+          </view>
+        </view>
+        <text class="ladder-toggle">{{ladderOn ? '收起' : '九境 ›'}}</text>
       </view>
 
       <view class="stats-row">

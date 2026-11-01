@@ -183,6 +183,9 @@ Page({
     revealOn: false,
     savingPaper: false,
     localToday: 0,
+    /** 图表上点中的那一天 */
+    selBar: '',
+    selBarText: '',
   },
 
   _alive: false,
@@ -276,6 +279,18 @@ Page({
       this.setData({ loading: false })
       wx.showToast({ title: (e && e.message) || '加载失败', icon: 'none' })
     }
+  },
+
+  onPickBar(e: any) {
+    const key = String(e.currentTarget.dataset.key || '')
+    const bar = this.data.bars.find((b) => b.key === key)
+    if (!bar) return
+    if (this.data.selBar === key) {
+      this.setData({ selBar: '', selBarText: '' })
+      return
+    }
+    const when = bar.isToday ? '今日' : fmtMD(key) + ' ' + weekdayCN(key)
+    this.setData({ selBar: key, selBarText: when + (bar.count ? ' · ' + fmtInt(bar.count) + ' 叩' : ' · 未敲') })
   },
 
   goAltar() {

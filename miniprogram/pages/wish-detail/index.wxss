@@ -405,3 +405,12 @@
   letter-spacing: 8rpx;
   color: rgba(224, 181, 119, 0.55);
 }
+
+/* 点中的那一天：柱子亮起，顶上标数 */
+.chart-col.sel .bar {
+  background: linear-gradient(180deg, #fff0cc, #e8c48a);
+  box-shadow: 0 0 16rpx rgba(255, 226, 168, 0.6);
+}
+.chart-col.sel .bar-label {
+  color: #f0cf8e;
+}

@@ -12,7 +12,7 @@ import { AMBIENCE_OPTIONS, AmbienceId, isPremiumAmbience, parseAmbience } from '
 import { isPremiumTheme, parseTheme, ThemeId, THEMES } from '../../utils/theme'
 import { buyPremium, isPaying, readPending, writePending, sleep, PACK_NAME } from '../../utils/premium'
 import { fmtInt, todayStr, offsetDate, weekdayMon0, fmtMD, concealTabBar, weekdayCN } from '../../utils/util'
-import { levelOf } from '../../utils/constants'
+import { levelOf, LEVELS } from '../../utils/constants'
 import { zenOfDay } from '../../utils/zen'
 import { startAmbience, stopAmbience, fadeOutAmbience } from '../../utils/ambience'
 import { vibrate } from '../../utils/knock'
@@ -32,6 +32,14 @@ const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日']
 const HEAT_WEEKS = 5
 /** 选了氛围以后试听多久再淡出 */
 const PREVIEW_MS = 3500
+
+interface LadderRow {
+  level: number
+  title: string
+  need: string
+  reached: boolean
+  cur: boolean
+}
 
 interface DressOption {
   id: string
@@ -107,6 +115,9 @@ Page({
     levelTitle: '',
     levelPct: 0,
     levelNext: '',
+    /** 点开称号卡，看九境都是什么 */
+    ladderOn: false,
+    ladder: [] as LadderRow[],
     zenText: '',
     zenFrom: '',
     rows: [] as HeatCell[][],
@@ -233,6 +244,13 @@ Page({
         levelTitle: lv.title,
         levelPct: Math.round(lv.progress * 100),
         levelNext: lv.isMax ? '已至最高一境' : '再 ' + fmtInt(lv.nextNeed - total) + ' 叩，至「' + lv.nextTitle + '」',
+        ladder: LEVELS.map((L) => ({
+          level: L.level,
+          title: L.title,
+          need: L.need ? fmtInt(L.need) + ' 叩' : '初发心',
+          reached: total >= L.need,
+          cur: L.level === lv.level,
+        })),
         rows,
         activeDays,
         selDate: sel,
@@ -251,6 +269,10 @@ Page({
       this.setData({ loading: false })
       wx.showToast({ title: (e && e.message) || '加载失败', icon: 'none' })
     }
+  },
+
+  toggleLadder() {
+    this.setData({ ladderOn: !this.data.ladderOn })
   },
 
   onPickCell(e: any) {

@@ -71,12 +71,12 @@
       <view class="block">
         <view class="block-head">
           <text class="block-label">近十四日</text>
-          <text class="block-sub" wx:if="{{localToday}}">今日 {{localToday}}</text>
+          <text class="block-sub">{{selBarText || (localToday ? '今日 ' + localToday : '轻触柱子看当天')}}</text>
         </view>
         <view class="chart">
-          <view class="chart-col" wx:for="{{bars}}" wx:key="key">
+          <view class="chart-col {{selBar === item.key ? 'sel' : ''}}" wx:for="{{bars}}" wx:key="key" data-key="{{item.key}}" bindtap="onPickBar">
             <view class="bar-wrap">
-              <text wx:if="{{item.tip}}" class="bar-tip mono-num">{{item.tip}}</text>
+              <text wx:if="{{selBar === item.key || (!selBar && item.tip)}}" class="bar-tip mono-num">{{item.count}}</text>
               <view class="bar {{item.hasValue ? 'val' : ''}} {{item.isToday ? 'today' : ''}}" style="height: {{item.ratio}}%;"></view>
             </view>
             <text class="bar-label {{item.isToday ? 'today' : ''}}">{{item.label}}</text>
