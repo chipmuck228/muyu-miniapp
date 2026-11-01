@@ -1,4 +1,4 @@
-<!-- 心愿：侧殿列表 -->
+<!-- 心愿：侧殿列表。进行中在上、已圆满在下；轻触回堂敲击，长按更多 -->
 <view class="page wing-page wishes-page">
   <view class="wing-head has-kicker" style="padding-top: {{statusBarHeight}}px;">
     <text class="wing-kicker ghost">＋</text>
@@ -12,29 +12,49 @@
     enhanced
     show-scrollbar="{{false}}"
     refresher-enabled
+    refresher-default-style="white"
+    refresher-background="#0e0b08"
     refresher-triggered="{{refreshing}}"
     bindrefresherrefresh="onRefresh"
   >
     <view class="wing-body">
-      <text class="list-hint" wx:if="{{wishes.length > 0}}">轻触心愿即回堂敲击 · 完成后另有惊喜</text>
-      <block wx:if="{{wishes.length > 0}}">
+      <!-- 首次加载：三行占位 -->
+      <view wx:if="{{loading && total === 0}}" class="skeleton">
+        <view class="sk-row" wx:for="{{[0,1,2]}}" wx:key="*this">
+          <view class="sk-line w60"></view>
+          <view class="sk-line w100 thin"></view>
+          <view class="sk-line w30"></view>
+        </view>
+      </view>
+
+      <block wx:elif="{{total > 0}}">
+        <text class="list-hint">轻触回堂敲击 · 长按更多</text>
+
+        <view wx:if="{{ongoing.length}}" class="group-head">
+          <text class="group-name">进行中</text>
+          <text class="group-count">{{ongoing.length}}</text>
+        </view>
         <view
-          wx:for="{{wishes}}"
+          wx:for="{{ongoing}}"
           wx:key="_id"
-          class="wish-row {{item.done ? 'done' : ''}}"
-          hover-class="hover-dim"
+          class="wish-card {{item.near ? 'near' : ''}} {{item.cur ? 'cur' : ''}}"
+          hover-class="wish-card-hover"
           data-id="{{item._id}}"
           bindtap="onPickWish"
+          bindlongpress="onLongPress"
         >
           <view class="wish-top">
             <text class="wish-name">{{item.name}}</text>
-            <text class="wish-mark">{{item.mark}}</text>
+            <text class="wish-pct mono-num">{{item.percent}}<text class="pct-sign">%</text></text>
           </view>
-          <view class="wish-line">
-            <view class="wish-fill" style="width: {{item.percent}}%;"></view>
+          <view class="wish-bar">
+            <view class="wish-bar-fill" style="width: {{item.percent}}%;"></view>
           </view>
           <view class="wish-foot">
-            <text class="wish-go" wx:if="{{!item.done}}">回堂敲击</text>
+            <text class="wish-nums mono-num">{{item.nums}}</text>
+            <text wx:if="{{item.today}}" class="wish-today">{{item.today}}</text>
+            <text wx:if="{{item.due}}" class="wish-due {{item.late ? 'late' : ''}}">{{item.due}}</text>
+            <text wx:if="{{item.cur}}" class="wish-cur">今日功课</text>
             <text
               class="wish-detail"
               hover-class="hover-dim"
@@ -44,12 +64,56 @@
             >详情 ›</text>
           </view>
         </view>
+
+        <view wx:if="{{done.length}}" class="group-head done-head">
+          <text class="group-name">已圆满</text>
+          <text class="group-count">{{done.length}}</text>
+        </view>
+        <view
+          wx:for="{{done}}"
+          wx:key="_id"
+          class="done-row"
+          hover-class="hover-dim"
+          data-id="{{item._id}}"
+          bindtap="onPickWish"
+          bindlongpress="onLongPress"
+        >
+          <view class="seal {{item.fulfilled ? 'fulfilled' : ''}}"><text>{{item.fulfilled ? '了' : '圆'}}</text></view>
+          <view class="done-text">
+            <text class="done-name">{{item.name}}</text>
+            <text class="done-meta">{{item.nums}}{{item.doneText ? ' · ' + item.doneText : ''}}</text>
+          </view>
+          <text class="done-go">证书 ›</text>
+        </view>
+
         <view class="wish-new" hover-class="hover-dim" bindtap="goNew">＋ 立新愿</view>
       </block>
-      <view class="empty" wx:elif="{{!loading}}">
+
+      <view class="empty" wx:elif="{{failed}}">
+        <text class="empty-title">没能取到心愿</text>
+        <text class="empty-sub">网络不稳，下拉再试</text>
+      </view>
+
+      <view class="empty" wx:else>
+        <view class="empty-lotus">
+          <view class="el-petal l"></view>
+          <view class="el-petal r"></view>
+          <view class="el-petal m"></view>
+        </view>
         <text class="empty-title">尚未立愿</text>
-        <text class="empty-sub">完成后另有惊喜</text>
-        <text class="empty-go" hover-class="hover-dim" bindtap="goNew">去立愿</text>
+        <text class="empty-sub">写下一件想专注的事，每一叩都算数</text>
+        <view class="empty-go" hover-class="hover-dim" bindtap="goNew">立第一个心愿</view>
+        <text class="ideas-label">或者从这里开始</text>
+        <view class="ideas">
+          <text
+            wx:for="{{ideas}}"
+            wx:key="*this"
+            class="idea"
+            hover-class="idea-hover"
+            data-name="{{item}}"
+            bindtap="onIdea"
+          >{{item}}</text>
+        </view>
       </view>
     </view>
   </scroll-view>
