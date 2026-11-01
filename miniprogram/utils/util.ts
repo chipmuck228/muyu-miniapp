@@ -74,6 +74,27 @@ export function weekdayCN(dateStr: string): string {
   return '周' + WEEKDAY_CN[d.getDay()]
 }
 
+const CN_DIGIT = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九']
+
+function cnSmall(n: number): string {
+  if (n <= 10) return n === 10 ? '十' : CN_DIGIT[n]
+  if (n < 20) return '十' + CN_DIGIT[n - 10]
+  const t = Math.floor(n / 10)
+  const u = n % 10
+  return CN_DIGIT[t] + '十' + (u ? CN_DIGIT[u] : '')
+}
+
+/** '2026-10-20' -> '二〇二六年十月二十日'，证书落款用 */
+export function cnDate(dateStr: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return ''
+  const y = dateStr
+    .slice(0, 4)
+    .split('')
+    .map((c) => CN_DIGIT[Number(c)])
+    .join('')
+  return y + '年' + cnSmall(parseInt(dateStr.slice(5, 7), 10)) + '月' + cnSmall(parseInt(dateStr.slice(8, 10), 10)) + '日'
+}
+
 /** 周一为 0 的星期索引 */
 export function weekdayMon0(dateStr: string): number {
   const d = new Date(dateStr + 'T00:00:00')
