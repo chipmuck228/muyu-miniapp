@@ -15,6 +15,7 @@
     "navigationStyle": "custom",
     "navigationBarTextStyle": "white",
     "navigationBarBackgroundColor": "#16110d",
+    "backgroundTextStyle": "light",
     "backgroundColor": "#120e0a",
     "backgroundColorTop": "#120e0a",
     "backgroundColorBottom": "#120e0a"

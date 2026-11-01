@@ -69,6 +69,9 @@ page {
 .wing-scroll {
   flex: 1;
   min-height: 0;
+  /* 上下边缘淡出：列表滑到标题和底部导航下面时不是一刀切 */
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 28rpx, #000 calc(100% - 56rpx), transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 28rpx, #000 calc(100% - 56rpx), transparent 100%);
 }
 .wing-body {
   padding: 8rpx 40rpx calc(280rpx + env(safe-area-inset-bottom));
