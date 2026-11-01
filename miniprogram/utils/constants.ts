@@ -12,15 +12,17 @@ export const LEVELS: LevelDef[] = [
   { level: 3, need: 500, title: '日有所进' },
   { level: 4, need: 1000, title: '心愿渐明' },
   { level: 5, need: 3000, title: '专注日深' },
-  { level: 6, need: 8000, title: '自我提升' },
-  { level: 7, need: 20000, title: '心愿管理' },
-  { level: 8, need: 50000, title: '静心有恒' },
-  { level: 9, need: 100000, title: '心愿得所' },
+  { level: 6, need: 8000, title: '心如止水' },
+  { level: 7, need: 20000, title: '持之以恒' },
+  { level: 8, need: 50000, title: '静水流深' },
+  { level: 9, need: 100000, title: '自在从容' },
 ]
 
 export interface LevelInfo {
   level: number
   title: string
+  /** 下一级的称号；满级为空 */
+  nextTitle: string
   curNeed: number
   nextNeed: number
   /** 当前等级内进度 0-1 */
@@ -36,10 +38,10 @@ export function levelOf(totalMerit: number): LevelInfo {
   const cur = LEVELS[idx]
   const next = LEVELS[idx + 1]
   if (!next) {
-    return { level: cur.level, title: cur.title, curNeed: cur.need, nextNeed: cur.need, progress: 1, isMax: true }
+    return { level: cur.level, title: cur.title, nextTitle: '', curNeed: cur.need, nextNeed: cur.need, progress: 1, isMax: true }
   }
   const progress = Math.max(0, Math.min(1, (totalMerit - cur.need) / (next.need - cur.need)))
-  return { level: cur.level, title: cur.title, curNeed: cur.need, nextNeed: next.need, progress, isMax: false }
+  return { level: cur.level, title: cur.title, nextTitle: next.title, curNeed: cur.need, nextNeed: next.need, progress, isMax: false }
 }
 
 /** 心愿目标预设 */
