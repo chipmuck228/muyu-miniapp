@@ -178,10 +178,10 @@
 
   <!-- 静心包介绍：里面有什么，氛围能试听，主题能看，定课说清配了什么 -->
   <block wx:if="{{packOn}}">
-    <view class="ps-mask {{packShow ? 'show' : ''}}" catchtouchmove="noop" bindtap="closePack"></view>
+    <view class="ps-mask {{packShow ? 'show' : ''}}" catchtouchmove="noop" bindtap="dismissPack"></view>
     <view class="ps {{packShow ? 'show' : ''}}" style="padding-bottom: {{safeBottom + 16}}px;">
-      <view class="ps-grip" bindtap="closePack"></view>
-      <scroll-view class="ps-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+      <view class="ps-grip" bindtap="dismissPack"></view>
+      <scroll-view class="ps-scroll" scroll-y enhanced show-scrollbar="{{false}}" scroll-into-view="{{packScrollTo}}" scroll-with-animation>
         <view class="ps-body">
           <view class="ps-top">
             <text class="ps-title">{{packName}}</text>
@@ -237,14 +237,15 @@
             </view>
           </view>
 
-          <view class="ps-sec">
+          <view class="ps-sec" id="ps-plans">
             <view class="ps-sec-head">
               <text class="ps-sec-name">两套定课</text>
               <text class="ps-sec-hint">声音、主题、节奏和时长都配好</text>
             </view>
-            <view wx:for="{{packPlans}}" wx:key="id" class="ps-plan">
+            <view wx:for="{{packPlans}}" wx:key="id" class="ps-plan {{packFrom === item.id ? 'from' : ''}}">
               <view class="ps-plan-top">
                 <text class="ps-plan-name">{{item.name}}</text>
+                <text wx:if="{{packFrom === item.id && !premium}}" class="ps-plan-tried">刚试过</text>
                 <text class="ps-plan-min">{{item.minutes}} 分钟</text>
               </view>
               <text class="ps-plan-scene">{{item.scene}}</text>

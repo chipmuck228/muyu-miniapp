@@ -2,7 +2,6 @@
 import {
   fetchProfile,
   updateSettings,
-  confirmPremiumPay,
   verifyPremium,
   UserSettings,
   settingsOf,
@@ -11,7 +10,7 @@ import {
 } from '../../utils/cloud'
 import { AMBIENCE_OPTIONS, AmbienceId, isPremiumAmbience, parseAmbience } from '../../utils/audioCatalog'
 import { isPremiumTheme, parseTheme, ThemeId, THEMES, themeOf } from '../../utils/theme'
-import { buyPremium, isPaying, readPending, writePending, sleep, PACK_NAME, packPrice } from '../../utils/premium'
+import { buyPremium, isPaying, isResuming, resumePending, writePending, PACK_NAME, packPrice } from '../../utils/premium'
 import { fmtInt, todayStr, offsetDate, weekdayMon0, fmtMD, concealTabBar, weekdayCN, winInfo } from '../../utils/util'
 import { SESSION_PLANS, planMix } from '../../utils/sessionPlans'
 import { levelOf, LEVELS } from '../../utils/constants'
@@ -170,14 +169,18 @@ Page({
     packShow: false,
     packTheme: 'night' as ThemeId,
     packPriceText: '',
+    /** 从香案哪套定课过来的：那套标上「刚试过」，面板直接翻到定课 */
+    packFrom: '',
+    packScrollTo: '',
     packAmbience: PACK_AMBIENCE,
     packThemes: PACK_THEMES,
     packPlans: PACK_PLANS,
   },
 
   _alive: false,
-  _resuming: false,
   _verified: false,
+  /** 从香案过来看静心包：开了或关掉面板都回香案；null 表示是自己点开的 */
+  _packVisit: null as string | null,
   _previewTimer: 0,
   /** 每次试听 / 收起都换一个号，淡出结束时号对不上就别去停（香案可能已经在放自己的氛围） */
   _previewSeq: 0,
@@ -207,11 +210,20 @@ Page({
     this.load()
     this.resumePending()
     this.verifyRefund()
+    const app = getApp<IAppOption>()
+    const visit = app.globalData.packVisit
+    app.globalData.packVisit = null
+    if (typeof visit === 'string') {
+      this._packVisit = visit
+      this.openPack()
+    }
   },
 
   onHide() {
     this.stopPreview()
     if (this.data.packOn) this.closePack()
+    // 从这里切去别的页：这趟就算看完了，不再替香案记着
+    this._packVisit = null
   },
 
   onUnload() {
@@ -221,28 +233,10 @@ Page({
   },
 
   // 上一笔付款没能当场确认发货时的续查。每次回到本页都继续追，直到开启或过期，
-  // 避免用户在发货到达前被要求再次付费。
+  // 避免用户在发货到达前被要求再次付费。香案也会追同一趟
   async resumePending() {
-    if (isPaying() || this._resuming) return
-    const no = readPending()
-    if (!no) return
-    this._resuming = true
-    try {
-      for (let i = 0; i < 12; i++) {
-        if (!this._alive || this.data.premium) return
-        const r = await confirmPremiumPay(no)
-        if (r.premium) {
-          writePending('')
-          this.markPremium()
-          wx.showToast({ title: '静心包已开启', icon: 'none' })
-          return
-        }
-        await sleep(i < 6 ? 1000 : 2000)
-      }
-    } catch (e) {
-      // 保留挂起状态，下次进入页面再试
-    } finally {
-      this._resuming = false
+    if (await resumePending()) {
+      if (this._alive) this.markPremium()
     }
   },
 
@@ -250,7 +244,7 @@ Page({
   // 我们没接异步回调，所以每次进本页主动问一次微信；确认已退款就收回权益。
   // 每次页面实例只查一次，避免切 tab 时反复请求。
   async verifyRefund() {
-    if (this._verified || isPaying() || this._resuming) return
+    if (this._verified || isPaying() || isResuming()) return
     this._verified = true
     try {
       if (!this.data.premium) return
@@ -420,10 +414,12 @@ Page({
       clearTimeout(this._packTimer)
       this._packTimer = 0
     }
-    this.setData({ packOn: true, packTheme: theme })
+    const from = this._packVisit || ''
+    this.setData({ packOn: true, packTheme: theme, packFrom: from })
     this._packTimer = setTimeout(() => {
       this._packTimer = 0
-      if (this._alive) this.setData({ packShow: true })
+      // 面板建好了再翻：从香案定课过来的直接看到定课那一段
+      if (this._alive) this.setData({ packShow: true, packScrollTo: from ? 'ps-plans' : '' })
     }, 30) as unknown as number
     if (!this.data.premium && !this.data.packPriceText) {
       packPrice().then((p) => {
@@ -438,8 +434,27 @@ Page({
     this.setData({ packShow: false })
     this._packTimer = setTimeout(() => {
       this._packTimer = 0
-      if (this._alive) this.setData({ packOn: false })
+      if (this._alive) this.setData({ packOn: false, packFrom: '', packScrollTo: '' })
     }, PACK_ANIM_MS) as unknown as number
+  },
+
+  /** 用户自己关掉面板：从香案过来的就回香案原处 */
+  dismissPack() {
+    this.closePack()
+    this.backToAltar(false)
+  },
+
+  /** 从香案的定课过来的：回香案。开了就让香案提示一声、接着那套定课。返回是否回去了 */
+  backToAltar(opened: boolean): boolean {
+    const visit = this._packVisit
+    this._packVisit = null
+    if (visit === null) return false
+    const app = getApp<IAppOption>()
+    if (opened) app.globalData.packOpened = visit
+    app.globalData.homeEnterAnim = true
+    concealTabBar(this)
+    wx.switchTab({ url: '/pages/home/index' })
+    return true
   },
 
   onPackListen(e: any) {
@@ -480,7 +495,8 @@ Page({
     if (r === 'opened') {
       this.markPremium()
       if (this.data.packOn) this.closePack()
-      wx.showToast({ title: '静心包已开启', icon: 'none' })
+      // 从香案过来的回香案，由那边提示
+      if (!this.backToAltar(true)) wx.showToast({ title: '静心包已开启', icon: 'none' })
     } else if (r === 'pending') {
       // 不要提示“刷新”：用户在回到本页时会由 resumePending 自动续查
       wx.showToast({ title: '付款已收到，正在开启', icon: 'none' })

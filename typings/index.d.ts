@@ -24,6 +24,10 @@ interface IAppOption {
     certFocusId?: string | null
     /** 在香案面板里点「立新愿」并立好：回到香案时收起面板，接着为新心愿敲 */
     newWishPicked?: boolean
+    /** 香案里点了要静心包的定课：静心页打开介绍面板。值是那套定课的 id */
+    packVisit?: string | null
+    /** 从香案过去、在静心页开启了静心包：回到香案提示一声，接着用这套定课（id，可为空串） */
+    packOpened?: string | null
     /** 扫码进入时的 scene，供首页首次触点归因 */
     pendingChannelScene?: string | null
   }

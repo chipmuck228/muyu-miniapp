@@ -1,4 +1,4 @@
-// 静心包：一次付款开启（users.premium）。静心页和香案的定课面板共用这一套付款流程。
+// 静心包：一次付款开启（users.premium）。付款都在静心页的介绍面板里；香案的定课要开启时也是去那里。
 import { preparePremiumPay, confirmPremiumPay, fetchPremiumPrice } from './cloud'
 import { mockEnabled, mockMarkPaid } from './devMock'
 
@@ -155,10 +155,49 @@ async function waitDelivered(outTradeNo: string, alive: () => boolean): Promise<
 export type BuyResult = 'opened' | 'pending' | 'cancel'
 
 let paying = false
+let resumeTask: Promise<boolean> | null = null
 
 /** 正在付款：续查、退款复核要避开，免得和这一单抢着改状态 */
 export function isPaying(): boolean {
   return paying
+}
+
+/** 正在续查上一笔：退款复核要避开 */
+export function isResuming(): boolean {
+  return !!resumeTask
+}
+
+/**
+ * 上一笔付了款、当场没等到开启的单，回到香案或静心页时接着查。
+ * 两个页面共用同一趟查询，开启时只提示一次；返回是否已开启
+ */
+export function resumePending(): Promise<boolean> {
+  if (paying) return Promise.resolve(false)
+  if (resumeTask) return resumeTask
+  const no = readPending()
+  if (!no) return Promise.resolve(false)
+  const run = async (): Promise<boolean> => {
+    for (let i = 0; i < 12; i++) {
+      if (paying) return false
+      const r = await confirmPremiumPay(no)
+      if (r.premium) {
+        writePending('')
+        wx.showToast({ title: PACK_NAME + '已开启', icon: 'none' })
+        return true
+      }
+      await sleep(i < 6 ? 1000 : 2000)
+    }
+    return false
+  }
+  const task = run()
+    // 查不到或出错都保留挂起的单号，下次回来再试
+    .catch(() => false)
+    .then((ok) => {
+      resumeTask = null
+      return ok
+    })
+  resumeTask = task
+  return task
 }
 
 /** 走一遍付款。成功、取消都不弹提示，交给调用方；其他错误照常 toast */

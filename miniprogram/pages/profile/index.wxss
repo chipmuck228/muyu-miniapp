@@ -744,8 +744,22 @@
   color: #f0cf8e;
 }
 .ps-plan-min {
+  margin-left: auto;
   font-size: 22rpx;
   color: rgba(224, 181, 119, 0.6);
+}
+/* 从香案这套定课过来的：框亮一点，名字后标「刚试过」 */
+.ps-plan.from {
+  border-color: rgba(224, 181, 119, 0.5);
+  background: rgba(224, 181, 119, 0.07);
+}
+.ps-plan-tried {
+  margin-left: 14rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  color: #16110d;
+  background: rgba(224, 181, 119, 0.85);
 }
 .ps-plan-scene {
   display: block;
