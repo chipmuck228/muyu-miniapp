@@ -1286,3 +1286,52 @@
   85% { opacity: 0.6; }
   100% { opacity: 0; transform: translate3d(80rpx, 110vh, 0) rotate(300deg); }
 }
+
+/* ===== 主题点缀：夜偏银蓝、墨偏骨白、霞偏霞红，香案上的字和进度跟着换 ===== */
+.theme-night .lh-cur,
+.theme-night .session-big,
+.theme-night .mat-label,
+.theme-night .lh-hint { color: #d3e3f6; }
+.theme-night .lh-switch,
+.theme-night .lh-goal,
+.theme-night .incense-entry-text,
+.theme-night .session-small,
+.theme-night .knock-hint { color: rgba(184, 208, 236, 0.6); }
+.theme-night .lh-bar { background: rgba(170, 200, 236, 0.16); }
+.theme-night .lh-fill { background: linear-gradient(90deg, #6f93c4, #d3e3f6); box-shadow: 0 0 8rpx rgba(190, 215, 245, 0.6); }
+.theme-night .lh-due { color: #d3e3f6; background: rgba(150, 185, 230, 0.14); }
+.theme-night .auto-tog.on .auto-text { color: #d3e3f6; }
+.theme-night .auto-tog.on .auto-dot { background: #d3e3f6; box-shadow: 0 0 10rpx rgba(200, 222, 248, 0.7); }
+.theme-night .mat-dot.on { box-shadow: 0 0 0 2rpx #b8d0ec, 0 0 0 8rpx rgba(184, 208, 236, 0.2); }
+
+.theme-ink .lh-cur,
+.theme-ink .session-big,
+.theme-ink .mat-label,
+.theme-ink .lh-hint { color: #eeebe4; }
+.theme-ink .lh-switch,
+.theme-ink .lh-goal,
+.theme-ink .incense-entry-text,
+.theme-ink .session-small,
+.theme-ink .knock-hint { color: rgba(222, 218, 210, 0.55); }
+.theme-ink .lh-bar { background: rgba(230, 228, 222, 0.14); }
+.theme-ink .lh-fill { background: linear-gradient(90deg, #8c8880, #eeebe4); box-shadow: 0 0 8rpx rgba(238, 235, 228, 0.45); }
+.theme-ink .lh-due { color: #eeebe4; background: rgba(230, 228, 222, 0.1); }
+.theme-ink .auto-tog.on .auto-text { color: #eeebe4; }
+.theme-ink .auto-tog.on .auto-dot { background: #eeebe4; box-shadow: 0 0 10rpx rgba(238, 235, 228, 0.6); }
+.theme-ink .mat-dot.on { box-shadow: 0 0 0 2rpx #dcd8d0, 0 0 0 8rpx rgba(220, 216, 208, 0.18); }
+
+.theme-dusk .lh-cur,
+.theme-dusk .session-big,
+.theme-dusk .mat-label,
+.theme-dusk .lh-hint { color: #ffcfa8; }
+.theme-dusk .lh-switch,
+.theme-dusk .lh-goal,
+.theme-dusk .incense-entry-text,
+.theme-dusk .session-small,
+.theme-dusk .knock-hint { color: rgba(246, 176, 136, 0.65); }
+.theme-dusk .lh-bar { background: rgba(240, 150, 110, 0.18); }
+.theme-dusk .lh-fill { background: linear-gradient(90deg, #c8643c, #ffcfa8); box-shadow: 0 0 8rpx rgba(255, 180, 130, 0.6); }
+.theme-dusk .lh-due { color: #ffcfa8; background: rgba(240, 140, 100, 0.14); }
+.theme-dusk .auto-tog.on .auto-text { color: #ffcfa8; }
+.theme-dusk .auto-tog.on .auto-dot { background: #ffcfa8; box-shadow: 0 0 10rpx rgba(255, 190, 140, 0.7); }
+.theme-dusk .mat-dot.on { box-shadow: 0 0 0 2rpx #f0a878, 0 0 0 8rpx rgba(240, 168, 120, 0.22); }
