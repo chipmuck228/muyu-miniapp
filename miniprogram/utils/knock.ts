@@ -6,6 +6,8 @@ import { resolveCloudFile } from './cloudFile'
 import { prepareSynthBell, prepareSynthKnock, playSynthBell, playSynthKnock } from './knockSynth'
 
 const POOL = 2
+/** 每一下快慢的浮动幅度（±2.5%） */
+const JITTER = 0.025
 
 let optionSet = false
 
@@ -107,9 +109,12 @@ export function playKnock(on: boolean, timbre: KnockTimbre = 'default') {
   const key = fileKeyOf(timbre)
   const v = voiceOf(key)
   const t = TIMBRES[timbre]
+  // 每一下音高、轻重都差一点点，像真的手在敲
+  const speed = 1 - JITTER + Math.random() * JITTER * 2
+  const loud = 1 - JITTER * 3 + Math.random() * JITTER * 3
   if (!v.path) {
     // 下载失败就一直用合成声，不在每一下都重新下载；还在下载的头几下照旧不响
-    if (v.failed) playSynthKnock(t.rate, t.hardness, t.volume)
+    if (v.failed) playSynthKnock(t.rate, t.hardness, t.volume * loud, speed)
     else ensureKnock(timbre)
     return
   }
@@ -119,8 +124,8 @@ export function playKnock(on: boolean, timbre: KnockTimbre = 'default') {
   // 有专门录音就原样播；借用默认敲击声时才放慢 / 放轻
   const borrowed = key !== t.file
   try {
-    ctx.volume = borrowed ? t.volume : 1
-    ctx.playbackRate = borrowed ? t.rate : 1
+    ctx.volume = (borrowed ? t.volume : 1) * loud
+    ctx.playbackRate = (borrowed ? t.rate : 1) * speed
   } catch {
     // 不支持变速的机型就按原声播
   }

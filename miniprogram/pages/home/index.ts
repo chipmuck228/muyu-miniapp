@@ -21,6 +21,7 @@ import { applyLesson, nextLesson, LessonPick, RANDOM_NAME, RANDOM_LESSON } from 
 import { SESSION_PLANS, SessionPlan, PlanId, planOf, triedPlans, markPlanTried } from '../../utils/sessionPlans'
 import { buyPremium, PACK_NAME } from '../../utils/premium'
 import { randomZen } from '../../utils/zen'
+import { WISH_SUGGESTIONS } from '../../utils/wishIdeas'
 
 interface FloatItem {
   key: number
@@ -298,6 +299,7 @@ Page({
     sheetLoading: false,
     sheetRows: [] as SheetRow[],
     sheetRandomCur: false,
+    ideas: WISH_SUGGESTIONS.slice(0, 6),
     materials: MATERIALS,
     material: savedMaterial(),
     // 定课：进行中右下角显示剩余时间 / 已敲次数
@@ -1078,6 +1080,11 @@ Page({
 
   onSheetNew() {
     wx.navigateTo({ url: '/pages/wish-form/index' })
+  },
+
+  onSheetIdea(e: any) {
+    const name = String(e.currentTarget.dataset.name || '')
+    wx.navigateTo({ url: '/pages/wish-form/index?name=' + encodeURIComponent(name) })
   },
 
   /** 心愿敲满：停住敲击，弹出圆满；关掉时再切到下一个心愿 */

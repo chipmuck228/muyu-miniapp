@@ -126,6 +126,20 @@
     </view>
     <scroll-view class="sheet-list" scroll-y enhanced show-scrollbar="{{false}}">
       <text class="sheet-loading" wx:if="{{sheetLoading}}">正在取心愿…</text>
+      <!-- 还没有心愿：给几个灵感，点了直接去立愿 -->
+      <view class="sheet-ideas" wx:elif="{{!sheetRows.length}}">
+        <text class="sheet-ideas-label">还没有心愿 · 挑一个开始，或随机专注</text>
+        <view class="idea-row">
+          <text
+            wx:for="{{ideas}}"
+            wx:key="*this"
+            class="chip"
+            hover-class="chip-hover"
+            data-name="{{item}}"
+            bindtap="onSheetIdea"
+          >{{item}}</text>
+        </view>
+      </view>
       <view
         wx:for="{{sheetRows}}"
         wx:key="_id"
