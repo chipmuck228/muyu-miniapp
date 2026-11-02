@@ -76,7 +76,9 @@ interface PlanOption {
   name: string
   mark: string
   locked: boolean
-  /** 右侧小签：免费 / 可试一次 / 静心包 */
+  /** 属于静心包：开没开都标出来 */
+  pack: boolean
+  /** 没开静心包时的试用状态：可试一次 / 已试过 */
   tag: string
 }
 
@@ -141,9 +143,8 @@ function planOptions(premium: boolean): PlanOption[] {
   return SESSION_PLANS.map((p) => {
     const locked = p.premium && !premium
     const mark = p.scene + ' · ' + p.minutes + ' 分钟'
-    let tag = ''
-    if (locked) tag = tried[p.id] ? PACK_NAME : '可试一次'
-    return { id: p.id, name: p.name, mark, locked, tag }
+    const tag = locked ? (tried[p.id] ? '已试过' : '可试一次') : ''
+    return { id: p.id, name: p.name, mark, locked, pack: p.premium, tag }
   })
 }
 
@@ -334,6 +335,7 @@ Page({
     sessionDone: null as SessionDone | null,
     /** 已开静心包 */
     premium: false,
+    packName: PACK_NAME,
   },
 
   _floatSeq: 0,
@@ -1353,7 +1355,7 @@ Page({
     this.visitPack(plan.id)
   },
 
-  /** 去静心页的介绍面板开启静心包；开了或关掉面板都会回香案 */
+  /** 去静心页的静心包那一块开启；开了或点「回香案」都会回来 */
   visitPack(planId: string) {
     const app = getApp<IAppOption>()
     app.globalData.packVisit = planId

@@ -252,62 +252,17 @@
 .legend-cell.l3 { background: rgba(224, 181, 119, 0.65); }
 .legend-cell.l4 { background: #e8c48a; }
 
-/* 静心包 */
-.pack-card {
-  margin-top: 48rpx;
-  padding: 32rpx;
-  display: flex;
-  align-items: center;
-  border-radius: 24rpx;
-  background:
-    radial-gradient(120% 160% at 100% 0%, rgba(240, 207, 142, 0.2), rgba(240, 207, 142, 0) 55%),
-    linear-gradient(135deg, rgba(60, 42, 24, 0.9), rgba(30, 22, 14, 0.9));
-  border: 1rpx solid rgba(232, 201, 138, 0.35);
-}
+/* 静心包：开了以后只剩一行 */
 .pack-hover {
   opacity: 0.85;
 }
-.pack-text {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-.pack-title {
-  font-family: var(--serif);
-  font-size: 36rpx;
-  letter-spacing: 8rpx;
-  color: #f0cf8e;
-}
-.pack-desc {
-  margin-top: 10rpx;
-  font-size: 24rpx;
-  letter-spacing: 2rpx;
-  color: rgba(243, 234, 220, 0.7);
-}
-.pack-note {
-  margin-top: 6rpx;
-  font-size: 22rpx;
-  letter-spacing: 2rpx;
-  color: rgba(224, 181, 119, 0.55);
-}
-.pack-go {
-  flex-shrink: 0;
-  padding: 14rpx 36rpx;
-  border-radius: 32rpx;
-  font-size: 28rpx;
-  letter-spacing: 6rpx;
-  padding-left: 42rpx;
-  color: #1b130c;
-  background: linear-gradient(135deg, #f0cf8e, #d9a866 60%, #c4925a);
-  box-shadow: 0 10rpx 24rpx rgba(224, 181, 119, 0.25);
-}
 .pack-owned {
   display: block;
-  margin-top: 32rpx;
+  margin-top: 40rpx;
   text-align: center;
-  font-size: 22rpx;
+  font-size: 26rpx;
   letter-spacing: 6rpx;
-  color: rgba(224, 181, 119, 0.5);
+  color: rgba(224, 181, 119, 0.6);
 }
 
 /* 设置 */
@@ -370,45 +325,10 @@
   background: linear-gradient(135deg, #f0cf8e, #d9a866);
   border-color: transparent;
 }
-.ambi-opt.locked {
-  color: rgba(240, 230, 216, 0.35);
-  border-style: dashed;
-}
 .ambi-hover {
   background: rgba(224, 181, 119, 0.14);
 }
 
-/* 一把小锁：锁身 + 锁梁 */
-.lock {
-  position: relative;
-  width: 16rpx;
-  height: 12rpx;
-  margin-left: 10rpx;
-  margin-top: 6rpx;
-  border-radius: 3rpx;
-  background: rgba(224, 181, 119, 0.6);
-}
-.lock::before {
-  content: '';
-  position: absolute;
-  left: 3rpx;
-  top: -9rpx;
-  width: 6rpx;
-  height: 8rpx;
-  border: 2rpx solid rgba(224, 181, 119, 0.6);
-  border-bottom: none;
-  border-radius: 6rpx 6rpx 0 0;
-}
-.lock.on-swatch {
-  position: absolute;
-  right: 4rpx;
-  bottom: 4rpx;
-  margin: 0;
-  background: rgba(243, 234, 220, 0.85);
-}
-.lock.on-swatch::before {
-  border-color: rgba(243, 234, 220, 0.85);
-}
 
 /* 主题：四枚色块 */
 .theme-row {
@@ -435,9 +355,6 @@
   box-shadow: 0 0 24rpx rgba(232, 201, 138, 0.35);
   transform: scale(1.06);
 }
-.theme-opt.locked .theme-swatch {
-  opacity: 0.55;
-}
 .theme-name {
   margin-top: 12rpx;
   font-family: var(--serif);
@@ -457,7 +374,7 @@
   color: rgba(224, 181, 119, 0.6);
 }
 
-/* 主题小样：左下角写是哪一套、换了什么；没开静心包的右下角一枚金签 */
+/* 主题小样：左下角写是哪一套、换了什么 */
 .stage {
   position: relative;
   margin-top: 24rpx;
@@ -483,27 +400,6 @@
   line-height: 1.45;
   letter-spacing: 1rpx;
   color: rgba(243, 234, 220, 0.55);
-}
-.stage-lock {
-  position: absolute;
-  right: 20rpx;
-  bottom: 24rpx;
-  display: flex;
-  align-items: center;
-  padding: 12rpx 22rpx;
-  border-radius: 30rpx;
-  font-size: 22rpx;
-  letter-spacing: 2rpx;
-  color: #1b130c;
-  background: linear-gradient(135deg, #f0cf8e, #d9a866 60%, #c4925a);
-  box-shadow: 0 8rpx 20rpx rgba(0, 0, 0, 0.4);
-}
-.lock.dark {
-  margin: 4rpx 10rpx 0 0;
-  background: rgba(27, 19, 12, 0.8);
-}
-.lock.dark::before {
-  border-color: rgba(27, 19, 12, 0.8);
 }
 
 /* 正在试听：三根跳动的小竖条 */
@@ -542,55 +438,15 @@
   }
 }
 
-/* ===== 静心包介绍面板 ===== */
-.ps-mask {
-  position: fixed;
-  left: 0;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 40;
-  background: rgba(0, 0, 0, 0.55);
-  opacity: 0;
-  transition: opacity 0.28s ease;
-}
-.ps-mask.show {
-  opacity: 1;
-}
-.ps {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 41;
-  height: 86vh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  border-radius: 32rpx 32rpx 0 0;
-  background: linear-gradient(180deg, #211810 0%, #140f0a 100%);
-  border-top: 1rpx solid rgba(232, 201, 138, 0.25);
-  box-shadow: 0 -20rpx 60rpx rgba(0, 0, 0, 0.5);
-  transform: translateY(100%);
-  transition: transform 0.28s ease;
-}
-.ps.show {
-  transform: translateY(0);
-}
-.ps-grip {
-  flex-shrink: 0;
-  width: 72rpx;
-  height: 8rpx;
-  margin: 18rpx auto 6rpx;
-  border-radius: 4rpx;
-  background: rgba(240, 230, 216, 0.2);
-}
-.ps-scroll {
-  flex: 1;
-  min-height: 0;
-}
-.ps-body {
-  padding: 16rpx 40rpx 32rpx;
+/* ===== 静心包：没开时摊在页上的一整块 ===== */
+.pack {
+  margin-top: 48rpx;
+  padding: 40rpx 32rpx 36rpx;
+  border-radius: 28rpx;
+  background:
+    radial-gradient(120% 60% at 100% 0%, rgba(240, 207, 142, 0.16), rgba(240, 207, 142, 0) 60%),
+    linear-gradient(180deg, rgba(48, 34, 20, 0.92), rgba(24, 18, 12, 0.92));
+  border: 1rpx solid rgba(232, 201, 138, 0.3);
 }
 .ps-top {
   display: flex;
@@ -609,8 +465,8 @@
 }
 .ps-lead {
   display: block;
-  margin-top: 12rpx;
-  font-size: 26rpx;
+  margin-top: 16rpx;
+  font-size: 28rpx;
   line-height: 1.6;
   color: rgba(243, 234, 220, 0.7);
 }
@@ -629,8 +485,8 @@
   color: rgba(243, 234, 220, 0.9);
 }
 .ps-sec-hint {
-  font-size: 22rpx;
-  color: rgba(243, 234, 220, 0.36);
+  font-size: 24rpx;
+  color: rgba(243, 234, 220, 0.45);
 }
 .ps-ambi {
   display: flex;
@@ -658,7 +514,7 @@
   height: 40rpx;
 }
 .ps-ambi-name {
-  font-size: 28rpx;
+  font-size: 30rpx;
   letter-spacing: 4rpx;
   color: rgba(243, 234, 220, 0.88);
 }
@@ -671,9 +527,9 @@
 }
 .ps-ambi-desc {
   display: block;
-  margin-top: 6rpx;
-  font-size: 22rpx;
-  color: rgba(243, 234, 220, 0.42);
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: rgba(243, 234, 220, 0.5);
 }
 .ps-themes {
   display: flex;
@@ -720,10 +576,10 @@
 }
 .ps-theme-desc {
   margin-top: 4rpx;
-  font-size: 20rpx;
+  font-size: 22rpx;
   line-height: 1.4;
   text-align: center;
-  color: rgba(243, 234, 220, 0.4);
+  color: rgba(243, 234, 220, 0.48);
 }
 .ps-plan {
   margin-bottom: 16rpx;
@@ -748,43 +604,46 @@
   font-size: 22rpx;
   color: rgba(224, 181, 119, 0.6);
 }
-/* 从香案这套定课过来的：框亮一点，名字后标「刚试过」 */
+/* 从香案这套定课过来的：框亮一点 */
 .ps-plan.from {
   border-color: rgba(224, 181, 119, 0.5);
   background: rgba(224, 181, 119, 0.07);
 }
+/* 名字后一枚小签：可试一次（描边）/ 已试过、刚试过（实底） */
 .ps-plan-tried {
   margin-left: 14rpx;
-  padding: 2rpx 12rpx;
+  padding: 2rpx 14rpx;
   border-radius: 999rpx;
-  font-size: 20rpx;
+  font-size: 22rpx;
   color: #16110d;
   background: rgba(224, 181, 119, 0.85);
+  border: 1rpx solid transparent;
+}
+.ps-plan-tried.open {
+  color: #e8c98a;
+  background: transparent;
+  border-color: rgba(224, 181, 119, 0.45);
 }
 .ps-plan-scene {
   display: block;
-  margin-top: 6rpx;
-  font-size: 24rpx;
+  margin-top: 8rpx;
+  font-size: 26rpx;
   color: rgba(243, 234, 220, 0.75);
 }
 .ps-plan-mix {
   display: block;
   margin-top: 6rpx;
-  font-size: 22rpx;
-  color: rgba(243, 234, 220, 0.42);
+  font-size: 24rpx;
+  color: rgba(243, 234, 220, 0.5);
 }
 .ps-note {
   display: block;
   margin-top: 6rpx;
-  font-size: 22rpx;
+  font-size: 24rpx;
   color: rgba(224, 181, 119, 0.55);
 }
-.ps-foot {
-  flex-shrink: 0;
-  padding: 20rpx 40rpx 0;
-  border-top: 1rpx solid rgba(224, 181, 119, 0.08);
-}
 .ps-buy {
+  margin-top: 44rpx;
   height: 92rpx;
   line-height: 92rpx;
   text-align: center;
@@ -795,12 +654,13 @@
   background: linear-gradient(135deg, #f0cf8e, #d9a866 60%, #c4925a);
   box-shadow: 0 10rpx 24rpx rgba(224, 181, 119, 0.25);
 }
-.ps-owned {
-  padding: 20rpx 0;
+.ps-back {
+  display: block;
+  margin-top: 28rpx;
   text-align: center;
   font-size: 26rpx;
-  letter-spacing: 6rpx;
-  color: rgba(224, 181, 119, 0.7);
+  letter-spacing: 4rpx;
+  color: rgba(243, 234, 220, 0.5);
 }
 
 .partner-entry {
