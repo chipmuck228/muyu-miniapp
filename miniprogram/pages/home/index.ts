@@ -20,7 +20,7 @@ import { AmbienceId } from '../../utils/audioCatalog'
 import { parseTheme, themeEnds, ThemeId } from '../../utils/theme'
 import { applyLesson, nextLesson, LessonPick, RANDOM_NAME, RANDOM_LESSON } from '../../utils/lesson'
 import { SESSION_PLANS, SessionPlan, PlanId, planOf, triedPlans, markPlanTried } from '../../utils/sessionPlans'
-import { resumePending, PACK_NAME } from '../../utils/premium'
+import { resumePending, guardRefund, PACK_NAME } from '../../utils/premium'
 import { randomZen } from '../../utils/zen'
 import { WISH_SUGGESTIONS } from '../../utils/wishIdeas'
 
@@ -506,6 +506,8 @@ Page({
     if (this._session) this.startSessionTick()
     this.refresh()
     this.tryEnter()
+    // 退款复核：香案是最常停留的页面，不能只靠静心页触发
+    guardRefund().catch(() => {})
     // 自动敲只在本次打开内有效：切页、锁屏回来接着敲，重开小程序从手敲开始
     if (this.data.autoMode && !this.entering() && !this.overlayOn()) this.startAuto()
     resumePending().then((ok) => {
@@ -840,6 +842,21 @@ Page({
         wx.showToast({ title: (e && e.message) || '加载失败', icon: 'none' })
       }
     }
+  },
+
+  // guardRefund 收回权益后广播：先立即撤掉付费氛围/主题，再拉云端覆盖一次，
+  // 避免用户退款后香案还留着松风、夜色这类已锁定内容。
+  onPremiumRevoked() {
+    if (!this._alive) return
+    this._userAmbience = 'off'
+    this._userTheme = 'dawn'
+    this.setData({ premium: false, ambience: 'off', theme: 'dawn' })
+    try {
+      stopAmbience()
+    } catch (e) {
+      // ignore
+    }
+    this.refresh()
   },
 
   applyHome(user: UserRecord, todayCount: number) {

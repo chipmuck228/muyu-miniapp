@@ -168,6 +168,39 @@
 
       <text wx:if="{{premium}}" class="pack-owned" hover-class="hover-dim" bindtap="openPack">{{packName}} · 已开启 ›</text>
 
+      <!-- 我的资料：微信不允许凭 openid 反查他人头像昵称，这里由本人授权填写 -->
+      <view class="me-card">
+        <text class="me-title">我的资料</text>
+        <view class="me-row">
+          <button class="me-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" aria-label="选择头像">
+            <image wx:if="{{myAvatarUrl}}" class="me-avatar" src="{{myAvatarUrl}}" mode="aspectFill" />
+            <view wx:else class="me-avatar me-avatar-ph"><text>设头像</text></view>
+          </button>
+          <view class="me-fields">
+            <input
+              class="me-input"
+              type="nickname"
+              maxlength="20"
+              placeholder="点此填写昵称"
+              placeholder-class="me-ph"
+              value="{{myNickname}}"
+              bindinput="onNickInput"
+              bindblur="onNickBlur"
+            />
+            <input
+              class="me-input"
+              maxlength="40"
+              placeholder="微信号（选填）"
+              placeholder-class="me-ph"
+              value="{{myWechatId}}"
+              bindinput="onWechatInput"
+              bindblur="onWechatBlur"
+            />
+          </view>
+        </view>
+        <text class="me-hint">头像与昵称仅在渠道推广统计中展示，可随时修改</text>
+      </view>
+
       <text class="partner-entry" hover-class="hover-dim" bindtap="openPartner">渠道合作</text>
       <text class="partner-entry" wx:if="{{showAdmin}}" hover-class="hover-dim" bindtap="openAdmin">渠道管理</text>
       <text class="sign-off">小叩木鱼 · 愿你心安</text>

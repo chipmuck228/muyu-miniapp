@@ -461,6 +461,21 @@ function handle(name: string, data: any): any {
   }
 
   if (name === 'user') {
+    if (data && data.action === 'profile') {
+      const p = (data && data.profile) || {}
+      if (typeof p.nickname === 'string') db.user.nickname = p.nickname.trim().slice(0, 20) || '静心的人'
+      if (typeof p.wechatId === 'string') db.user.wechatId = p.wechatId.trim().slice(0, 40)
+      if (typeof p.avatarFileID === 'string') db.user.avatarFileID = p.avatarFileID.trim()
+      save(db)
+      return {
+        ok: true,
+        user: {
+          nickname: db.user.nickname,
+          wechatId: db.user.wechatId || '',
+          avatarFileID: db.user.avatarFileID || '',
+        },
+      }
+    }
     const patch = (data && data.settings) || {}
     const premium = db.user.premium === true
     if (!premium && (PREMIUM_AMBIENCE[patch.ambience] || PREMIUM_THEME[patch.theme])) {
@@ -529,6 +544,25 @@ function handle(name: string, data: any): any {
   if (name === 'bindChannel') return { ok: true, bound: false, reason: 'mock' }
   if (name === 'channelAdmin' && data && data.action === 'check') {
     return { ok: true, isAdmin: false, needsBootstrap: false }
+  }
+  if (name === 'getChannelStats') {
+    // 本地预览用：一条带昵称、一条未填资料，方便验证头像占位与昵称回退
+    const nick = String(db.user.nickname || '').trim()
+    const q = String((data && data.wechatId) || '').trim().toLowerCase()
+    const rows = [
+      { id: 'mock-u1', wechatId: nick && nick !== '静心的人' ? nick : 'A1B2C3D4', nickname: nick && nick !== '静心的人' ? nick : '', avatarUrl: '', boundAt: Date.now() - 86400000, paid: db.user.premium === true },
+      { id: 'mock-u2', wechatId: '9F8E7D6C', nickname: '', avatarUrl: '', boundAt: Date.now() - 2 * 86400000, paid: false },
+    ].filter((u) => !q || (u.wechatId + u.nickname).toLowerCase().indexOf(q) >= 0)
+    return {
+      ok: true,
+      name: '本地模拟渠道',
+      status: 'active',
+      userCount: rows.length,
+      paidCount: rows.filter((r) => r.paid).length,
+      totalCommission: 0,
+      pendingCommission: 0,
+      users: rows,
+    }
   }
 
   return fail('本地模式不支持')

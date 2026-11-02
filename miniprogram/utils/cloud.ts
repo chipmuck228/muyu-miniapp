@@ -46,6 +46,9 @@ export interface UserSettings {
 export interface UserRecord {
   _id?: string
   nickname: string
+  /** 本人授权填写的头像（云存储 fileID）与微信号；渠道统计里展示的就是这份 */
+  avatarFileID?: string
+  wechatId?: string
   totalMerit: number
   /** 一次开启后为 true。只应由支付结果写入，不进 settings */
   premium?: boolean
@@ -205,6 +208,17 @@ export function removeWish(wishId: string): Promise<void> {
 
 export function updateSettings(patch: Partial<UserSettings>): Promise<{ settings: UserSettings }> {
   return callCloud('user', { settings: patch })
+}
+
+export interface MyProfile {
+  nickname: string
+  wechatId: string
+  avatarFileID: string
+}
+
+/** 保存本人授权填写的昵称、微信号、头像。头像 fileID 由 wx.cloud.uploadFile 得到 */
+export function saveMyProfile(profile: Partial<MyProfile>): Promise<{ user: MyProfile }> {
+  return callCloud('user', { action: 'profile', profile })
 }
 
 // 普通微信支付（商户平台 JSAPI）：参数由服务端签好名后下发，前端直接调 wx.requestPayment
@@ -442,7 +456,15 @@ export interface ChannelStats {
   paidCount: number
   totalCommission: number
   pendingCommission: number
-  users: { id: string; wechatId: string; boundAt: number; paid: boolean }[]
+  /** 头像昵称需用户本人授权填写；未填写时 nickname/avatarUrl 为空，回退显示 wechatId */
+  users: {
+    id: string
+    wechatId: string
+    nickname: string
+    avatarUrl: string
+    boundAt: number
+    paid: boolean
+  }[]
 }
 
 export function getChannelStats(

@@ -2,15 +2,17 @@
 import {
   fetchProfile,
   updateSettings,
-  verifyPremium,
   UserSettings,
   settingsOf,
   channelAdminCheck,
   rememberUser,
+  saveMyProfile,
 } from '../../utils/cloud'
+import { resolveCloudFile } from '../../utils/cloudFile'
+import { mockEnabled } from '../../utils/devMock'
 import { AMBIENCE_OPTIONS, AmbienceId, isPremiumAmbience, parseAmbience } from '../../utils/audioCatalog'
 import { isPremiumTheme, parseTheme, ThemeId, THEMES, themeOf } from '../../utils/theme'
-import { buyPremium, isPaying, isResuming, resumePending, writePending, PACK_NAME, packPrice } from '../../utils/premium'
+import { buyPremium, guardRefund, resumePending, writePending, PACK_NAME, packPrice } from '../../utils/premium'
 import { fmtInt, todayStr, offsetDate, weekdayMon0, fmtMD, concealTabBar, weekdayCN, winInfo } from '../../utils/util'
 import { SESSION_PLANS, planMix } from '../../utils/sessionPlans'
 import { levelOf, LEVELS } from '../../utils/constants'
@@ -175,10 +177,15 @@ Page({
     packAmbience: PACK_AMBIENCE,
     packThemes: PACK_THEMES,
     packPlans: PACK_PLANS,
+    // 我的资料：本人授权填写，渠道统计里展示的就是这份
+    myNickname: '',
+    myWechatId: '',
+    myAvatarUrl: '',
+    myAvatarFileID: '',
+    profileSaving: false,
   },
 
   _alive: false,
-  _verified: false,
   /** 从香案过来看静心包：开了或关掉面板都回香案；null 表示是自己点开的 */
   _packVisit: null as string | null,
   _previewTimer: 0,
@@ -240,23 +247,100 @@ Page({
     }
   },
 
-  // 退款复核：在商户平台给用户退款后，微信侧订单会变成 REFUND。
-  // 我们没接异步回调，所以每次进本页主动问一次微信；确认已退款就收回权益。
-  // 每次页面实例只查一次，避免切 tab 时反复请求。
-  async verifyRefund() {
-    if (this._verified || isPaying() || isResuming()) return
-    this._verified = true
+  // 退款复核：全局统一走 guardRefund（App.onShow 也会调），内部有节流与去重。
+  // 旧实现在这里读 this.data.premium，但 load() 是异步的，onShow 时它还是 false，
+  // 于是直接 return，加上 _verified 一次性置位，导致这个页面几乎从不真正复核。
+  verifyRefund() {
+    guardRefund(true).catch(() => {})
+  },
+
+  // guardRefund 收回权益后广播：立刻把本页的锁定态刷回来
+  onPremiumRevoked() {
+    if (!this._alive) return
+    this.setData({
+      premium: false,
+      ambience: 'off' as AmbienceId,
+      ambienceOptions: dressList(AMBIENCE_OPTIONS, false),
+      theme: 'dawn' as ThemeId,
+      themeOptions: dressList(THEMES, false),
+    })
+    this.load()
+  },
+
+  // ===== 我的资料：头像与昵称由本人授权填写 =====
+  // 微信不提供凭 openid 反查他人头像昵称的能力，所以推广统计里能显示的，
+  // 只有用户自己在这里填过的这份。未填写的用户仍显示识别号。
+
+  applyAvatar(fileID: string) {
+    if (!fileID) {
+      this.setData({ myAvatarUrl: '' })
+      return
+    }
+    resolveCloudFile(fileID)
+      .then((path) => {
+        if (this._alive && this.data.myAvatarFileID === fileID) this.setData({ myAvatarUrl: path })
+      })
+      .catch(() => {
+        if (this._alive) this.setData({ myAvatarUrl: '' })
+      })
+  },
+
+  // <button open-type="chooseAvatar"> 回调：拿到的是本地临时路径，要传上云存储
+  async onChooseAvatar(e: any) {
+    const filePath = e && e.detail && e.detail.avatarUrl
+    if (!filePath) return
+    this.setData({ myAvatarUrl: filePath })
+    // 本地模拟模式没有真实云存储，uploadFile 会失败；头像仅本次会话内预览
+    if (mockEnabled()) {
+      wx.showToast({ title: '模拟模式：头像仅本次显示', icon: 'none' })
+      return
+    }
+    wx.showLoading({ title: '上传头像', mask: true })
     try {
-      if (!this.data.premium) return
-      const r = await verifyPremium()
-      if (!this._alive) return
-      if (r.refunded) {
-        writePending('')
-        wx.showToast({ title: '已退款，高级功能已关闭', icon: 'none' })
-        this.load()
-      }
-    } catch (e) {
-      // 复核失败不收回权益：网络抖动不应误伤付费用户
+      const ext = String(filePath).split('.').pop() || 'png'
+      const cloudPath = 'avatars/' + Date.now() + '-' + Math.floor(Math.random() * 1e6) + '.' + ext
+      const up = await (wx as any).cloud.uploadFile({ cloudPath, filePath })
+      const fileID = up && up.fileID
+      if (!fileID) throw new Error('上传失败')
+      this.setData({ myAvatarFileID: fileID })
+      const r = await saveMyProfile({ avatarFileID: fileID })
+      if (r && r.user) this.applyAvatar(r.user.avatarFileID || fileID)
+      wx.showToast({ title: '头像已保存', icon: 'none' })
+    } catch (err: any) {
+      wx.showToast({ title: (err && err.message) || '头像上传失败', icon: 'none' })
+    } finally {
+      wx.hideLoading()
+    }
+  },
+
+  // <input type="nickname">：微信会在用户选完昵称后回调，失焦时保存
+  onNickInput(e: any) {
+    this.setData({ myNickname: String((e && e.detail && e.detail.value) || '') })
+  },
+
+  async onNickBlur(e: any) {
+    const nickname = String((e && e.detail && e.detail.value) || '').trim()
+    if (!nickname || nickname === this.data.myNickname) return
+    try {
+      await saveMyProfile({ nickname })
+      this.setData({ myNickname: nickname })
+    } catch (err: any) {
+      wx.showToast({ title: (err && err.message) || '昵称保存失败', icon: 'none' })
+    }
+  },
+
+  onWechatInput(e: any) {
+    this.setData({ myWechatId: String((e && e.detail && e.detail.value) || '') })
+  },
+
+  async onWechatBlur(e: any) {
+    const wechatId = String((e && e.detail && e.detail.value) || '').trim()
+    if (wechatId === this.data.myWechatId) return
+    try {
+      await saveMyProfile({ wechatId })
+      this.setData({ myWechatId: wechatId })
+    } catch (err: any) {
+      wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
     }
   },
 
@@ -313,7 +397,11 @@ Page({
         theme: s.theme,
         themeOptions: dressList(THEMES, premium),
         premium,
+        myNickname: res.user.nickname && res.user.nickname !== '静心的人' ? res.user.nickname : '',
+        myWechatId: res.user.wechatId || '',
+        myAvatarFileID: res.user.avatarFileID || '',
       }, stagePatch(s.theme, premium)))
+      this.applyAvatar(res.user.avatarFileID || '')
       this.loadChannelFlags()
     } catch (e: any) {
       if (!this._alive) return

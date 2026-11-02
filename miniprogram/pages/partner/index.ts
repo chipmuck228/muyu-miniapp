@@ -94,7 +94,15 @@ Page({
     totalText: '0.00',
     pendingText: '0.00',
     qrSrc: '',
-    users: [] as { id: string; wechatId: string; timeText: string; paidText: string }[],
+    users: [] as {
+      id: string
+      wechatId: string
+      nickname: string
+      avatarUrl: string
+      avatarText: string
+      timeText: string
+      paidText: string
+    }[],
     months: monthOptions(),
     monthIndex: 0,
     userQuery: '',
@@ -207,12 +215,19 @@ Page({
       paidCount: st.paidCount || 0,
       totalText: fenText(st.totalCommission),
       pendingText: fenText(st.pendingCommission),
-      users: (st.users || []).map((u) => ({
-        id: u.id,
-        wechatId: u.wechatId || '未填写',
-        timeText: fmtDT(u.boundAt),
-        paidText: u.paid ? '已付费' : '未付费',
-      })),
+      users: (st.users || []).map((u) => {
+        const label = (u.nickname || u.wechatId || '未填写').trim()
+        return {
+          id: u.id,
+          wechatId: u.wechatId || '未填写',
+          nickname: u.nickname || '',
+          avatarUrl: u.avatarUrl || '',
+          // 没头像时用昵称首字做占位，避免一片空圆圈
+          avatarText: label.slice(0, 1).toUpperCase(),
+          timeText: fmtDT(u.boundAt),
+          paidText: u.paid ? '已付费' : '未付费',
+        }
+      }),
       tenures: this._tenures.map((t) => ({
         key: t.channelId + '-' + t.boundAt,
         channelId: t.channelId,

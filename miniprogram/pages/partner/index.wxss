@@ -172,23 +172,59 @@
 }
 .user-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   padding: 14rpx 0;
 }
-.user-id {
+.user-avatar {
+  flex: none;
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 50%;
+  margin-right: 20rpx;
+  background: rgba(224, 181, 119, 0.1);
+  border: 1rpx solid rgba(224, 181, 119, 0.22);
+}
+.user-avatar-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.user-avatar-ph text {
+  font-size: 28rpx;
+  color: rgba(224, 181, 119, 0.7);
+}
+.user-main {
   flex: 1;
   min-width: 0;
-  font-size: 28rpx;
-  color: rgba(240, 230, 216, 0.62);
+  display: flex;
+  flex-direction: column;
 }
-.user-meta {
-  margin-left: 16rpx;
-  font-size: 24rpx;
+.user-nick {
+  font-size: 28rpx;
+  color: rgba(240, 230, 216, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-sub {
+  margin-top: 4rpx;
+  font-size: 22rpx;
   color: rgba(240, 230, 216, 0.32);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .user-pay {
   margin-left: 16rpx;
+  flex: none;
   font-size: 24rpx;
   letter-spacing: 2rpx;
   color: rgba(224, 181, 119, 0.7);
+}
+.user-note {
+  display: block;
+  margin-top: 18rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: rgba(240, 230, 216, 0.28);
 }

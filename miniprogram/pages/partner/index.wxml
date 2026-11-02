@@ -109,7 +109,7 @@
             <input
               class="input"
               maxlength="40"
-              placeholder="按微信号搜索"
+              placeholder="按昵称 / 微信号搜索"
               placeholder-class="ph"
               value="{{userQuery}}"
               adjust-position="{{false}}"
@@ -124,10 +124,15 @@
           </picker>
           <text class="empty" wx:if="{{!users.length}}">暂无用户</text>
           <view class="user-row" wx:for="{{users}}" wx:key="id">
-            <text class="user-id">{{item.wechatId}}</text>
-            <text class="user-meta">{{item.timeText}}</text>
+            <image wx:if="{{item.avatarUrl}}" class="user-avatar" src="{{item.avatarUrl}}" mode="aspectFill" />
+            <view wx:else class="user-avatar user-avatar-ph"><text>{{item.avatarText}}</text></view>
+            <view class="user-main">
+              <text class="user-nick">{{item.nickname || item.wechatId}}</text>
+              <text class="user-sub">{{item.wechatId}} · {{item.timeText}}</text>
+            </view>
             <text class="user-pay">{{item.paidText}}</text>
           </view>
+          <text class="user-note">头像与昵称由用户本人授权填写；未填写的显示识别号</text>
         </view>
       </view>
     </view>

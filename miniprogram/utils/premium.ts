@@ -1,6 +1,7 @@
 // 静心包：一次付款开启（users.premium）。付款都在静心页的介绍面板里；香案的定课要开启时也是去那里。
-import { preparePremiumPay, confirmPremiumPay, fetchPremiumPrice } from './cloud'
+import { preparePremiumPay, confirmPremiumPay, fetchPremiumPrice, verifyPremium } from './cloud'
 import { mockEnabled, mockMarkPaid } from './devMock'
+import { stopAmbience } from './ambience'
 
 export const PACK_NAME = '静心包'
 export const PACK_DESC = '四种氛围：白噪、溪流、松风、炉火\n三套主题：夜、墨、霞\n两套定课：松间慢叩、夜里收心\n一次开启，永久可用'
@@ -165,6 +166,75 @@ export function isPaying(): boolean {
 /** 正在续查上一笔：退款复核要避开 */
 export function isResuming(): boolean {
   return !!resumeTask
+}
+
+// ===== 退款复核（全局） =====
+// 后台退款后微信没有可用的异步回调（notify_url 是占位地址），只能客户端主动问。
+// 原先只在静心页 onShow 查一次，用户不进那页就永远不收回，且 load() 未完成时
+// this.data.premium 还是 false 会直接跳过。改为：App.onShow / 页面 onShow 都能触发，
+// 带节流与并发去重，收回到本地后广播给所有已打开的页面。
+
+const REFUND_GUARD_GAP_MS = 60 * 1000
+let lastRefundGuard = 0
+let refundGuardTask: Promise<boolean> | null = null
+
+function broadcastRefund() {
+  try {
+    const pages = getCurrentPages()
+    for (let i = 0; i < pages.length; i++) {
+      const p: any = pages[i]
+      if (p && typeof p.onPremiumRevoked === 'function') p.onPremiumRevoked()
+    }
+  } catch (e) {
+    // 页面栈拿不到就算了，下次 onShow 会重新拉云端状态
+  }
+}
+
+function applyRefundLocal() {
+  writePending('')
+  try {
+    const app = getApp<IAppOption>()
+    if (app && app.globalData && app.globalData.user) {
+      app.globalData.user.premium = false
+      app.globalData.user.premiumAt = undefined
+    }
+  } catch (e) {
+    // ignore
+  }
+  try {
+    stopAmbience()
+  } catch (e) {
+    // ignore
+  }
+  broadcastRefund()
+}
+
+/**
+ * 复核一次退款。force 用于页面 onShow（同一会话内仍受节流），
+ * 返回 true 表示本次把权益收回了。付款/续查期间自动避开。
+ */
+export function guardRefund(force = false): Promise<boolean> {
+  if (isPaying() || isResuming()) return Promise.resolve(false)
+  if (refundGuardTask) return refundGuardTask
+  const now = Date.now()
+  if (!force && now - lastRefundGuard < REFUND_GUARD_GAP_MS) return Promise.resolve(false)
+  lastRefundGuard = now
+  const task = (async () => {
+    try {
+      const r = await verifyPremium()
+      // 复核失败一律不收回：网络抖动不应误伤付费用户
+      if (!r || !r.refunded) return false
+      applyRefundLocal()
+      wx.showToast({ title: '已退款，高级功能已关闭', icon: 'none' })
+      return true
+    } catch (e) {
+      return false
+    } finally {
+      refundGuardTask = null
+    }
+  })()
+  refundGuardTask = task
+  return task
 }
 
 /**

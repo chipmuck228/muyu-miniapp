@@ -17,4 +17,14 @@ module.exports = {
   price: 600,
   // 商品描述，会展示在用户支付凭证上
   description: '静心包 · 定课、氛围与主题一次开启',
+
+  // ---- 分账 ----
+  // 分账开关。置 1 前必须先确认商户平台 → 产品中心 → 已开通「分账」产品。
+  // 开启后下单会带 settle_info.profit_sharing，该笔资金会被冻结，
+  // 直到完成分账或主动解冻（splitQuery / unfreeze 动作），否则一直挂账无法结算。
+  split: '0',
+  // 分账比例 0 ~ 0.3，微信规定单笔最多分 30%。20% 即 0.2
+  splitRate: 0.2,
+  // 管理动作（addReceiver / splitQuery / unfreeze）的口令，留空则这些动作不可用
+  adminKey: '',
 }
