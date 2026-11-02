@@ -2,7 +2,6 @@
 import {
   fetchProfile,
   updateSettings,
-  verifyPremium,
   UserSettings,
   settingsOf,
   channelAdminCheck,
@@ -10,7 +9,7 @@ import {
 } from '../../utils/cloud'
 import { AMBIENCE_OPTIONS, AmbienceId, isPremiumAmbience, parseAmbience } from '../../utils/audioCatalog'
 import { isPremiumTheme, parseTheme, ThemeId, THEMES, themeOf } from '../../utils/theme'
-import { buyPremium, isPaying, isResuming, resumePending, writePending, PACK_NAME, packPrice } from '../../utils/premium'
+import { buyPremium, checkRefund, resumePending, writePending, PACK_NAME, packPrice } from '../../utils/premium'
 import { fmtInt, todayStr, offsetDate, weekdayMon0, fmtMD, concealTabBar, weekdayCN, winInfo } from '../../utils/util'
 import { SESSION_PLANS, planMix } from '../../utils/sessionPlans'
 import { levelOf, LEVELS } from '../../utils/constants'
@@ -178,7 +177,6 @@ Page({
   },
 
   _alive: false,
-  _verified: false,
   /** 从香案过来看静心包：开了或关掉面板都回香案；null 表示是自己点开的 */
   _packVisit: null as string | null,
   _previewTimer: 0,
@@ -209,7 +207,6 @@ Page({
     concealTabBar(this)
     this.load()
     this.resumePending()
-    this.verifyRefund()
     const app = getApp<IAppOption>()
     const visit = app.globalData.packVisit
     app.globalData.packVisit = null
@@ -240,24 +237,11 @@ Page({
     }
   },
 
-  // 退款复核：在商户平台给用户退款后，微信侧订单会变成 REFUND。
-  // 我们没接异步回调，所以每次进本页主动问一次微信；确认已退款就收回权益。
-  // 每次页面实例只查一次，避免切 tab 时反复请求。
-  async verifyRefund() {
-    if (this._verified || isPaying() || isResuming()) return
-    this._verified = true
-    try {
-      if (!this.data.premium) return
-      const r = await verifyPremium()
-      if (!this._alive) return
-      if (r.refunded) {
-        writePending('')
-        wx.showToast({ title: '已退款，高级功能已关闭', icon: 'none' })
-        this.load()
-      }
-    } catch (e) {
-      // 复核失败不收回权益：网络抖动不应误伤付费用户
-    }
+  /** 开着静心包的：隔一阵问一次是否已退款（utils/premium 里节流），退了就重新拉资料，锁回去 */
+  recheckRefund() {
+    checkRefund().then((refunded) => {
+      if (refunded && this._alive) this.load()
+    })
   },
 
   async load() {
@@ -274,6 +258,7 @@ Page({
       const s = settingsOf(res.user)
       const premium = res.user.premium === true
       if (premium) writePending('')
+      if (premium) this.recheckRefund()
       const total = res.user.totalMerit || 0
       const lv = levelOf(total)
       let activeDays = 0
