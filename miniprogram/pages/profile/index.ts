@@ -11,7 +11,7 @@ import { AMBIENCE_OPTIONS, AmbienceId, isPremiumAmbience, parseAmbience } from '
 import { isPremiumTheme, parseTheme, ThemeId, THEMES, themeOf } from '../../utils/theme'
 import { buyPremium, checkRefund, resumePending, writePending, PACK_NAME, packPrice } from '../../utils/premium'
 import { fmtInt, todayStr, offsetDate, weekdayMon0, fmtMD, concealTabBar, weekdayCN, winInfo } from '../../utils/util'
-import { SESSION_PLANS, planMix } from '../../utils/sessionPlans'
+import { SESSION_PLANS, planMix, triedPlans } from '../../utils/sessionPlans'
 import { levelOf, LEVELS } from '../../utils/constants'
 import { zenOfDay } from '../../utils/zen'
 import { startAmbience, stopAmbience, fadeOutAmbience } from '../../utils/ambience'
@@ -44,43 +44,43 @@ interface LadderRow {
 interface DressOption {
   id: string
   name: string
-  locked: boolean
   /** 主题色块的背景样式；氛围没有 */
   swatch: string
 }
 
+/** 设置里能选的：没开静心包只列免费的，付费的都在静心包那一块里 */
 function dressList(
   list: { id: string; name: string; premium?: boolean; swatch?: [string, string] }[],
   premium: boolean
 ): DressOption[] {
-  return list.map((item) => ({
-    id: item.id,
-    name: item.name,
-    locked: !!item.premium && !premium,
-    swatch: item.swatch ? swatchStyle(item.swatch) : '',
-  }))
+  return list
+    .filter((item) => premium || !item.premium)
+    .map((item) => ({ id: item.id, name: item.name, swatch: item.swatch ? swatchStyle(item.swatch) : '' }))
 }
 
-/** 主题小样下面那行字：哪一套、换了什么、能不能用 */
-function stagePatch(id: ThemeId, premium: boolean) {
+/** 主题小样下面那行字：哪一套、换了什么 */
+function stagePatch(id: ThemeId) {
   const t = themeOf(id)
-  return { previewTheme: t.id, previewName: t.name, previewDesc: t.desc, previewLocked: t.premium && !premium }
+  return { previewTheme: t.id, previewName: t.name, previewDesc: t.desc }
 }
 
 const swatchStyle = (s: [string, string]) => 'background: linear-gradient(180deg, ' + s[0] + ' 0%, ' + s[1] + ' 100%);'
 
-/** 静心包面板里列的东西：付费的氛围、主题和定课 */
+/** 静心包那一块里列的东西：付费的氛围、主题和定课 */
 const PACK_AMBIENCE = AMBIENCE_OPTIONS.filter((a) => a.premium).map((a) => ({ id: a.id, name: a.name, desc: a.desc }))
 const PACK_THEMES = THEMES.filter((t) => t.premium).map((t) => ({ id: t.id, name: t.name, desc: t.desc, swatch: swatchStyle(t.swatch) }))
-const PACK_PLANS = SESSION_PLANS.filter((p) => p.premium).map((p) => ({
-  id: p.id,
-  name: p.name,
-  minutes: p.minutes,
-  scene: p.scene,
-  mix: planMix(p),
-}))
-/** 面板升起 / 收起的动画时长 */
-const PACK_ANIM_MS = 280
+/** 付费定课，带上这台手机上试没试过 */
+function packPlans() {
+  const tried = triedPlans()
+  return SESSION_PLANS.filter((p) => p.premium).map((p) => ({
+    id: p.id,
+    name: p.name,
+    minutes: p.minutes,
+    scene: p.scene,
+    mix: planMix(p),
+    tried: !!tried[p.id],
+  }))
+}
 
 /** 深浅按这几周里最多的一天来分四档，几百下的日子也分得出层次 */
 function levelOfCount(c: number, max: number): number {
@@ -158,31 +158,28 @@ Page({
     safeBottom: 0,
     /** 正在试听的氛围：氛围签上画一个小声波 */
     playingId: '',
-    // 主题小样：显示的是哪一套（没开静心包的也能看，只是不存）
+    // 主题小样：显示的是哪一套
     previewTheme: 'dawn' as ThemeId,
     previewName: '晨',
     previewDesc: '',
-    previewLocked: false,
-    // 静心包介绍面板
-    packOn: false,
-    packShow: false,
+    // 静心包那一块（没开时摊在页上）
     packTheme: 'night' as ThemeId,
     packPriceText: '',
-    /** 从香案哪套定课过来的：那套标上「刚试过」，面板直接翻到定课 */
+    /** 从香案哪套定课过来的：那套标上「刚试过」，页面翻到静心包 */
     packFrom: '',
-    packScrollTo: '',
+    /** 页面滚到哪一块：静心包是 pack */
+    scrollTo: '',
     packAmbience: PACK_AMBIENCE,
     packThemes: PACK_THEMES,
-    packPlans: PACK_PLANS,
+    packPlans: packPlans(),
   },
 
   _alive: false,
-  /** 从香案过来看静心包：开了或关掉面板都回香案；null 表示是自己点开的 */
+  /** 从香案过来看静心包：开了或点「回香案」都回去；null 表示是自己来的 */
   _packVisit: null as string | null,
   _previewTimer: 0,
   /** 每次试听 / 收起都换一个号，淡出结束时号对不上就别去停（香案可能已经在放自己的氛围） */
   _previewSeq: 0,
-  _packTimer: 0,
 
   onLoad() {
     const app = getApp<IAppOption>()
@@ -198,7 +195,7 @@ Page({
     this.setData(
       Object.assign(
         { statusBarHeight: app.globalData.statusBarHeight || 20, zenText: zen.text, zenFrom: zen.from, safeBottom },
-        stagePatch('dawn', false)
+        stagePatch('dawn')
       )
     )
   },
@@ -212,21 +209,21 @@ Page({
     app.globalData.packVisit = null
     if (typeof visit === 'string') {
       this._packVisit = visit
-      this.openPack()
+      this.setData({ packFrom: visit })
+      this.showPack()
     }
   },
 
   onHide() {
     this.stopPreview()
-    if (this.data.packOn) this.closePack()
     // 从这里切去别的页：这趟就算看完了，不再替香案记着
     this._packVisit = null
+    if (this.data.packFrom) this.setData({ packFrom: '' })
   },
 
   onUnload() {
     this._alive = false
     this.stopPreview()
-    if (this._packTimer) clearTimeout(this._packTimer)
   },
 
   // 上一笔付款没能当场确认发货时的续查。每次回到本页都继续追，直到开启或过期，
@@ -298,7 +295,11 @@ Page({
         theme: s.theme,
         themeOptions: dressList(THEMES, premium),
         premium,
-      }, stagePatch(s.theme, premium)))
+        packPlans: packPlans(),
+      }, stagePatch(s.theme)))
+      if (!premium) this.loadPackPrice()
+      // 从香案过来的：静心包那一块要等资料到了才画出来，画出来再翻过去
+      if (!premium && this._packVisit !== null) this.showPack()
       this.loadChannelFlags()
     } catch (e: any) {
       if (!this._alive) return
@@ -331,8 +332,8 @@ Page({
   onPickAmbience(e: any) {
     const ambience = parseAmbience(e.currentTarget.dataset.id)
     if (isPremiumAmbience(ambience) && !this.data.premium) {
-      // 没开静心包：先听听，再看看静心包里还有什么
-      this.openPack()
+      // 设置里不列付费的；万一点到了，就去静心包那一块听
+      this.showPack()
       this.listen(ambience)
       return
     }
@@ -344,10 +345,10 @@ Page({
     this.saveSetting({ ambience })
     this.preview(ambience)
   },
-  /** 点色块：小样马上换成这一套；开得了的顺手存下，没开静心包的只看不存 */
+  /** 点色块：小样马上换成这一套，并存下（主题这一项只在开了静心包后出现） */
   onPickTheme(e: any) {
     const theme = parseTheme(e.currentTarget.dataset.id)
-    this.setData(stagePatch(theme, this.data.premium))
+    this.setData(stagePatch(theme))
     if (theme === this.data.theme) return
     if (isPremiumTheme(theme) && !this.data.premium) return
     this.saveSetting({ theme })
@@ -389,43 +390,26 @@ Page({
     this.preview(id)
   },
 
-  // ===== 静心包介绍 =====
-  noop() {},
-
-  openPack(e?: any) {
-    const want = e && e.currentTarget && e.currentTarget.dataset ? e.currentTarget.dataset.theme : ''
-    const theme = want && isPremiumTheme(want) ? parseTheme(want) : this.data.packTheme
-    if (this._packTimer) {
-      clearTimeout(this._packTimer)
-      this._packTimer = 0
-    }
-    const from = this._packVisit || ''
-    this.setData({ packOn: true, packTheme: theme, packFrom: from })
-    this._packTimer = setTimeout(() => {
-      this._packTimer = 0
-      // 面板建好了再翻：从香案定课过来的直接看到定课那一段
-      if (this._alive) this.setData({ packShow: true, packScrollTo: from ? 'ps-plans' : '' })
-    }, 30) as unknown as number
-    if (!this.data.premium && !this.data.packPriceText) {
-      packPrice().then((p) => {
-        if (this._alive && p) this.setData({ packPriceText: '¥' + p })
-      })
-    }
+  // ===== 静心包 =====
+  /** 翻到静心包那一块。先清空再设，同一个目标也能再滚一次 */
+  showPack() {
+    if (this.data.premium) return
+    this.setData({ scrollTo: '' })
+    setTimeout(() => {
+      if (this._alive) this.setData({ scrollTo: 'pack' })
+    }, 60)
   },
 
-  closePack() {
+  loadPackPrice() {
+    if (this.data.packPriceText) return
+    packPrice().then((p) => {
+      if (this._alive && p) this.setData({ packPriceText: '¥' + p })
+    })
+  },
+
+  /** 从香案过来、先不开：回香案原处 */
+  onPackBack() {
     this.stopPreview()
-    if (this._packTimer) clearTimeout(this._packTimer)
-    this.setData({ packShow: false })
-    this._packTimer = setTimeout(() => {
-      this._packTimer = 0
-      if (this._alive) this.setData({ packOn: false, packFrom: '', packScrollTo: '' })
-    }, PACK_ANIM_MS) as unknown as number
-  },
-
-  /** 用户自己关掉面板：从香案过来的就回香案原处 */
-  dismissPack() {
-    this.closePack()
     this.backToAltar(false)
   },
 
@@ -460,17 +444,19 @@ Page({
     this.beginUnlock()
   },
 
-  /** 云端说这项要静心包（比如本机缓存还当它开着）：打开介绍面板 */
+  /** 云端说这项要静心包（比如本机缓存还当它开着）：翻到静心包 */
   askUnlock() {
-    this.openPack()
+    this.showPack()
   },
 
+  /** 开了：静心包那一块收成一行，付费的氛围、主题并进设置 */
   markPremium() {
     this.setData({
       premium: true,
       ambienceOptions: dressList(AMBIENCE_OPTIONS, true),
       themeOptions: dressList(THEMES, true),
-      previewLocked: false,
+      packFrom: '',
+      scrollTo: '',
     })
   },
 
@@ -479,7 +465,6 @@ Page({
     if (!this._alive) return
     if (r === 'opened') {
       this.markPremium()
-      if (this.data.packOn) this.closePack()
       // 从香案过来的回香案，由那边提示
       if (!this.backToAltar(true)) wx.showToast({ title: '静心包已开启', icon: 'none' })
     } else if (r === 'pending') {
