@@ -108,7 +108,8 @@ exports.main = async (event) => {
       if (p.userId) paidSet[p.userId] = true
       const n = p.commissionAmount || 0
       totalCommission += n
-      if (p.status === 'pending') pendingCommission += n
+      // 已被管理员结算过的行不再算「待结」，否则结算完这个数永远不降
+      if (p.status === 'pending' && !p.settledAt) pendingCommission += n
     })
 
     let allUsers = usersR.data || []

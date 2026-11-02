@@ -501,18 +501,20 @@ exports.main = async (event) => {
         const c = channels[i]
         const agg = await collectMonth(c._id, month)
         const settlement = await readSettlement(c._id, month)
+        const settled = !!(settlement && settlement.status === 'settled')
+        // 已结算的显示当时快照，避免退款冲销后数字和已打款的金额对不上
         list.push({
           channelId: c._id,
           name: c.name || '渠道',
           phone: c.phone || '',
           receiverOpenid: c.boundOpenid || c.authorizedOpenid || '',
           rate: Number(c.commissionRate) || 0,
-          userCount: agg.userCount,
-          paidCount: agg.paidCount,
-          orderAmount: agg.orderAmount,
-          commissionAmount: agg.commissionAmount,
-          refundedAmount: agg.refundedAmount,
-          status: settlement ? 'settled' : 'unsettled',
+          userCount: settled ? settlement.userCount || 0 : agg.userCount,
+          paidCount: settled ? settlement.paidCount || 0 : agg.paidCount,
+          orderAmount: settled ? settlement.orderAmount || 0 : agg.orderAmount,
+          commissionAmount: settled ? settlement.commissionAmount || 0 : agg.commissionAmount,
+          refundedAmount: settled ? settlement.refundedAmount || 0 : agg.refundedAmount,
+          status: settled ? 'settled' : 'unsettled',
           settledAt: settlement ? toMs(settlement.settledAt) : 0,
         })
       }
