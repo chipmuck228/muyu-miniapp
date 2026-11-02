@@ -1173,6 +1173,27 @@
   color: #e8c98a;
   border: 1rpx solid rgba(224, 181, 119, 0.4);
 }
+/* 「静心包」实底金签，试用状态描边签 */
+.plan-tag.pack {
+  color: #1b130c;
+  background: linear-gradient(135deg, #f0cf8e, #d9a866);
+  border-color: transparent;
+}
+.plan-tags {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.plan-tags .plan-tag + .plan-tag {
+  margin-left: 10rpx;
+}
+.plan-note {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: rgba(243, 234, 220, 0.45);
+}
 .sheet-row.locked .plan-mark {
   opacity: 0.55;
 }

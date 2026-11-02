@@ -190,6 +190,7 @@
     </view>
     <scroll-view class="sheet-list" scroll-y enhanced show-scrollbar="{{false}}">
       <text class="sheet-section">成品定课</text>
+      <text wx:if="{{!premium}}" class="plan-note">雨窗片刻免费；带「{{packName}}」的两套没开也能各完整试一次</text>
       <view
         wx:for="{{planOptions}}"
         wx:key="id"
@@ -202,7 +203,10 @@
         <view class="plan-text">
           <view class="sheet-line">
             <text class="sheet-name">{{item.name}}</text>
-            <text wx:if="{{item.tag}}" class="plan-tag">{{item.tag}}</text>
+            <view wx:if="{{item.pack}}" class="plan-tags">
+              <text class="plan-tag pack">{{packName}}</text>
+              <text wx:if="{{item.tag}}" class="plan-tag">{{item.tag}}</text>
+            </view>
           </view>
           <text class="plan-sub">{{item.mark}}</text>
         </view>

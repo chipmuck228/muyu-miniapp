@@ -155,41 +155,39 @@ async function waitDelivered(outTradeNo: string, alive: () => boolean): Promise<
 /** opened 已开启；pending 付了款还在等发货；cancel 用户没付或页面已关 */
 export type BuyResult = 'opened' | 'pending' | 'cancel'
 
+/** 正在付款：续查、退款复核要避开，免得和这一单抢着改状态 */
 let paying = false
+/** 正在续查上一笔：退款复核要避开 */
 let resumeTask: Promise<boolean> | null = null
 
-/** 正在付款：续查、退款复核要避开，免得和这一单抢着改状态 */
-export function isPaying(): boolean {
-  return paying
-}
+// ===== 退款复核 =====
+// 商户平台退款后微信侧订单变成 REFUND，我们没接退款回调，只能客户端主动问。
+// 香案和静心页在拉到「已开通」的资料后再问一次（#11 修掉的时序 bug 就在这里：
+// 旧版在 load() 完成前读 this.data.premium，初始是 false 直接跳过，且一页只查一次）。
+// 统一用本机持久化节流：6 小时问一次，失败 10 分钟后重试，多个入口共用一趟。
+const REFUND_CHECK_KEY = 'premium_refund_checked_at'
+const REFUND_CHECK_MS = 6 * 60 * 60 * 1000
+const REFUND_RETRY_MS = 10 * 60 * 1000
+let refundTask: Promise<boolean> | null = null
 
-/** 正在续查上一笔：退款复核要避开 */
-export function isResuming(): boolean {
-  return !!resumeTask
-}
-
-// ===== 退款复核（全局） =====
-// 后台退款后微信没有可用的异步回调（notify_url 是占位地址），只能客户端主动问。
-// 原先只在静心页 onShow 查一次，用户不进那页就永远不收回，且 load() 未完成时
-// this.data.premium 还是 false 会直接跳过。改为：App.onShow / 页面 onShow 都能触发，
-// 带节流与并发去重，收回到本地后广播给所有已打开的页面。
-
-const REFUND_GUARD_GAP_MS = 60 * 1000
-let lastRefundGuard = 0
-let refundGuardTask: Promise<boolean> | null = null
-
-function broadcastRefund() {
+function refundCheckedAt(): number {
   try {
-    const pages = getCurrentPages()
-    for (let i = 0; i < pages.length; i++) {
-      const p: any = pages[i]
-      if (p && typeof p.onPremiumRevoked === 'function') p.onPremiumRevoked()
-    }
+    return Number(wx.getStorageSync(REFUND_CHECK_KEY)) || 0
   } catch (e) {
-    // 页面栈拿不到就算了，下次 onShow 会重新拉云端状态
+    return 0
   }
 }
 
+function markRefundChecked(at: number) {
+  try {
+    wx.setStorageSync(REFUND_CHECK_KEY, at)
+  } catch (e) {
+    // 存储不可用：本次会话里每次都会再问，不影响结果
+  }
+}
+
+// 收回后立刻清本机缓存并停掉付费氛围，不等页面重新拉完资料。
+// 页面刷新由 checkRefund 的调用方（recheckRefund）负责，这里不重复广播。
 function applyRefundLocal() {
   writePending('')
   try {
@@ -206,34 +204,35 @@ function applyRefundLocal() {
   } catch (e) {
     // ignore
   }
-  broadcastRefund()
 }
 
 /**
- * 复核一次退款。force 用于页面 onShow（同一会话内仍受节流），
- * 返回 true 表示本次把权益收回了。付款/续查期间自动避开。
+ * 问一次微信这单退款了没有，退了云端会把静心包收回。
+ * 香案、静心页、App.onShow 共用同一趟，收回时只提示一次；
+ * 返回是否刚被收回（调用方据此重新拉资料）。付款/续查期间自动避开。
  */
-export function guardRefund(force = false): Promise<boolean> {
-  if (isPaying() || isResuming()) return Promise.resolve(false)
-  if (refundGuardTask) return refundGuardTask
-  const now = Date.now()
-  if (!force && now - lastRefundGuard < REFUND_GUARD_GAP_MS) return Promise.resolve(false)
-  lastRefundGuard = now
-  const task = (async () => {
-    try {
-      const r = await verifyPremium()
-      // 复核失败一律不收回：网络抖动不应误伤付费用户
-      if (!r || !r.refunded) return false
+export function checkRefund(): Promise<boolean> {
+  if (refundTask) return refundTask
+  if (paying || resumeTask) return Promise.resolve(false)
+  if (Date.now() - refundCheckedAt() < REFUND_CHECK_MS) return Promise.resolve(false)
+  const task = verifyPremium()
+    .then((r) => {
+      markRefundChecked(Date.now())
+      if (!r.refunded) return false
       applyRefundLocal()
-      wx.showToast({ title: '已退款，高级功能已关闭', icon: 'none' })
+      wx.showToast({ title: '已退款，' + PACK_NAME + '已关闭', icon: 'none' })
       return true
-    } catch (e) {
+    })
+    .catch(() => {
+      // 复核失败不收回：网络抖动不该误伤付了钱的人
+      markRefundChecked(Date.now() - REFUND_CHECK_MS + REFUND_RETRY_MS)
       return false
-    } finally {
-      refundGuardTask = null
-    }
-  })()
-  refundGuardTask = task
+    })
+    .then((refunded) => {
+      refundTask = null
+      return refunded
+    })
+  refundTask = task
   return task
 }
 

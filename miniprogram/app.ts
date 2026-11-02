@@ -4,7 +4,7 @@ import { ensureSmokeTexture } from './utils/smoke'
 import { loginUser, bindChannelByScene, normalizeChannelScene } from './utils/cloud'
 import { winInfo } from './utils/util'
 import { applyMockLaunch, mockEnabled } from './utils/devMock'
-import { guardRefund } from './utils/premium'
+import { checkRefund } from './utils/premium'
 
 // 云开发环境 ID（如需切换环境，改这里即可）
 const CLOUD_ENV = 'cloud1-d5gcfyv8v980774aa'
@@ -87,9 +87,8 @@ App<IAppOption>({
       this.globalData.pendingChannelScene = scene
       bindChannelByScene(scene).catch(() => {})
     }
-    // 退款复核挂全局：不管用户从哪个页面回到前台都会问一次，
-    // 避免"只在静心页查"导致长期不进那页的用户一直保持付费态。
-    // guardRefund 内部有节流和并发去重，切前后台不会刷屏请求。
-    guardRefund().catch(() => {})
+    // 退款复核的全局兜底：香案和静心页在拉到资料后也会调，但用户可能长期停在别的页，
+    // 那就一直没人问。checkRefund 有 6 小时本机节流 + 并发去重，这里不会刷屏请求。
+    checkRefund().catch(() => {})
   },
 })

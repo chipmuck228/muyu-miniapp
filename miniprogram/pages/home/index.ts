@@ -20,7 +20,7 @@ import { AmbienceId } from '../../utils/audioCatalog'
 import { parseTheme, themeEnds, ThemeId } from '../../utils/theme'
 import { applyLesson, nextLesson, LessonPick, RANDOM_NAME, RANDOM_LESSON } from '../../utils/lesson'
 import { SESSION_PLANS, SessionPlan, PlanId, planOf, triedPlans, markPlanTried } from '../../utils/sessionPlans'
-import { resumePending, guardRefund, PACK_NAME } from '../../utils/premium'
+import { checkRefund, resumePending, PACK_NAME } from '../../utils/premium'
 import { randomZen } from '../../utils/zen'
 import { WISH_SUGGESTIONS } from '../../utils/wishIdeas'
 
@@ -76,7 +76,9 @@ interface PlanOption {
   name: string
   mark: string
   locked: boolean
-  /** 右侧小签：免费 / 可试一次 / 静心包 */
+  /** 属于静心包：开没开都标出来 */
+  pack: boolean
+  /** 没开静心包时的试用状态：可试一次 / 已试过 */
   tag: string
 }
 
@@ -141,9 +143,8 @@ function planOptions(premium: boolean): PlanOption[] {
   return SESSION_PLANS.map((p) => {
     const locked = p.premium && !premium
     const mark = p.scene + ' · ' + p.minutes + ' 分钟'
-    let tag = ''
-    if (locked) tag = tried[p.id] ? PACK_NAME : '可试一次'
-    return { id: p.id, name: p.name, mark, locked, tag }
+    const tag = locked ? (tried[p.id] ? '已试过' : '可试一次') : ''
+    return { id: p.id, name: p.name, mark, locked, pack: p.premium, tag }
   })
 }
 
@@ -334,6 +335,7 @@ Page({
     sessionDone: null as SessionDone | null,
     /** 已开静心包 */
     premium: false,
+    packName: PACK_NAME,
   },
 
   _floatSeq: 0,
@@ -506,8 +508,6 @@ Page({
     if (this._session) this.startSessionTick()
     this.refresh()
     this.tryEnter()
-    // 退款复核：香案是最常停留的页面，不能只靠静心页触发
-    guardRefund().catch(() => {})
     // 自动敲只在本次打开内有效：切页、锁屏回来接着敲，重开小程序从手敲开始
     if (this.data.autoMode && !this.entering() && !this.overlayOn()) this.startAuto()
     resumePending().then((ok) => {
@@ -844,21 +844,6 @@ Page({
     }
   },
 
-  // guardRefund 收回权益后广播：先立即撤掉付费氛围/主题，再拉云端覆盖一次，
-  // 避免用户退款后香案还留着松风、夜色这类已锁定内容。
-  onPremiumRevoked() {
-    if (!this._alive) return
-    this._userAmbience = 'off'
-    this._userTheme = 'dawn'
-    this.setData({ premium: false, ambience: 'off', theme: 'dawn' })
-    try {
-      stopAmbience()
-    } catch (e) {
-      // ignore
-    }
-    this.refresh()
-  },
-
   applyHome(user: UserRecord, todayCount: number) {
     rememberUser(user)
     this._wishId = bindWishId()
@@ -884,6 +869,24 @@ Page({
     this.setData(this.titleColorPatch())
     this.drawLessonTitle()
     startAmbience(scene.ambience)
+    if (user.premium === true) this.recheckRefund()
+  },
+
+  /** 开着静心包的：隔一阵问一次是否已退款（utils/premium 里节流），退了就重新拉资料，氛围、主题、定课都锁回去 */
+  recheckRefund() {
+    checkRefund().then((refunded) => {
+      if (!refunded || !this._alive) return
+      // 先立即撤掉付费氛围/主题，不等 refresh 回来：否则退款后还能听见松风、看见夜色
+      this._userAmbience = 'off'
+      this._userTheme = 'dawn'
+      this.setData({ premium: false, planOptions: planOptions(false), ambience: 'off', theme: 'dawn' })
+      try {
+        stopAmbience()
+      } catch (e) {
+        // ignore
+      }
+      this.refresh()
+    })
   },
 
   /** 此刻香案该用的声音和主题：成品定课铺着时用定课的，否则用自己的设置 */
@@ -1360,7 +1363,7 @@ Page({
     this.visitPack(plan.id)
   },
 
-  /** 去静心页的介绍面板开启静心包；开了或关掉面板都会回香案 */
+  /** 去静心页的静心包那一块开启；开了或点「回香案」都会回来 */
   visitPack(planId: string) {
     const app = getApp<IAppOption>()
     app.globalData.packVisit = planId
