@@ -324,3 +324,9 @@
   line-height: 1.7;
   color: rgba(240, 230, 216, 0.34);
 }
+
+.pending-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
