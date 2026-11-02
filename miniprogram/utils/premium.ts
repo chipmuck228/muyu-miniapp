@@ -1,6 +1,7 @@
 // 静心包：一次付款开启（users.premium）。付款都在静心页的介绍面板里；香案的定课要开启时也是去那里。
 import { preparePremiumPay, confirmPremiumPay, fetchPremiumPrice, verifyPremium } from './cloud'
 import { mockEnabled, mockMarkPaid } from './devMock'
+import { stopAmbience } from './ambience'
 
 export const PACK_NAME = '静心包'
 export const PACK_DESC = '四种氛围：白噪、溪流、松风、炉火\n三套主题：夜、墨、霞\n两套定课：松间慢叩、夜里收心\n一次开启，永久可用'
@@ -159,9 +160,11 @@ let paying = false
 /** 正在续查上一笔：退款复核要避开 */
 let resumeTask: Promise<boolean> | null = null
 
-// 退款复核：商户平台退款后微信侧订单变成 REFUND，我们没接退款回调，只能主动问。
-// 开着静心包的人每次拉到自己的资料都可能来问，所以按本机节流：隔 6 小时才再问一次；
-// 问失败了 10 分钟后再试，别因为网络抖动就一直不查
+// ===== 退款复核 =====
+// 商户平台退款后微信侧订单变成 REFUND，我们没接退款回调，只能客户端主动问。
+// 香案和静心页在拉到「已开通」的资料后再问一次（#11 修掉的时序 bug 就在这里：
+// 旧版在 load() 完成前读 this.data.premium，初始是 false 直接跳过，且一页只查一次）。
+// 统一用本机持久化节流：6 小时问一次，失败 10 分钟后重试，多个入口共用一趟。
 const REFUND_CHECK_KEY = 'premium_refund_checked_at'
 const REFUND_CHECK_MS = 6 * 60 * 60 * 1000
 const REFUND_RETRY_MS = 10 * 60 * 1000
@@ -183,9 +186,30 @@ function markRefundChecked(at: number) {
   }
 }
 
+// 收回后立刻清本机缓存并停掉付费氛围，不等页面重新拉完资料。
+// 页面刷新由 checkRefund 的调用方（recheckRefund）负责，这里不重复广播。
+function applyRefundLocal() {
+  writePending('')
+  try {
+    const app = getApp<IAppOption>()
+    if (app && app.globalData && app.globalData.user) {
+      app.globalData.user.premium = false
+      app.globalData.user.premiumAt = undefined
+    }
+  } catch (e) {
+    // ignore
+  }
+  try {
+    stopAmbience()
+  } catch (e) {
+    // ignore
+  }
+}
+
 /**
- * 已开通的用户拉到资料后调用：问一次微信这单退款了没有，退了云端会把静心包收回。
- * 香案和静心页共用同一趟，收回时只提示一次；返回是否刚被收回（调用方据此重新拉资料）
+ * 问一次微信这单退款了没有，退了云端会把静心包收回。
+ * 香案、静心页、App.onShow 共用同一趟，收回时只提示一次；
+ * 返回是否刚被收回（调用方据此重新拉资料）。付款/续查期间自动避开。
  */
 export function checkRefund(): Promise<boolean> {
   if (refundTask) return refundTask
@@ -195,7 +219,7 @@ export function checkRefund(): Promise<boolean> {
     .then((r) => {
       markRefundChecked(Date.now())
       if (!r.refunded) return false
-      writePending('')
+      applyRefundLocal()
       wx.showToast({ title: '已退款，' + PACK_NAME + '已关闭', icon: 'none' })
       return true
     })

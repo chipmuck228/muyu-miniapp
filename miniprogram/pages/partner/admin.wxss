@@ -82,3 +82,29 @@
   letter-spacing: 8rpx;
   color: rgba(240, 230, 216, 0.16);
 }
+
+/* 佣金结算 */
+.settle-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4rpx 0 12rpx;
+}
+.filter {
+  font-size: 26rpx;
+  letter-spacing: 4rpx;
+  color: #e8c98a;
+}
+.settle-total {
+  flex: none;
+  font-size: 24rpx;
+  letter-spacing: 2rpx;
+  color: rgba(240, 230, 216, 0.55);
+}
+.user-note {
+  display: block;
+  margin-top: 18rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: rgba(240, 230, 216, 0.28);
+}

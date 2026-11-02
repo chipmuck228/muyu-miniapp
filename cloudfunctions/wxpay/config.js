@@ -41,7 +41,33 @@ function wxpayConfig() {
     process.env.WXPAY_DESC || s.description || '静心包 · 定课、氛围与主题一次开启'
   ).trim()
 
-  return { appid, mchid, serialNo, privateKey, apiV3Key, notifyUrl, price, description }
+  // 分账。默认关闭，开启前必须确认商户平台已开通「分账」产品：
+  // 开启后下单会带 settle_info.profit_sharing，该笔资金会被冻结，
+  // 直到完成分账或主动解冻，否则一直挂账无法结算。
+  const splitFlag = String(process.env.WXPAY_SPLIT || s.split || '0').trim().toLowerCase()
+  const splitEnabled = splitFlag === '1' || splitFlag === 'true' || splitFlag === 'on'
+  // 分账比例（0 ~ 0.3）。微信规定单笔订单最多分 30%，超出会被直接拒绝
+  let splitRate = Number(
+    process.env.WXPAY_SPLIT_RATE != null ? process.env.WXPAY_SPLIT_RATE : s.splitRate
+  )
+  if (isNaN(splitRate) || !(splitRate > 0)) splitRate = 0.2
+  if (splitRate > 0.3) splitRate = 0.3
+  // 管理类动作（添加接收方、解冻、查分账）的口令，留空则这些动作不可用
+  const adminKey = String(process.env.WXPAY_ADMIN_KEY || s.adminKey || '').trim()
+
+  return {
+    appid,
+    mchid,
+    serialNo,
+    privateKey,
+    apiV3Key,
+    notifyUrl,
+    price,
+    description,
+    splitEnabled,
+    splitRate,
+    adminKey,
+  }
 }
 
 function wxpayReady(cfg) {

@@ -1,0 +1,9 @@
+{
+  "name": "resetPremium",
+  "version": "1.0.0",
+  "description": "清库工具：把所有用户恢复成未付费，并清空订单与佣金记录",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

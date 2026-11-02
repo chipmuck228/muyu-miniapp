@@ -1,8 +1,26 @@
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
+const _ = db.command
 
 const ACTIVATE_TTL_MS = 48 * 60 * 60 * 1000
+
+// 渠道管理员不再由「第一个打开管理页的人」自动担任——那样任何人抢先进来就能拿到后台。
+// 现在只认两种来源：
+//   1) 云函数环境变量 CHANNEL_ADMIN_OPENIDS（逗号/分号/空格分隔），部署时写死最省事
+//   2) channel_admins 集合（手动加一条，或用 CHANNEL_ADMIN_KEY 口令调 bootstrap 认领）
+function configuredAdmins() {
+  const raw = String(process.env.CHANNEL_ADMIN_OPENIDS || '')
+  return raw
+    .split(/[\s,;]+/)
+    .map((s) => s.trim())
+    .filter((s) => !!s)
+}
+
+function isConfiguredAdmin(openid) {
+  if (!openid) return false
+  return configuredAdmins().indexOf(String(openid)) >= 0
+}
 
 function toMs(d) {
   if (!d) return 0
@@ -57,6 +75,7 @@ async function ensureOwners() {
 }
 
 async function isAdmin(openid) {
+  if (isConfiguredAdmin(openid)) return true
   await ensureAdmins()
   const r = await db.collection('channel_admins').where({ _openid: openid }).limit(1).get()
   return !!(r.data && r.data[0])
@@ -65,7 +84,7 @@ async function isAdmin(openid) {
 async function adminCount() {
   await ensureAdmins()
   const r = await db.collection('channel_admins').limit(2).get()
-  return (r.data || []).length
+  return configuredAdmins().length + (r.data || []).length
 }
 
 async function getApplication(id) {
@@ -132,7 +151,7 @@ async function closeOwners(channelId) {
   }
 }
 
-async function grantPending({ openid, name, contact, applicationId, envVersion }) {
+async function grantPending({ openid, name, contact, phone, applicationId, envVersion }) {
   const busy = await openidBusy(openid, '')
   if (busy) return { ok: false, msg: busy }
   const activateCode = await uniqueActivateCode()
@@ -144,6 +163,7 @@ async function grantPending({ openid, name, contact, applicationId, envVersion }
     data: {
       name: name || '渠道',
       contact: contact || '',
+      phone: phone || '',
       activateCode,
       promoKey,
       activateQrFileID: qr.fileID,
@@ -203,9 +223,100 @@ function mapApp(a) {
     type: appType(a),
     name: a.name || '',
     contact: a.contact || '',
+    phone: a.phone || '',
     mark: wxMark(openid),
     channelId: a.channelId || '',
     createdAt: toMs(a.createdAt),
+  }
+}
+
+// ===== 佣金结算 =====
+// 只标记状态，不触发任何资金划转：真正打款由管理员线下完成（支付宝按手机号 / 微信商家转账）。
+const PAGE = 100
+const MAX_PAGES = 10
+
+function monthKeyOf(d) {
+  return d.getFullYear() + '-' + (d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1)
+}
+
+function currentMonthKey() {
+  return monthKeyOf(new Date())
+}
+
+function prevMonthKey() {
+  const now = new Date()
+  return monthKeyOf(new Date(now.getFullYear(), now.getMonth() - 1, 1))
+}
+
+function monthRange(month) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(month || '').trim())
+  if (!m) return null
+  const y = parseInt(m[1], 10)
+  const mo = parseInt(m[2], 10)
+  if (mo < 1 || mo > 12) return null
+  return { start: new Date(y, mo - 1, 1), end: new Date(y, mo, 1) }
+}
+
+// 汇总某渠道某自然月：新增推广用户、付费人数、订单额、佣金、已退款佣金
+async function collectMonth(channelId, month) {
+  const range = monthRange(month)
+  const out = { userCount: 0, paidCount: 0, orderAmount: 0, commissionAmount: 0, refundedAmount: 0 }
+  if (!range) return out
+
+  try {
+    let n = 0
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const r = await db
+        .collection('channel_users')
+        .where({ channelId, boundAt: _.gte(range.start).and(_.lt(range.end)) })
+        .skip(page * PAGE)
+        .limit(PAGE)
+        .get()
+      const rows = r.data || []
+      n += rows.length
+      if (rows.length < PAGE) break
+    }
+    out.userCount = n
+  } catch (e) {
+    console.warn('collectMonth users', e && e.message)
+  }
+
+  try {
+    const paid = {}
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const r = await db
+        .collection('channel_commissions')
+        .where({ channelId, createdAt: _.gte(range.start).and(_.lt(range.end)) })
+        .skip(page * PAGE)
+        .limit(PAGE)
+        .get()
+      const rows = r.data || []
+      rows.forEach((p) => {
+        // 已退款的单不计入佣金，但单独记下金额，结算页要提示差异
+        if (p.status === 'failed') {
+          out.refundedAmount += p.commissionAmount || 0
+          return
+        }
+        if (p.userId) paid[p.userId] = true
+        out.orderAmount += p.orderAmount || 0
+        out.commissionAmount += p.commissionAmount || 0
+      })
+      if (rows.length < PAGE) break
+    }
+    out.paidCount = Object.keys(paid).length
+  } catch (e) {
+    console.warn('collectMonth commissions', e && e.message)
+  }
+
+  return out
+}
+
+async function readSettlement(channelId, month) {
+  try {
+    const d = await db.collection('channel_settlements').doc(channelId + '_' + month).get()
+    return (d && d.data) || null
+  } catch (e) {
+    return null
   }
 }
 
@@ -215,18 +326,28 @@ exports.main = async (event) => {
   try {
     await ensureApps()
     if (action === 'check') {
-      const n = await adminCount()
-      return { ok: true, isAdmin: n === 0 ? false : await isAdmin(OPENID), needsBootstrap: n === 0 }
+      // needsBootstrap 恒为 false：自动认领已移除，管理权只来自环境变量白名单或 channel_admins。
+      // 保留这个字段是为了兼容还没更新的旧客户端。
+      return {
+        ok: true,
+        isAdmin: await isAdmin(OPENID),
+        needsBootstrap: false,
+        configured: configuredAdmins().length > 0,
+        // 返回调用者自己的 openid，方便把它填进 CHANNEL_ADMIN_OPENIDS。
+        // 只回自己的，不涉及他人。
+        openid: OPENID,
+      }
     }
 
     if (action === 'bootstrap') {
-      const n = await adminCount()
-      if (n === 0) {
-        await db.collection('channel_admins').add({ data: { _openid: OPENID, createdAt: db.serverDate() } })
-        return { ok: true, isAdmin: true, bootstrapped: true }
-      }
+      // 自助认领必须带口令，且云函数要配了 CHANNEL_ADMIN_KEY。
+      // 没配就直接拒绝——不能让第一个打开管理页的人白白拿到后台。
+      const key = String(process.env.CHANNEL_ADMIN_KEY || '')
+      if (!key) return { ok: false, msg: '未配置 CHANNEL_ADMIN_KEY，不能自助认领管理员' }
+      if (String((event && event.key) || '') !== key) return { ok: false, msg: '口令不正确' }
       if (await isAdmin(OPENID)) return { ok: true, isAdmin: true, bootstrapped: false }
-      return { ok: false, msg: '无管理权限' }
+      await db.collection('channel_admins').add({ data: { _openid: OPENID, createdAt: db.serverDate() } })
+      return { ok: true, isAdmin: true, bootstrapped: true }
     }
 
     if (!(await isAdmin(OPENID))) return { ok: false, msg: '无管理权限' }
@@ -272,6 +393,7 @@ exports.main = async (event) => {
         openid: applicant,
         name: ap.name || '',
         contact: ap.contact || '',
+        phone: ap.phone || '',
         applicationId,
         envVersion: event && event.envVersion,
       })
@@ -368,6 +490,119 @@ exports.main = async (event) => {
       return r
     }
 
+    if (action === 'settleBoard') {
+      const month = String((event && event.month) || '').trim() || prevMonthKey()
+      if (!monthRange(month)) return { ok: false, msg: '月份格式应为 YYYY-MM' }
+      const r = await db.collection('channels').limit(80).get()
+      // 只列有实际推广关系的渠道：已激活的，或者至少绑定过推广商
+      const channels = (r.data || []).filter((c) => c.status === 'active' || c.boundOpenid || c.authorizedOpenid)
+      const list = []
+      for (let i = 0; i < channels.length; i++) {
+        const c = channels[i]
+        const agg = await collectMonth(c._id, month)
+        const settlement = await readSettlement(c._id, month)
+        const settled = !!(settlement && settlement.status === 'settled')
+        // 已结算的显示当时快照，避免退款冲销后数字和已打款的金额对不上
+        list.push({
+          channelId: c._id,
+          name: c.name || '渠道',
+          phone: c.phone || '',
+          receiverOpenid: c.boundOpenid || c.authorizedOpenid || '',
+          rate: Number(c.commissionRate) || 0,
+          userCount: settled ? settlement.userCount || 0 : agg.userCount,
+          paidCount: settled ? settlement.paidCount || 0 : agg.paidCount,
+          orderAmount: settled ? settlement.orderAmount || 0 : agg.orderAmount,
+          commissionAmount: settled ? settlement.commissionAmount || 0 : agg.commissionAmount,
+          refundedAmount: settled ? settlement.refundedAmount || 0 : agg.refundedAmount,
+          status: settled ? 'settled' : 'unsettled',
+          settledAt: settlement ? toMs(settlement.settledAt) : 0,
+        })
+      }
+      list.sort((a, b) => b.commissionAmount - a.commissionAmount)
+      return { ok: true, month, list }
+    }
+
+    if (action === 'settle') {
+      // 只写状态，不转账。同一渠道同一月只能结算一次（_id 幂等）。
+      const channelId = String((event && event.channelId) || '').trim()
+      const month = String((event && event.month) || '').trim()
+      if (!channelId) return { ok: false, msg: '缺少渠道 id' }
+      if (!monthRange(month)) return { ok: false, msg: '月份格式应为 YYYY-MM' }
+      if (month >= currentMonthKey()) return { ok: false, msg: '只能结算已经结束的月份' }
+
+      const doc = await db.collection('channels').doc(channelId).get().catch(() => null)
+      const ch = doc && doc.data
+      if (!ch) return { ok: false, msg: '渠道不存在' }
+
+      const id = channelId + '_' + month
+      const existing = await readSettlement(channelId, month)
+      if (existing && existing.status === 'settled') {
+        return { ok: true, already: true, settlement: existing }
+      }
+
+      const agg = await collectMonth(channelId, month)
+      const patch = {
+        channelId,
+        channelName: ch.name || '渠道',
+        month,
+        phone: ch.phone || '',
+        receiverOpenid: ch.boundOpenid || ch.authorizedOpenid || '',
+        rate: Number(ch.commissionRate) || 0,
+        userCount: agg.userCount,
+        paidCount: agg.paidCount,
+        orderAmount: agg.orderAmount,
+        commissionAmount: agg.commissionAmount,
+        refundedAmount: agg.refundedAmount,
+        status: 'settled',
+        settledAt: db.serverDate(),
+        settledBy: OPENID,
+        updatedAt: db.serverDate(),
+      }
+
+      await ensureCollection('channel_settlements')
+      if (existing) {
+        await db.collection('channel_settlements').doc(id).update({ data: patch })
+      } else {
+        await db.collection('channel_settlements').add({
+          data: Object.assign({ _id: id, createdAt: db.serverDate() }, patch),
+        })
+      }
+
+      // 回写该月佣金行，便于逐笔审计（失败不阻断结算）
+      const range = monthRange(month)
+      try {
+        for (let page = 0; page < MAX_PAGES; page++) {
+          const r = await db
+            .collection('channel_commissions')
+            .where({ channelId, createdAt: _.gte(range.start).and(_.lt(range.end)) })
+            .skip(page * PAGE)
+            .limit(PAGE)
+            .get()
+          const rows = r.data || []
+          for (let i = 0; i < rows.length; i++) {
+            await db
+              .collection('channel_commissions')
+              .doc(rows[i]._id)
+              .update({ data: { settlementId: id, settledAt: db.serverDate() } })
+              .catch(() => {})
+          }
+          if (rows.length < PAGE) break
+        }
+      } catch (e) {
+        console.warn('settle mark rows', e && e.message)
+      }
+
+      return {
+        ok: true,
+        already: false,
+        settlement: Object.assign({}, patch, {
+          _id: id,
+          settledAt: Date.now(),
+          createdAt: existing ? existing.createdAt : Date.now(),
+        }),
+      }
+    }
+
     if (action === 'wipe') {
       const WIPE = [
         'channels',
@@ -377,6 +612,7 @@ exports.main = async (event) => {
         'channel_users',
         'channel_commissions',
         'channel_owners',
+        'channel_settlements',
       ]
       const results = []
       for (let i = 0; i < WIPE.length; i++) {

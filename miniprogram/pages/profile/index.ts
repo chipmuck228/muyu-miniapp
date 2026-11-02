@@ -237,7 +237,21 @@ Page({
   /** 开着静心包的：隔一阵问一次是否已退款（utils/premium 里节流），退了就重新拉资料，锁回去 */
   recheckRefund() {
     checkRefund().then((refunded) => {
-      if (refunded && this._alive) this.load()
+      if (!refunded || !this._alive) return
+      // 先立即把锁定态撤掉，不等 load() 回来：否则退款后本页还显示已开启、还在放付费氛围
+      this.setData({
+        premium: false,
+        ambience: 'off' as AmbienceId,
+        ambienceOptions: dressList(AMBIENCE_OPTIONS, false),
+        theme: 'dawn' as ThemeId,
+        themeOptions: dressList(THEMES, false),
+      })
+      try {
+        stopAmbience()
+      } catch (e) {
+        // ignore
+      }
+      this.load()
     })
   },
 
@@ -501,8 +515,9 @@ Page({
         needsBootstrap: false,
       }))
       if (!this._alive) return
+      // 只按真实管理员显示入口：不再有「第一个进来的人可以认领」这回事
       this.setData({
-        showAdmin: !!(admin.isAdmin || admin.needsBootstrap),
+        showAdmin: !!admin.isAdmin,
       })
     } catch (e) {
       // 入口保持隐藏

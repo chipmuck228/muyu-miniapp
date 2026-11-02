@@ -1,5 +1,5 @@
 import {
-  channelAdminBootstrap,
+  channelAdminCheck,
   channelAdminList,
   channelAdminApps,
   channelAdminAuthorize,
@@ -9,8 +9,11 @@ import {
   channelAdminQr,
   channelAdminRefreshActivate,
   channelAdminWipe,
+  channelAdminSettleBoard,
+  channelAdminSettle,
   AdminChannelRow,
   AdminAppRow,
+  AdminSettleRow,
 } from '../../utils/cloud'
 import { resolveCloudFile } from '../../utils/cloudFile'
 import { concealTabBar } from '../../utils/util'
@@ -48,9 +51,30 @@ function statusText(row: AdminChannelRow): string {
 }
 
 function appLine(row: AdminAppRow): string {
-  const mark = row.mark || ''
+  const parts = []
+  if (row.phone) parts.push('手机 ' + row.phone)
+  if (row.mark) parts.push(row.mark)
   const t = fmtDT(row.createdAt)
-  return [mark, t].filter(Boolean).join(' · ')
+  if (t) parts.push(t)
+  return parts.join(' · ')
+}
+
+function fenText(n: number): string {
+  return (Math.max(0, n || 0) / 100).toFixed(2)
+}
+
+// 只能结算已结束的自然月，所以从「上个月」往前列 12 个月
+function settleMonthOptions(): { value: string; label: string }[] {
+  const out: { value: string; label: string }[] = []
+  const now = new Date()
+  for (let i = 1; i <= 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    out.push({
+      value: d.getFullYear() + '-' + pad(d.getMonth() + 1),
+      label: d.getFullYear() + '年' + (d.getMonth() + 1) + '月',
+    })
+  }
+  return out
 }
 
 Page({
@@ -64,6 +88,16 @@ Page({
     qrTitle: '',
     qrCode: '',
     qrExpire: '',
+    settleMonths: settleMonthOptions(),
+    settleMonthIndex: 0,
+    settleMonth: '',
+    settleTotalText: '0.00',
+    settleList: [] as (AdminSettleRow & {
+      orderText: string
+      commissionText: string
+      refundText: string
+      settledText: string
+    })[],
   },
 
   onLoad() {
@@ -84,7 +118,10 @@ Page({
 
   async boot() {
     try {
-      await channelAdminBootstrap()
+      // 不再调 bootstrap 自动认领：先进这个页面的人不会平白变成管理员。
+      // 先问一次权限，是管理员才加载数据
+      const chk = await channelAdminCheck()
+      if (!chk.isAdmin) throw new Error('无管理权限')
       await this.reload()
       this.setData({ ready: true })
     } catch (e: any) {
@@ -110,6 +147,71 @@ Page({
         pending: c.status === 'pending' && !!c.authorized,
       })),
     })
+    await this.loadSettle()
+  },
+
+  async loadSettle() {
+    const month = (this.data.settleMonths[this.data.settleMonthIndex] || { value: '' }).value
+    try {
+      const r = await channelAdminSettleBoard(month)
+      const list = (r.list || []).map((x) => ({
+        ...x,
+        orderText: fenText(x.orderAmount),
+        commissionText: fenText(x.commissionAmount),
+        refundText: fenText(x.refundedAmount),
+        settledText: x.settledAt ? fmtDT(x.settledAt) : '',
+      }))
+      // 合计只算还没结算的，方便判断这轮要付多少
+      const pending = list.reduce((s, x) => s + (x.status === 'settled' ? 0 : x.commissionAmount), 0)
+      this.setData({
+        settleMonth: r.month || month,
+        settleList: list,
+        settleTotalText: fenText(pending),
+      })
+    } catch (e: any) {
+      wx.showToast({ title: (e && e.message) || '结算数据加载失败', icon: 'none' })
+    }
+  },
+
+  onSettleMonth(e: any) {
+    const i = parseInt(e.detail.value, 10) || 0
+    this.setData({ settleMonthIndex: i })
+    this.loadSettle().catch(() => {})
+  },
+
+  doSettle(e: any) {
+    const id = String(e.currentTarget.dataset.id || '')
+    const row = this.data.settleList.find((x) => x.channelId === id)
+    if (!row || row.status === 'settled') return
+    wx.showModal({
+      title: '确认结算',
+      content:
+        '结算「' +
+        row.name +
+        '」' +
+        this.data.settleMonth +
+        ' 佣金 ¥' +
+        row.commissionText +
+        '？\n只标记为已结算，不会自动打款，请在线下完成转账。',
+      confirmText: '结算',
+      confirmColor: '#c4a574',
+      success: (res) => {
+        if (res.confirm) this.runSettle(id)
+      },
+    })
+  },
+
+  async runSettle(channelId: string) {
+    wx.showLoading({ title: '处理中', mask: true })
+    try {
+      const r = await channelAdminSettle(channelId, this.data.settleMonth)
+      await this.loadSettle()
+      wx.showToast({ title: r.already ? '该月已结算过' : '已标记结算', icon: 'none' })
+    } catch (e: any) {
+      wx.showToast({ title: (e && e.message) || '结算失败', icon: 'none' })
+    } finally {
+      wx.hideLoading()
+    }
   },
 
   async showQr(fileID: string, title: string, code: string, expireAt?: number) {

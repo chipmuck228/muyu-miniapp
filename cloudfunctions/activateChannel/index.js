@@ -2,6 +2,9 @@ const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 
+// 手机号只做结算联系用，格式校验到此为止（不查运营商归属）
+const PHONE_RE = /^1[3-9]\d{9}$/
+
 function normalizeCode(raw) {
   return String(raw || '')
     .trim()
@@ -216,11 +219,15 @@ exports.main = async (event) => {
       const pendingBind = applications.some((a) => a.type === 'bind' && a.status === 'pending')
       const pendingUnbind = applications.some((a) => a.type === 'unbind' && a.status === 'pending')
       const actExpired = !!(pendingCh && expired(pendingCh))
+      // 手机号取当前有效的那份：已激活渠道 > 待激活渠道 > 待审申请
+      const bindApp = (await pendingOf(OPENID, 'bind')) || {}
+      const phone = (owned && owned.phone) || (pendingCh && pendingCh.phone) || bindApp.phone || ''
       return {
         ok: true,
         isChannel: !!owned,
         channelId: owned ? owned._id : '',
         name: owned ? owned.name || '渠道' : '',
+        phone,
         canApplyBind: !owned && !pendingBind && !pendingCh,
         canApplyUnbind: !!owned && !pendingUnbind,
         pendingBind,
@@ -236,10 +243,43 @@ exports.main = async (event) => {
       }
     }
 
+    if (action === 'updatePhone') {
+      // 用户按 openid 自助改号：只能改自己名下的申请/渠道，改不了别人的。
+      // 手机号只用于结算联系，不是身份凭证，所以不需要验证码或人工审核。
+      const phone = String((event && event.phone) || '').trim()
+      if (!PHONE_RE.test(phone)) return { ok: false, msg: '请填写正确的 11 位手机号' }
+      let touched = 0
+
+      const ap = await pendingOf(OPENID, 'bind')
+      if (ap) {
+        await db.collection('channel_applications').doc(ap._id).update({
+          data: { phone, updatedAt: db.serverDate() },
+        })
+        touched++
+      }
+
+      const pendingCh = await authorizedPending(OPENID)
+      if (pendingCh) {
+        await db.collection('channels').doc(pendingCh._id).update({ data: { phone } })
+        touched++
+      }
+
+      const owned = await activeByOpenid(OPENID)
+      if (owned) {
+        await db.collection('channels').doc(owned._id).update({ data: { phone } })
+        touched++
+      }
+
+      if (!touched) return { ok: false, msg: '没有可修改的申请记录' }
+      return { ok: true, phone }
+    }
+
     if (action === 'apply') {
       const name = String((event && event.name) || '').trim().slice(0, 40)
       const contact = String((event && event.contact) || '').trim().slice(0, 40)
+      const phone = String((event && event.phone) || '').trim()
       if (!name) return { ok: false, msg: '请填写名称' }
+      if (!PHONE_RE.test(phone)) return { ok: false, msg: '请填写正确的 11 位手机号' }
       if (await activeByOpenid(OPENID)) return { ok: false, msg: '当前微信已绑定渠道' }
       if (await authorizedPending(OPENID)) return { ok: false, msg: '已获授权，请激活' }
       await saveChannelName(OPENID, name)
@@ -250,6 +290,7 @@ exports.main = async (event) => {
             type: 'bind',
             name,
             contact,
+            phone,
             openid: OPENID,
             updatedAt: db.serverDate(),
           },
@@ -262,6 +303,7 @@ exports.main = async (event) => {
           openid: OPENID,
           name,
           contact,
+          phone,
           status: 'pending',
           channelId: '',
           createdAt: db.serverDate(),
@@ -278,6 +320,7 @@ exports.main = async (event) => {
         data: {
           type: 'unbind',
           openid: OPENID,
+          phone: owned.phone || '',
           name: owned.name || '',
           contact: owned.contact || '',
           status: 'pending',

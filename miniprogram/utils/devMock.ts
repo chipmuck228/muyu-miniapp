@@ -530,6 +530,67 @@ function handle(name: string, data: any): any {
   if (name === 'channelAdmin' && data && data.action === 'check') {
     return { ok: true, isAdmin: false, needsBootstrap: false }
   }
+  if (name === 'activateChannel') {
+    if (data && data.action === 'apply') return { ok: true, phase: 'applied' }
+    if (data && data.action === 'updatePhone') return { ok: true, phone: String(data.phone || '') }
+    if (data && data.action === 'applyUnbind') return { ok: true, phase: 'unbind_applied' }
+    return {
+      ok: true,
+      isChannel: false,
+      channelId: '',
+      name: '',
+      phone: '',
+      canApplyBind: true,
+      canApplyUnbind: false,
+      pendingBind: false,
+      pendingUnbind: false,
+      tenures: [],
+      applications: [],
+    }
+  }
+  if (name === 'channelAdmin' && data && data.action === 'settleBoard') {
+    return { ok: true, month: String(data.month || ''), list: [] }
+  }
+  if (name === 'channelAdmin' && data && data.action === 'settle') {
+    return { ok: true, already: false, settlement: {} }
+  }
+  if (name === 'getChannelStats') {
+    // 本地预览用：两个识别号，一条已付费一条未付费
+    const q = String((data && data.wechatId) || '').trim().toLowerCase()
+    const month = String((data && data.month) || '')
+    const rows = [
+      { id: 'mock-u1', wechatId: 'A1B2C3D4', boundAt: Date.now() - 86400000, paid: db.user.premium === true },
+      { id: 'mock-u2', wechatId: '9F8E7D6C', boundAt: Date.now() - 2 * 86400000, paid: false },
+    ].filter((u) => !q || u.wechatId.toLowerCase().indexOf(q) >= 0)
+
+    // 按天铺一份，本地也能看到日历和结算标签
+    const dailyNew: Record<string, number> = {}
+    if (month) {
+      const p = (n: number) => (n < 10 ? '0' + n : '' + n)
+      rows.forEach((u) => {
+        const d = new Date(u.boundAt)
+        const k = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
+        dailyNew[k] = (dailyNew[k] || 0) + 1
+      })
+    }
+    return {
+      ok: true,
+      name: '本地模拟渠道',
+      status: 'active',
+      userCount: rows.length,
+      paidCount: rows.filter((r) => r.paid).length,
+      totalCommission: 0,
+      pendingCommission: 0,
+      refundedAmount: 0,
+      dailyNew,
+      settlement: month
+        ? { status: 'unsettled', settledAt: 0, commissionAmount: 0, refundedAmount: 0 }
+        : null,
+      month,
+      truncated: false,
+      users: rows,
+    }
+  }
 
   return fail('本地模式不支持')
 }

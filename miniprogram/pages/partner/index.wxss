@@ -172,23 +172,161 @@
 }
 .user-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   padding: 14rpx 0;
 }
-.user-id {
+.user-main {
   flex: 1;
   min-width: 0;
-  font-size: 28rpx;
-  color: rgba(240, 230, 216, 0.62);
+  display: flex;
+  flex-direction: column;
 }
-.user-meta {
-  margin-left: 16rpx;
-  font-size: 24rpx;
+.user-nick {
+  font-size: 28rpx;
+  color: rgba(240, 230, 216, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-sub {
+  margin-top: 4rpx;
+  font-size: 22rpx;
   color: rgba(240, 230, 216, 0.32);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .user-pay {
   margin-left: 16rpx;
+  flex: none;
   font-size: 24rpx;
   letter-spacing: 2rpx;
   color: rgba(224, 181, 119, 0.7);
+}
+.user-note {
+  display: block;
+  margin-top: 18rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: rgba(240, 230, 216, 0.28);
+}
+
+/* 结算联系手机号 */
+.phone-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18rpx;
+  padding-top: 18rpx;
+  border-top: 1rpx solid rgba(240, 230, 216, 0.08);
+}
+.phone-text {
+  font-size: 24rpx;
+  color: rgba(240, 230, 216, 0.5);
+}
+.phone-edit {
+  flex: none;
+  margin-left: 20rpx;
+  font-size: 24rpx;
+  letter-spacing: 2rpx;
+  color: #e8c98a;
+}
+
+/* 当月结算状态 */
+.settle-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 26rpx;
+}
+.settle-sum {
+  font-size: 26rpx;
+  letter-spacing: 2rpx;
+  color: rgba(240, 230, 216, 0.7);
+}
+.settle-tag {
+  flex: none;
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  letter-spacing: 2rpx;
+  color: rgba(240, 230, 216, 0.45);
+  border: 1rpx solid rgba(240, 230, 216, 0.16);
+}
+.settle-tag.on {
+  color: #1a1510;
+  background: #e8c98a;
+  border-color: #e8c98a;
+}
+.settle-time {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: rgba(240, 230, 216, 0.3);
+}
+
+/* 当月新增日历 */
+.cal {
+  margin-top: 18rpx;
+  padding: 16rpx 12rpx 12rpx;
+  border: 1rpx solid rgba(224, 181, 119, 0.12);
+  border-radius: 16rpx;
+  background: rgba(224, 181, 119, 0.03);
+}
+.cal-week {
+  display: flex;
+}
+.cal-w {
+  flex: 1;
+  text-align: center;
+  font-size: 20rpx;
+  letter-spacing: 1rpx;
+  color: rgba(232, 201, 138, 0.5);
+}
+.cal-grid {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 8rpx;
+}
+.cal-cell {
+  width: 14.2857%;
+  height: 54rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.cal-d {
+  font-size: 20rpx;
+  color: rgba(240, 230, 216, 0.4);
+}
+.cal-cell.has {
+  border-radius: 10rpx;
+  background: rgba(224, 181, 119, 0.16);
+}
+.cal-cell.has .cal-d {
+  color: rgba(240, 230, 216, 0.85);
+}
+.cal-n {
+  margin-top: 1rpx;
+  font-size: 18rpx;
+  color: #e8c98a;
+}
+.cal-cell.is-empty {
+  visibility: hidden;
+}
+
+/* 结算说明 */
+.note-line {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  line-height: 1.7;
+  color: rgba(240, 230, 216, 0.34);
+}
+
+.pending-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }

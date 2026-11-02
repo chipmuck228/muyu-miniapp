@@ -77,6 +77,35 @@
         </view>
       </view>
 
+      <view class="block">
+        <text class="block-label">佣金结算</text>
+        <view class="settle-bar">
+          <picker mode="selector" range="{{settleMonths}}" range-key="label" value="{{settleMonthIndex}}" bindchange="onSettleMonth">
+            <text class="filter">{{settleMonths[settleMonthIndex].label}}</text>
+          </picker>
+          <text class="settle-total">待结 ¥{{settleTotalText}}</text>
+        </view>
+        <text class="empty" wx:if="{{!settleList.length}}">该月暂无渠道数据</text>
+        <view class="row" wx:for="{{settleList}}" wx:key="channelId">
+          <view class="row-main">
+            <text class="row-name">{{item.name}}</text>
+            <text class="row-st">新增 {{item.userCount}} · 付费 {{item.paidCount}} · 佣金 ¥{{item.commissionText}}</text>
+            <text class="row-st" wx:if="{{item.phone}}">手机 {{item.phone}}</text>
+            <text class="row-st" wx:if="{{item.refundedAmount}}">其中已退款 ¥{{item.refundText}}</text>
+            <text class="row-st" wx:if="{{item.settledText}}">结算于 {{item.settledText}}</text>
+          </view>
+          <text
+            wx:if="{{item.status !== 'settled'}}"
+            class="row-act"
+            hover-class="hover-dim"
+            data-id="{{item.channelId}}"
+            bindtap="doSettle"
+          >结算</text>
+          <text wx:else class="row-act dim">已结算</text>
+        </view>
+        <text class="user-note">结算只记录状态，不触发转账；请按手机号线下完成打款</text>
+      </view>
+
       <text class="wipe" hover-class="hover-dim" bindtap="wipe">清空记录</text>
     </view>
   </scroll-view>

@@ -38,9 +38,25 @@
           hold-keyboard
           bindinput="onContact"
         />
+        <text class="label">手机号</text>
+        <input
+          class="input"
+          type="number"
+          maxlength="11"
+          placeholder="佣金结算与联系使用"
+          placeholder-class="ph"
+          value="{{phone}}"
+          adjust-position="{{false}}"
+          hold-keyboard
+          bindinput="onPhone"
+        />
+        <text class="hint">申请渠道合作需提供真实手机号，仅用于佣金结算与联系，不会在推广列表中展示。提交后可在下方自助修改。</text>
         <view class="submit" hover-class="hover-dim" bindtap="doApply">提交申请</view>
       </view>
-      <text class="hint" wx:elif="{{pendingBind}}">绑定申请已提交，等待管理员授权</text>
+      <view class="hint pending-row" wx:elif="{{pendingBind}}">
+        <text>绑定申请已提交，等待管理员授权</text>
+        <text class="phone-edit" hover-class="hover-dim" bindtap="editPhone">修改手机号</text>
+      </view>
 
       <view class="block" wx:if="{{canApplyUnbind}}">
         <text class="row-act lone" hover-class="hover-dim" bindtap="applyUnbind">申请解绑</text>
@@ -74,6 +90,10 @@
             <text class="row-st">{{item.statusText}}{{item.timeText ? ' · ' + item.timeText : ''}}</text>
           </view>
         </view>
+        <view class="phone-row" wx:if="{{isActive}}">
+          <text class="phone-text">{{phone ? '结算联系 ' + phone : '未填写结算手机号'}}</text>
+          <text class="phone-edit" hover-class="hover-dim" bindtap="editPhone">{{phone ? '修改' : '填写'}}</text>
+        </view>
       </view>
 
       <view wx:if="{{selectedId}}">
@@ -97,6 +117,30 @@
           </view>
         </view>
 
+        <view class="settle-head" wx:if="{{monthValue}}">
+          <text class="settle-sum">{{monthValue}} 新增 {{calTotal}} 人</text>
+          <text class="settle-tag {{settlementStatus === 'settled' ? 'on' : ''}}">{{settlementStatus === 'settled' ? '已结算' : '未结算'}}</text>
+        </view>
+        <text class="settle-time" wx:if="{{settledText}}">结算于 {{settledText}}</text>
+
+        <view class="cal" wx:if="{{monthValue}}">
+          <view class="cal-week">
+            <text class="cal-w" wx:for="{{weekNames}}" wx:key="*this">{{item}}</text>
+          </view>
+          <view class="cal-grid">
+            <view
+              class="cal-cell {{item.empty ? 'is-empty' : ''}} {{item.count ? 'has' : ''}}"
+              wx:for="{{calCells}}"
+              wx:key="key"
+            >
+              <text class="cal-d" wx:if="{{!item.empty}}">{{item.day}}</text>
+              <text class="cal-n" wx:if="{{!item.empty && item.count}}">{{item.count}}</text>
+            </view>
+          </view>
+        </view>
+
+        <text class="hint" wx:if="{{truncated}}">该月佣金记录超过 1000 条，统计可能偏少，请联系管理员核对</text>
+
         <view class="block" wx:if="{{isActive}}">
           <text class="block-label">我的推广码</text>
           <image wx:if="{{qrSrc}}" class="qr" src="{{qrSrc}}" mode="aspectFit" show-menu-by-longpress />
@@ -109,7 +153,7 @@
             <input
               class="input"
               maxlength="40"
-              placeholder="按微信号搜索"
+              placeholder="按识别号搜索"
               placeholder-class="ph"
               value="{{userQuery}}"
               adjust-position="{{false}}"
@@ -124,10 +168,20 @@
           </picker>
           <text class="empty" wx:if="{{!users.length}}">暂无用户</text>
           <view class="user-row" wx:for="{{users}}" wx:key="id">
-            <text class="user-id">{{item.wechatId}}</text>
-            <text class="user-meta">{{item.timeText}}</text>
+            <view class="user-main">
+              <text class="user-nick">{{item.wechatId}}</text>
+              <text class="user-sub">{{item.timeText}}</text>
+            </view>
             <text class="user-pay">{{item.paidText}}</text>
           </view>
+          <text class="user-note">用户仅以识别号标识，不采集头像与昵称</text>
+        </view>
+
+        <view class="block">
+          <text class="block-label">结算说明</text>
+          <text class="note-line">佣金按自然月结算，次月由管理员核对后统一打款。结算通过手机号转账（支付宝 / 微信零钱）完成，请确保上方手机号可正常收款，号码变更后请及时修改。</text>
+          <text class="note-line">佣金属于个人收入，涉及的个人所得税按国家规定处理；具体税费承担方式与开票要求，以管理员通知及双方约定为准。</text>
+          <text class="note-line">小程序内点「结算」只记录结算状态，不会自动扣款或打款。</text>
         </view>
       </view>
     </view>

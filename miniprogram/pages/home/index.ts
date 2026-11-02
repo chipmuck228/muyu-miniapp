@@ -876,7 +876,15 @@ Page({
   recheckRefund() {
     checkRefund().then((refunded) => {
       if (!refunded || !this._alive) return
-      this.setData({ premium: false, planOptions: planOptions(false) })
+      // 先立即撤掉付费氛围/主题，不等 refresh 回来：否则退款后还能听见松风、看见夜色
+      this._userAmbience = 'off'
+      this._userTheme = 'dawn'
+      this.setData({ premium: false, planOptions: planOptions(false), ambience: 'off', theme: 'dawn' })
+      try {
+        stopAmbience()
+      } catch (e) {
+        // ignore
+      }
       this.refresh()
     })
   },
