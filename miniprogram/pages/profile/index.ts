@@ -6,10 +6,7 @@ import {
   settingsOf,
   channelAdminCheck,
   rememberUser,
-  saveMyProfile,
 } from '../../utils/cloud'
-import { resolveCloudFile } from '../../utils/cloudFile'
-import { mockEnabled } from '../../utils/devMock'
 import { AMBIENCE_OPTIONS, AmbienceId, isPremiumAmbience, parseAmbience } from '../../utils/audioCatalog'
 import { isPremiumTheme, parseTheme, ThemeId, THEMES, themeOf } from '../../utils/theme'
 import { buyPremium, checkRefund, resumePending, writePending, PACK_NAME, packPrice } from '../../utils/premium'
@@ -175,12 +172,6 @@ Page({
     packAmbience: PACK_AMBIENCE,
     packThemes: PACK_THEMES,
     packPlans: packPlans(),
-    // 我的资料：本人授权填写，渠道统计里展示的就是这份
-    myNickname: '',
-    myWechatId: '',
-    myAvatarUrl: '',
-    myAvatarFileID: '',
-    profileSaving: false,
   },
 
   _alive: false,
@@ -264,83 +255,6 @@ Page({
     })
   },
 
-  // ===== 我的资料：头像与昵称由本人授权填写 =====
-  // 微信不提供凭 openid 反查他人头像昵称的能力，所以推广统计里能显示的，
-  // 只有用户自己在这里填过的这份。未填写的用户仍显示识别号。
-
-  applyAvatar(fileID: string) {
-    if (!fileID) {
-      this.setData({ myAvatarUrl: '' })
-      return
-    }
-    resolveCloudFile(fileID)
-      .then((path) => {
-        if (this._alive && this.data.myAvatarFileID === fileID) this.setData({ myAvatarUrl: path })
-      })
-      .catch(() => {
-        if (this._alive) this.setData({ myAvatarUrl: '' })
-      })
-  },
-
-  // <button open-type="chooseAvatar"> 回调：拿到的是本地临时路径，要传上云存储
-  async onChooseAvatar(e: any) {
-    const filePath = e && e.detail && e.detail.avatarUrl
-    if (!filePath) return
-    this.setData({ myAvatarUrl: filePath })
-    // 本地模拟模式没有真实云存储，uploadFile 会失败；头像仅本次会话内预览
-    if (mockEnabled()) {
-      wx.showToast({ title: '模拟模式：头像仅本次显示', icon: 'none' })
-      return
-    }
-    wx.showLoading({ title: '上传头像', mask: true })
-    try {
-      const ext = String(filePath).split('.').pop() || 'png'
-      const cloudPath = 'avatars/' + Date.now() + '-' + Math.floor(Math.random() * 1e6) + '.' + ext
-      const up = await (wx as any).cloud.uploadFile({ cloudPath, filePath })
-      const fileID = up && up.fileID
-      if (!fileID) throw new Error('上传失败')
-      this.setData({ myAvatarFileID: fileID })
-      const r = await saveMyProfile({ avatarFileID: fileID })
-      if (r && r.user) this.applyAvatar(r.user.avatarFileID || fileID)
-      wx.showToast({ title: '头像已保存', icon: 'none' })
-    } catch (err: any) {
-      wx.showToast({ title: (err && err.message) || '头像上传失败', icon: 'none' })
-    } finally {
-      wx.hideLoading()
-    }
-  },
-
-  // <input type="nickname">：微信会在用户选完昵称后回调，失焦时保存
-  onNickInput(e: any) {
-    this.setData({ myNickname: String((e && e.detail && e.detail.value) || '') })
-  },
-
-  async onNickBlur(e: any) {
-    const nickname = String((e && e.detail && e.detail.value) || '').trim()
-    if (!nickname || nickname === this.data.myNickname) return
-    try {
-      await saveMyProfile({ nickname })
-      this.setData({ myNickname: nickname })
-    } catch (err: any) {
-      wx.showToast({ title: (err && err.message) || '昵称保存失败', icon: 'none' })
-    }
-  },
-
-  onWechatInput(e: any) {
-    this.setData({ myWechatId: String((e && e.detail && e.detail.value) || '') })
-  },
-
-  async onWechatBlur(e: any) {
-    const wechatId = String((e && e.detail && e.detail.value) || '').trim()
-    if (wechatId === this.data.myWechatId) return
-    try {
-      await saveMyProfile({ wechatId })
-      this.setData({ myWechatId: wechatId })
-    } catch (err: any) {
-      wx.showToast({ title: (err && err.message) || '保存失败', icon: 'none' })
-    }
-  },
-
   async load() {
     try {
       const res = await fetchProfile()
@@ -395,12 +309,8 @@ Page({
         theme: s.theme,
         themeOptions: dressList(THEMES, premium),
         premium,
-        myNickname: res.user.nickname && res.user.nickname !== '静心的人' ? res.user.nickname : '',
-        myWechatId: res.user.wechatId || '',
-        myAvatarFileID: res.user.avatarFileID || '',
         packPlans: packPlans(),
       }, stagePatch(s.theme)))
-      this.applyAvatar(res.user.avatarFileID || '')
       if (!premium) this.loadPackPrice()
       // 从香案过来的：静心包那一块要等资料到了才画出来，画出来再翻过去
       if (!premium && this._packVisit !== null) this.showPack()
@@ -605,8 +515,9 @@ Page({
         needsBootstrap: false,
       }))
       if (!this._alive) return
+      // 只按真实管理员显示入口：不再有「第一个进来的人可以认领」这回事
       this.setData({
-        showAdmin: !!(admin.isAdmin || admin.needsBootstrap),
+        showAdmin: !!admin.isAdmin,
       })
     } catch (e) {
       // 入口保持隐藏

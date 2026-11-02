@@ -1,7 +1,6 @@
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
-const _ = db.command
 
 function toMs(d) {
   if (!d) return 0
@@ -43,6 +42,16 @@ function monthRange(month) {
   return { start: new Date(y, mo - 1, 1), end: new Date(y, mo, 1) }
 }
 
+// 云函数跑在 UTC，按东八区切天，否则凌晨 0-8 点的新增会算到前一天
+function dayKey(ms) {
+  const d = new Date(ms + 8 * 3600 * 1000)
+  const p = (n) => (n < 10 ? '0' + n : '' + n)
+  return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate())
+}
+
+const PAGE = 100
+const MAX_PAGES = 10
+
 exports.main = async (event) => {
   const { OPENID } = cloud.getWXContext()
   const channelId = String((event && event.channelId) || '').trim()
@@ -72,8 +81,6 @@ exports.main = async (event) => {
     if (range) payConds.push({ createdAt: _.gte(range.start).and(_.lt(range.end)) })
     const payWhere = payConds.length === 1 ? payConds[0] : _.and(payConds)
     const pays = []
-    const PAGE = 100
-    const MAX_PAGES = 10
     let truncated = false
     for (let page = 0; page < MAX_PAGES; page++) {
       const r = await db
@@ -91,8 +98,13 @@ exports.main = async (event) => {
     const paidSet = {}
     let totalCommission = 0
     let pendingCommission = 0
+    let refundedAmount = 0
     pays.forEach((p) => {
-      if (p.status === 'failed') return // 已退款冲销的不计入
+      // 已退款冲销的单不计入佣金，但单独累计，结算页要提示差异
+      if (p.status === 'failed') {
+        refundedAmount += p.commissionAmount || 0
+        return
+      }
       if (p.userId) paidSet[p.userId] = true
       const n = p.commissionAmount || 0
       totalCommission += n
@@ -101,49 +113,39 @@ exports.main = async (event) => {
 
     let allUsers = usersR.data || []
 
-    // 关联 users：昵称和头像是用户本人授权填写的，channel_users 里没有。
-    // 微信不支持凭 openid 反查他人头像昵称，所以只能读我们自己存的这份。
-    const openids = allUsers.map((u) => String(u._openid || '')).filter(Boolean)
-    const profileMap = {}
-    if (openids.length) {
+    // 当月新增：列表只取 100 条，不能拿来当总数；单独翻页统计，同时按天聚合，供日历展示
+    const dailyNew = {}
+    let monthNewUsers = 0
+    if (range) {
       try {
-        const pr = await db.collection('users').where({ _id: _.in(openids) }).limit(100).get()
-        ;(pr.data || []).forEach((p) => {
-          profileMap[String(p._id)] = {
-            nickname: String(p.nickname || '').trim(),
-            wechatId: String(p.wechatId || '').trim(),
-            avatarFileID: String(p.avatarFileID || '').trim(),
-          }
-        })
+        for (let page = 0; page < MAX_PAGES; page++) {
+          const r = await db
+            .collection('channel_users')
+            .where(where)
+            .skip(page * PAGE)
+            .limit(PAGE)
+            .get()
+          const rows = r.data || []
+          rows.forEach((u) => {
+            const t = toMs(u.boundAt)
+            if (!t) return
+            monthNewUsers++
+            const k = dayKey(t)
+            dailyNew[k] = (dailyNew[k] || 0) + 1
+          })
+          if (rows.length < PAGE) break
+        }
       } catch (e) {
-        console.warn('getChannelStats profiles', e && e.message)
+        console.warn('getChannelStats dailyNew', e && e.message)
       }
     }
 
-    // cloud:// 在 <image> 里不能直接用，批量换成 https 临时链接
-    const fileIDs = Object.keys(profileMap)
-      .map((k) => profileMap[k].avatarFileID)
-      .filter((f) => f.indexOf('cloud://') === 0)
-    const urlMap = {}
-    for (let i = 0; i < fileIDs.length; i += 50) {
-      try {
-        const tr = await cloud.getTempFileURL({ fileList: fileIDs.slice(i, i + 50) })
-        ;(tr.fileList || []).forEach((f) => {
-          if (f.status === 0 && f.tempFileURL) urlMap[f.fileID] = f.tempFileURL
-        })
-      } catch (e) {
-        console.warn('getChannelStats tempURL', e && e.message)
-      }
-    }
-
+    // 不采集头像昵称，列表只用 openid 后 8 位作为识别号
     if (wechatQ) {
       const q = wechatQ.toLowerCase()
       allUsers = allUsers.filter((u) => {
         const id = String(u._openid || '')
-        const p = profileMap[id] || {}
-        // 默认占位昵称 '静心的人' 不参与匹配，否则搜「静心」会命中所有人
-        const nick = p.nickname && p.nickname !== '静心的人' ? p.nickname : ''
-        return [u.wxMark, u.wechatId, p.wechatId, nick, id.slice(-8)]
+        return [u.wxMark, u.wechatId, id.slice(-8)]
           .some((v) => String(v || '').toLowerCase().indexOf(q) >= 0)
       })
     }
@@ -155,25 +157,42 @@ exports.main = async (event) => {
     }
     allUsers.sort((a, b) => toMs(b.boundAt) - toMs(a.boundAt))
 
-    let userCount = allUsers.length
-    try {
-      const c = await db.collection('channel_users').where({ channelId }).count()
-      userCount = (c && c.total) || userCount
-    } catch (e) {
-      // keep filtered length as fallback only if count fails
+    // 选了月份就只看当月新增，否则才是总数
+    let userCount = monthNewUsers
+    if (!range) {
+      try {
+        const c = await db.collection('channel_users').where({ channelId }).count()
+        userCount = (c && c.total) || 0
+      } catch (e) {
+        userCount = 0
+      }
+    }
+
+    // 结算状态：只有指定月份才有意义
+    let settlement = null
+    if (range) {
+      try {
+        const s = await db.collection('channel_settlements').doc(channelId + '_' + month).get()
+        if (s && s.data) {
+          settlement = {
+            status: s.data.status === 'settled' ? 'settled' : 'unsettled',
+            settledAt: toMs(s.data.settledAt),
+            commissionAmount: s.data.commissionAmount || 0,
+            refundedAmount: s.data.refundedAmount || 0,
+          }
+        }
+      } catch (e) {
+        // 集合还没建或该月未结算，按未结算处理
+      }
     }
 
     const users = allUsers.slice(0, 100).map((u) => {
       const id = String(u._openid || '')
-      const p = profileMap[id] || {}
-      // channel_users.wechatId 是绑定时的快照，用户后来在资料页填的微信号存在 users 里，
-      // 后者才是最新值，优先用它。'静心的人' 是默认占位昵称，不当作用户填过的昵称。
-      const rawNick = String(p.nickname || '').trim()
+      // 识别号统一用 openid 后 8 位，和用户自己看到的 wxMark 一致
+      const mark = String(u.wxMark || '').trim() || (id ? id.slice(-8).toUpperCase() : '')
       return {
         id: u._id,
-        wechatId: p.wechatId || u.wechatId || u.wxMark || (id ? id.slice(-8).toUpperCase() : '未填写'),
-        nickname: rawNick && rawNick !== '静心的人' ? rawNick : '',
-        avatarUrl: urlMap[p.avatarFileID] || '',
+        wechatId: mark || '未填写',
         boundAt: toMs(u.boundAt),
         paid: !!paidSet[id],
       }
@@ -187,6 +206,10 @@ exports.main = async (event) => {
       paidCount: Object.keys(paidSet).length,
       totalCommission,
       pendingCommission,
+      refundedAmount,
+      dailyNew,
+      settlement,
+      month: range ? month : '',
       truncated, // 佣金超过 1000 条时可能少算，前端可提示
       users,
     }

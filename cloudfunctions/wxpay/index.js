@@ -269,8 +269,9 @@ async function grantPremium(openid, outTradeNo, extra) {
 }
 
 // ===== 渠道佣金 =====
-// 只记账，不做真实资金划转（未接微信支付分账接口，商户平台也没开分账产品）。
+// 记账 + 可选的微信分账（splitForOrder，需 WXPAY_SPLIT=1，默认关闭）。
 // 佣金金额 = 实付金额 × 渠道费率，费率上限 0.3，与 createOrder 的口径保持一致。
+// 真正的结算由管理员在渠道管理页按月标记，这里只负责产生佣金记录。
 
 async function recordCommission(openid, outTradeNo, amount) {
   if (!openid || !outTradeNo) return

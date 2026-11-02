@@ -46,9 +46,6 @@ export interface UserSettings {
 export interface UserRecord {
   _id?: string
   nickname: string
-  /** 本人授权填写的头像（云存储 fileID）与微信号；渠道统计里展示的就是这份 */
-  avatarFileID?: string
-  wechatId?: string
   totalMerit: number
   /** 一次开启后为 true。只应由支付结果写入，不进 settings */
   premium?: boolean
@@ -210,17 +207,6 @@ export function updateSettings(patch: Partial<UserSettings>): Promise<{ settings
   return callCloud('user', { settings: patch })
 }
 
-export interface MyProfile {
-  nickname: string
-  wechatId: string
-  avatarFileID: string
-}
-
-/** 保存本人授权填写的昵称、微信号、头像。头像 fileID 由 wx.cloud.uploadFile 得到 */
-export function saveMyProfile(profile: Partial<MyProfile>): Promise<{ user: MyProfile }> {
-  return callCloud('user', { action: 'profile', profile })
-}
-
 // 普通微信支付（商户平台 JSAPI）：参数由服务端签好名后下发，前端直接调 wx.requestPayment
 export interface PremiumPayParams {
   premium: boolean
@@ -296,16 +282,22 @@ export function previewActivate(activateCode: string): Promise<{
   return callCloud('activateChannel', { action: 'preview', activateCode })
 }
 
-export function applyChannel(name: string, contact?: string): Promise<{ phase: string }> {
+export function applyChannel(name: string, contact: string, phone: string): Promise<{ phase: string }> {
   return callCloud('activateChannel', {
     action: 'apply',
     name,
     contact: contact || '',
+    phone,
   })
 }
 
 export function applyChannelUnbind(): Promise<{ phase: string }> {
   return callCloud('activateChannel', { action: 'applyUnbind' })
+}
+
+/** 用户按 openid 自助改手机号：只能改自己名下的申请/渠道，无需审核 */
+export function updateChannelPhone(phone: string): Promise<{ phone: string }> {
+  return callCloud('activateChannel', { action: 'updatePhone', phone })
 }
 
 export interface PartnerAppRow {
@@ -331,6 +323,8 @@ export interface PartnerHub {
   isChannel: boolean
   channelId: string
   name: string
+  /** 当前生效的手机号：已激活渠道 > 待激活渠道 > 待审申请 */
+  phone?: string
   canApplyBind: boolean
   canApplyUnbind: boolean
   pendingBind: boolean
@@ -364,12 +358,19 @@ export function generateChannelQR(channelId: string): Promise<{ fileID: string }
   return callCloud('generateChannelQR', { channelId, envVersion: miniEnvVersion() })
 }
 
-export function channelAdminCheck(): Promise<{ isAdmin: boolean; needsBootstrap: boolean }> {
+export function channelAdminCheck(): Promise<{
+  isAdmin: boolean
+  needsBootstrap: boolean
+  configured?: boolean
+  /** 调用者自己的 openid，用于填进 CHANNEL_ADMIN_OPENIDS */
+  openid?: string
+}> {
   return callCloud('channelAdmin', { action: 'check' })
 }
 
-export function channelAdminBootstrap(): Promise<{ isAdmin: boolean; bootstrapped?: boolean }> {
-  return callCloud('channelAdmin', { action: 'bootstrap' })
+/** 自助认领管理员：必须带云函数环境变量 CHANNEL_ADMIN_KEY 里配的口令，否则一律被拒 */
+export function channelAdminBootstrap(key: string): Promise<{ isAdmin: boolean; bootstrapped?: boolean }> {
+  return callCloud('channelAdmin', { action: 'bootstrap', key })
 }
 
 export interface AdminChannelRow {
@@ -389,6 +390,8 @@ export interface AdminAppRow {
   type: 'bind' | 'unbind'
   name: string
   contact: string
+  /** 申请人填写的结算联系手机号 */
+  phone: string
   mark: string
   channelId: string
   createdAt: number
@@ -449,19 +452,62 @@ export function channelAdminWipe(): Promise<{ results: { name: string; removed: 
   return callCloud('channelAdmin', { action: 'wipe' })
 }
 
+/** 管理员结算看板：某自然月各渠道的新增用户、付费、佣金、结算状态 */
+export interface AdminSettleRow {
+  channelId: string
+  name: string
+  phone: string
+  receiverOpenid: string
+  rate: number
+  userCount: number
+  paidCount: number
+  orderAmount: number
+  commissionAmount: number
+  refundedAmount: number
+  status: 'settled' | 'unsettled'
+  settledAt: number
+}
+
+export function channelAdminSettleBoard(month?: string): Promise<{
+  month: string
+  list: AdminSettleRow[]
+}> {
+  return callCloud('channelAdmin', { action: 'settleBoard', month: month || '' })
+}
+
+/** 标记某渠道某月已结算。只改状态，不触发转账 */
+export function channelAdminSettle(
+  channelId: string,
+  month: string
+): Promise<{ already: boolean; settlement: AdminSettleRow }> {
+  return callCloud('channelAdmin', { action: 'settle', channelId, month })
+}
+
 export interface ChannelStats {
   name: string
   status: string
+  /** 选了月份就是当月新增，未选月份是累计总数 */
   userCount: number
   paidCount: number
   totalCommission: number
   pendingCommission: number
-  /** 头像昵称需用户本人授权填写；未填写时 nickname/avatarUrl 为空，回退显示 wechatId */
+  /** 该月被退款冲销的佣金，用于在结算页提示差异 */
+  refundedAmount?: number
+  /** 该月每天新增推广用户数，key 为 YYYY-MM-DD */
+  dailyNew?: Record<string, number>
+  settlement?: {
+    status: 'settled' | 'unsettled'
+    settledAt: number
+    commissionAmount: number
+    refundedAmount: number
+  } | null
+  month?: string
+  /** 佣金超过 1000 条时可能少算 */
+  truncated?: boolean
+  /** 只用识别号（openid 后 8 位）区分用户；未绑定时回退为「未填写」 */
   users: {
     id: string
     wechatId: string
-    nickname: string
-    avatarUrl: string
     boundAt: number
     paid: boolean
   }[]

@@ -11,6 +11,7 @@ const COLLECTIONS = [
   'channel_admins',
   'channel_applications',
   'channel_owners',
+  'channel_settlements',
 ]
 
 async function ensureCollection(name) {

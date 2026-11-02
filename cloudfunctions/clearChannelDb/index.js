@@ -10,6 +10,7 @@ const WIPE = [
   'channel_users',
   'channel_commissions',
   'channel_owners',
+  'channel_settlements',
 ]
 
 async function wipeCollection(name) {

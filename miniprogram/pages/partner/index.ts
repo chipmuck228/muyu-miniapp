@@ -5,6 +5,7 @@ import {
   getChannelStats,
   generateChannelQR,
   activateChannel,
+  updateChannelPhone,
   PartnerAppRow,
   PartnerTenure,
 } from '../../utils/cloud'
@@ -59,6 +60,38 @@ function appExtra(row: PartnerAppRow): string {
   return ''
 }
 
+const PHONE_RE = /^1[3-9]\d{9}$/
+
+const WEEK_NAMES = ['一', '二', '三', '四', '五', '六', '日']
+
+interface CalCell {
+  key: string
+  day: string
+  count: number
+  empty: boolean
+}
+
+// 把「每天新增人数」铺成月历网格：周一开头，不足一周的补空格
+function buildCalendar(month: string, dailyNew: Record<string, number>) {
+  if (!month) return { cells: [] as CalCell[], total: 0 }
+  const y = parseInt(month.slice(0, 4), 10)
+  const m = parseInt(month.slice(5, 7), 10)
+  if (!y || !m) return { cells: [] as CalCell[], total: 0 }
+  const first = new Date(y, m - 1, 1)
+  const days = new Date(y, m, 0).getDate()
+  const lead = (first.getDay() + 6) % 7
+  const cells: CalCell[] = []
+  for (let i = 0; i < lead; i++) cells.push({ key: 'e' + i, day: '', count: 0, empty: true })
+  let total = 0
+  for (let d = 1; d <= days; d++) {
+    const k = month + '-' + pad(d)
+    const c = dailyNew[k] || 0
+    total += c
+    cells.push({ key: k, day: String(d), count: c, empty: false })
+  }
+  return { cells, total }
+}
+
 function monthOptions(): { value: string; label: string }[] {
   const out = [{ value: '', label: '全部月份' }]
   const now = new Date()
@@ -97,19 +130,26 @@ Page({
     users: [] as {
       id: string
       wechatId: string
-      nickname: string
-      avatarUrl: string
-      avatarText: string
       timeText: string
       paidText: string
     }[],
     months: monthOptions(),
     monthIndex: 0,
+    monthValue: '',
     userQuery: '',
+    /** 当前渠道的结算联系手机号，用户可自助修改 */
+    phone: '',
+    weekNames: WEEK_NAMES,
+    calCells: [] as CalCell[],
+    calTotal: 0,
+    settlementStatus: '' as '' | 'settled' | 'unsettled',
+    settledText: '',
+    truncated: false,
   },
 
   _name: '',
   _contact: '',
+  _phone: '',
   _booting: false,
   _tenures: [] as PartnerTenure[],
   _qrChannelId: '',
@@ -138,6 +178,43 @@ Page({
     this._contact = String(e.detail.value || '')
   },
 
+  onPhone(e: any) {
+    const v = String(e.detail.value || '')
+    this._phone = v
+    // 同步到 data：避免表单里其它 setData 重渲染时把输入框清空
+    this.setData({ phone: v })
+  },
+
+  // 手机号只用于结算联系，按 openid 改自己的记录，不需要验证码或人工审核
+  editPhone() {
+    wx.showModal({
+      title: '修改手机号',
+      editable: true,
+      placeholderText: '11 位手机号',
+      content: this.data.phone || '',
+      confirmText: '保存',
+      confirmColor: '#c4a574',
+      success: (res) => {
+        if (!res.confirm) return
+        const phone = String(res.content || '').trim()
+        if (!PHONE_RE.test(phone)) {
+          wx.showToast({ title: '请填写正确的 11 位手机号', icon: 'none' })
+          return
+        }
+        wx.showLoading({ title: '保存中', mask: true })
+        updateChannelPhone(phone)
+          .then(() => {
+            this.setData({ phone })
+            wx.showToast({ title: '已更新', icon: 'none' })
+          })
+          .catch((e: any) => {
+            wx.showToast({ title: (e && e.message) || '保存失败', icon: 'none' })
+          })
+          .finally(() => wx.hideLoading())
+      },
+    })
+  },
+
   onUserQ(e: any) {
     this.setData({ userQuery: String(e.detail.value || '') })
   },
@@ -158,6 +235,7 @@ Page({
       }
       this.setData({
         ready: true,
+        phone: hub.phone || '',
         canApplyBind: !!hub.canApplyBind,
         pendingBind: !!hub.pendingBind,
         canApplyUnbind: !!hub.canApplyUnbind,
@@ -207,6 +285,8 @@ Page({
       month,
     })
     const isActive = !!(tenure && tenure.status === 'active')
+    const cal = buildCalendar(month, st.dailyNew || {})
+    const settlement = st.settlement || null
     this.setData({
       selectedId: channelId,
       isActive,
@@ -215,19 +295,20 @@ Page({
       paidCount: st.paidCount || 0,
       totalText: fenText(st.totalCommission),
       pendingText: fenText(st.pendingCommission),
-      users: (st.users || []).map((u) => {
-        const label = (u.nickname || u.wechatId || '未填写').trim()
-        return {
-          id: u.id,
-          wechatId: u.wechatId || '未填写',
-          nickname: u.nickname || '',
-          avatarUrl: u.avatarUrl || '',
-          // 没头像时用昵称首字做占位，避免一片空圆圈
-          avatarText: label.slice(0, 1).toUpperCase(),
-          timeText: fmtDT(u.boundAt),
-          paidText: u.paid ? '已付费' : '未付费',
-        }
-      }),
+      monthValue: month,
+      calCells: cal.cells,
+      calTotal: cal.total,
+      // 只有选定具体月份才有结算状态；「全部月份」不适合谈结算
+      settlementStatus: month ? ((settlement && settlement.status) || 'unsettled') : '',
+      settledText: settlement && settlement.settledAt ? fmtDT(settlement.settledAt) : '',
+      truncated: !!st.truncated,
+      // 只用识别号（openid 后 8 位）区分用户：不采集、不展示头像昵称
+      users: (st.users || []).map((u) => ({
+        id: u.id,
+        wechatId: u.wechatId || '未填写',
+        timeText: fmtDT(u.boundAt),
+        paidText: u.paid ? '已付费' : '未付费',
+      })),
       tenures: this._tenures.map((t) => ({
         key: t.channelId + '-' + t.boundAt,
         channelId: t.channelId,
@@ -294,13 +375,18 @@ Page({
 
   async doApply() {
     const name = this._name.trim()
+    const phone = this._phone.trim()
     if (!name) {
       wx.showToast({ title: '请填写名称', icon: 'none' })
       return
     }
+    if (!PHONE_RE.test(phone)) {
+      wx.showToast({ title: '请填写正确的 11 位手机号', icon: 'none' })
+      return
+    }
     wx.showLoading({ title: '提交中', mask: true })
     try {
-      await applyChannel(name, this._contact.trim())
+      await applyChannel(name, this._contact.trim(), phone)
       await this.boot()
       wx.showToast({ title: '已提交', icon: 'none' })
     } catch (e: any) {
