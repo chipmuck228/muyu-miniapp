@@ -20,7 +20,7 @@ import { AmbienceId } from '../../utils/audioCatalog'
 import { parseTheme, themeEnds, ThemeId } from '../../utils/theme'
 import { applyLesson, nextLesson, LessonPick, RANDOM_NAME, RANDOM_LESSON } from '../../utils/lesson'
 import { SESSION_PLANS, SessionPlan, PlanId, planOf, triedPlans, markPlanTried } from '../../utils/sessionPlans'
-import { buyPremium, PACK_NAME } from '../../utils/premium'
+import { resumePending, PACK_NAME } from '../../utils/premium'
 import { randomZen } from '../../utils/zen'
 import { WISH_SUGGESTIONS } from '../../utils/wishIdeas'
 
@@ -508,7 +508,21 @@ Page({
     this.tryEnter()
     // 自动敲只在本次打开内有效：切页、锁屏回来接着敲，重开小程序从手敲开始
     if (this.data.autoMode && !this.entering() && !this.overlayOn()) this.startAuto()
-    if (app.globalData.openLessonSheet) {
+    resumePending().then((ok) => {
+      if (ok && this._alive) this.setData({ premium: true, planOptions: planOptions(true) })
+    })
+    const opened = app.globalData.packOpened
+    app.globalData.packOpened = null
+    if (typeof opened === 'string') {
+      // 去静心页开了静心包：提示一声，接着用刚才想用的那套
+      const plan = planOf(opened)
+      this.setData({ premium: true, planOptions: planOptions(true) })
+      setTimeout(() => {
+        if (!this._alive) return
+        wx.showToast({ title: PACK_NAME + '已开启', icon: 'none' })
+        if (plan && !this._session) this.startPlan(plan, false)
+      }, 700)
+    } else if (app.globalData.openLessonSheet) {
       app.globalData.openLessonSheet = false
       // 先让香案亮出来，再升起面板
       setTimeout(() => {
@@ -1313,8 +1327,8 @@ Page({
     this.beginSession(kind, value)
   },
 
-  /** 成品定课：免费的直接开始；静心包的没开过先试一次，试过了再点就去开启 */
-  async onPickPlan(e: any) {
+  /** 成品定课：免费的直接开始；静心包的没开过先试一次，试过了再点就去静心页看静心包 */
+  onPickPlan(e: any) {
     const plan = planOf(String(e.currentTarget.dataset.id || ''))
     if (!plan) return
     if (!plan.premium || this.data.premium) {
@@ -1325,15 +1339,17 @@ Page({
       this.startPlan(plan, true)
       return
     }
-    const r = await buyPremium(() => this._alive)
-    if (!this._alive) return
-    if (r === 'opened') {
-      this.setData({ premium: true })
-      wx.showToast({ title: PACK_NAME + '已开启', icon: 'none' })
-      this.startPlan(plan, false)
-    } else if (r === 'pending') {
-      wx.showToast({ title: '付款已收到，正在开启', icon: 'none' })
-    }
+    // 面板留着：没开就回到这里，开了回来直接开始这套
+    this.visitPack(plan.id)
+  },
+
+  /** 去静心页的介绍面板开启静心包；开了或关掉面板都会回香案 */
+  visitPack(planId: string) {
+    const app = getApp<IAppOption>()
+    app.globalData.packVisit = planId
+    app.globalData.homeWillReenter = true
+    concealTabBar(this)
+    wx.switchTab({ url: '/pages/profile/index' })
   },
 
   startPlan(plan: SessionPlan, trial: boolean) {
@@ -1512,23 +1528,11 @@ Page({
     else this.beginSession(info.kind, info.value)
   },
 
-  /** 试用结束的小结里直接开启；开了就接着用刚才这套 */
-  async onSessionBuy() {
+  /** 试用结束的小结里点开启：去静心页看静心包；开了回来就接着用刚才这套 */
+  onSessionBuy() {
     const info = this.closeSessionDone()
-    const plan = info && info.planId ? planOf(info.planId) : null
-    const r = await buyPremium(() => this._alive)
-    if (!this._alive) return
-    if (r === 'opened') {
-      this.setData({ premium: true })
-      wx.showToast({ title: PACK_NAME + '已开启', icon: 'none' })
-      if (plan) {
-        this.beginSession('time', planMinutes(plan), plan, false)
-        return
-      }
-    } else if (r === 'pending') {
-      wx.showToast({ title: '付款已收到，正在开启', icon: 'none' })
-    }
     this.restoreScene()
+    this.visitPack((info && info.planId) || '')
   },
 
   /** 提前收起：已敲的早已计入，收起只是不再计时 / 计数 */
