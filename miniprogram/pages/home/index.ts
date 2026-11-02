@@ -20,7 +20,7 @@ import { AmbienceId } from '../../utils/audioCatalog'
 import { parseTheme, themeEnds, ThemeId } from '../../utils/theme'
 import { applyLesson, nextLesson, LessonPick, RANDOM_NAME, RANDOM_LESSON } from '../../utils/lesson'
 import { SESSION_PLANS, SessionPlan, PlanId, planOf, triedPlans, markPlanTried } from '../../utils/sessionPlans'
-import { resumePending, PACK_NAME } from '../../utils/premium'
+import { checkRefund, resumePending, PACK_NAME } from '../../utils/premium'
 import { randomZen } from '../../utils/zen'
 import { WISH_SUGGESTIONS } from '../../utils/wishIdeas'
 
@@ -867,6 +867,16 @@ Page({
     this.setData(this.titleColorPatch())
     this.drawLessonTitle()
     startAmbience(scene.ambience)
+    if (user.premium === true) this.recheckRefund()
+  },
+
+  /** 开着静心包的：隔一阵问一次是否已退款（utils/premium 里节流），退了就重新拉资料，氛围、主题、定课都锁回去 */
+  recheckRefund() {
+    checkRefund().then((refunded) => {
+      if (!refunded || !this._alive) return
+      this.setData({ premium: false, planOptions: planOptions(false) })
+      this.refresh()
+    })
   },
 
   /** 此刻香案该用的声音和主题：成品定课铺着时用定课的，否则用自己的设置 */

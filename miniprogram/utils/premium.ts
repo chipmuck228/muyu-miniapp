@@ -1,5 +1,5 @@
 // 静心包：一次付款开启（users.premium）。付款都在静心页的介绍面板里；香案的定课要开启时也是去那里。
-import { preparePremiumPay, confirmPremiumPay, fetchPremiumPrice } from './cloud'
+import { preparePremiumPay, confirmPremiumPay, fetchPremiumPrice, verifyPremium } from './cloud'
 import { mockEnabled, mockMarkPaid } from './devMock'
 
 export const PACK_NAME = '静心包'
@@ -154,17 +154,62 @@ async function waitDelivered(outTradeNo: string, alive: () => boolean): Promise<
 /** opened 已开启；pending 付了款还在等发货；cancel 用户没付或页面已关 */
 export type BuyResult = 'opened' | 'pending' | 'cancel'
 
+/** 正在付款：续查、退款复核要避开，免得和这一单抢着改状态 */
 let paying = false
+/** 正在续查上一笔：退款复核要避开 */
 let resumeTask: Promise<boolean> | null = null
 
-/** 正在付款：续查、退款复核要避开，免得和这一单抢着改状态 */
-export function isPaying(): boolean {
-  return paying
+// 退款复核：商户平台退款后微信侧订单变成 REFUND，我们没接退款回调，只能主动问。
+// 开着静心包的人每次拉到自己的资料都可能来问，所以按本机节流：隔 6 小时才再问一次；
+// 问失败了 10 分钟后再试，别因为网络抖动就一直不查
+const REFUND_CHECK_KEY = 'premium_refund_checked_at'
+const REFUND_CHECK_MS = 6 * 60 * 60 * 1000
+const REFUND_RETRY_MS = 10 * 60 * 1000
+let refundTask: Promise<boolean> | null = null
+
+function refundCheckedAt(): number {
+  try {
+    return Number(wx.getStorageSync(REFUND_CHECK_KEY)) || 0
+  } catch (e) {
+    return 0
+  }
 }
 
-/** 正在续查上一笔：退款复核要避开 */
-export function isResuming(): boolean {
-  return !!resumeTask
+function markRefundChecked(at: number) {
+  try {
+    wx.setStorageSync(REFUND_CHECK_KEY, at)
+  } catch (e) {
+    // 存储不可用：本次会话里每次都会再问，不影响结果
+  }
+}
+
+/**
+ * 已开通的用户拉到资料后调用：问一次微信这单退款了没有，退了云端会把静心包收回。
+ * 香案和静心页共用同一趟，收回时只提示一次；返回是否刚被收回（调用方据此重新拉资料）
+ */
+export function checkRefund(): Promise<boolean> {
+  if (refundTask) return refundTask
+  if (paying || resumeTask) return Promise.resolve(false)
+  if (Date.now() - refundCheckedAt() < REFUND_CHECK_MS) return Promise.resolve(false)
+  const task = verifyPremium()
+    .then((r) => {
+      markRefundChecked(Date.now())
+      if (!r.refunded) return false
+      writePending('')
+      wx.showToast({ title: '已退款，' + PACK_NAME + '已关闭', icon: 'none' })
+      return true
+    })
+    .catch(() => {
+      // 复核失败不收回：网络抖动不该误伤付了钱的人
+      markRefundChecked(Date.now() - REFUND_CHECK_MS + REFUND_RETRY_MS)
+      return false
+    })
+    .then((refunded) => {
+      refundTask = null
+      return refunded
+    })
+  refundTask = task
+  return task
 }
 
 /**
