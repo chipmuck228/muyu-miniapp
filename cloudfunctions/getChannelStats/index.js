@@ -1,6 +1,7 @@
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
+const _ = db.command
 
 function toMs(d) {
   if (!d) return 0
@@ -68,11 +69,29 @@ exports.main = async (event) => {
     // 搜索不再下推到数据库：昵称存在 users 集合里，需要先关联出来才能一起匹配
     const where = conds.length === 1 ? conds[0] : _.and(conds)
 
-    let usersR
+    // 用户列表：按绑定时间倒序翻页取，最多 1000 条；超过置 usersTruncated，
+    // 否则推广用户多时列表只显示随机的 100 条，搜索也搜不到没取到的人
+    let allUsers = []
+    let usersTruncated = false
     try {
-      usersR = await db.collection('channel_users').where(where).limit(100).get()
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const r = await db
+          .collection('channel_users')
+          .where(where)
+          .orderBy('boundAt', 'desc')
+          .skip(page * PAGE)
+          .limit(PAGE)
+          .get()
+        const rows = r.data || []
+        allUsers.push.apply(allUsers, rows)
+        if (rows.length < PAGE) break
+        if (page === MAX_PAGES - 1) usersTruncated = true
+      }
     } catch (e) {
-      usersR = await db.collection('channel_users').where({ channelId }).limit(100).get()
+      // 兜底：个别数据缺 boundAt 导致数据库排序失败时，退回无排序的简单查询
+      allUsers = []
+      const r = await db.collection('channel_users').where({ channelId }).limit(100).get()
+      allUsers = r.data || []
     }
 
     // 佣金：按月份过滤（原先没有月份条件，"本月佣金"实际是累计值），
@@ -112,9 +131,7 @@ exports.main = async (event) => {
       if (p.status === 'pending' && !p.settledAt) pendingCommission += n
     })
 
-    let allUsers = usersR.data || []
-
-    // 当月新增：列表只取 100 条，不能拿来当总数；单独翻页统计，同时按天聚合，供日历展示
+    // 当月新增：单独翻页统计（上面的列表已翻到 1000 上限，不能拿来当总数），同时按天聚合，供日历展示
     const dailyNew = {}
     let monthNewUsers = 0
     if (range) {
@@ -187,7 +204,7 @@ exports.main = async (event) => {
       }
     }
 
-    const users = allUsers.slice(0, 100).map((u) => {
+    const users = allUsers.map((u) => {
       const id = String(u._openid || '')
       // 识别号统一用 openid 后 8 位，和用户自己看到的 wxMark 一致
       const mark = String(u.wxMark || '').trim() || (id ? id.slice(-8).toUpperCase() : '')
@@ -212,6 +229,7 @@ exports.main = async (event) => {
       settlement,
       month: range ? month : '',
       truncated, // 佣金超过 1000 条时可能少算，前端可提示
+      usersTruncated, // 用户超过 1000 人时列表只显示最近 1000 人
       users,
     }
   } catch (e) {

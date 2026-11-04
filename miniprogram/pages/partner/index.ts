@@ -171,6 +171,7 @@ Page({
     settlementStatus: '' as '' | 'settled' | 'unsettled',
     settledText: '',
     truncated: false,
+    usersTruncated: false,
     agreeOpen: false,
     agreeChecked: false,
     refreshing: false,
@@ -335,6 +336,7 @@ Page({
       settlementStatus: month ? ((settlement && settlement.status) || 'unsettled') : '',
       settledText: settlement && settlement.settledAt ? fmtDT(settlement.settledAt) : '',
       truncated: !!st.truncated,
+      usersTruncated: !!st.usersTruncated,
       // 只用识别号（openid 后 8 位）区分用户：不采集、不展示头像昵称
       users: (st.users || []).map((u) => ({
         id: u.id,

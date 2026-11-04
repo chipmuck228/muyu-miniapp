@@ -202,6 +202,7 @@
             </view>
             <text class="user-pay">{{item.paidText}}</text>
           </view>
+          <text class="hint" wx:if="{{usersTruncated}}">推广用户超过 1000 人，这里只显示最近绑定的 1000 人</text>
           <text class="user-note">用户仅以识别号标识，不采集头像与昵称</text>
         </view>
 

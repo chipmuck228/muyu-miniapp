@@ -508,6 +508,8 @@ export interface ChannelStats {
   month?: string
   /** 佣金超过 1000 条时可能少算 */
   truncated?: boolean
+  /** 推广用户超过 1000 人时，列表只显示最近 1000 人 */
+  usersTruncated?: boolean
   /** 只用识别号（openid 后 8 位）区分用户；未绑定时回退为「未填写」 */
   users: {
     id: string
