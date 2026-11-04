@@ -490,6 +490,9 @@ export function channelAdminSettle(
 }
 
 export interface ChannelStats {
+  /** 云函数失败时 ok 为 false 并带 msg，调用方需检查 */
+  ok?: boolean
+  msg?: string
   name: string
   status: string
   /** 选了月份就是当月新增，未选月份是累计总数 */

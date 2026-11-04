@@ -328,6 +328,11 @@ Page({
       wechatId: String(this.data.userQuery || '').trim(),
       month,
     })
+    // 云函数失败时返回 { ok:false, msg }，不检查的话会把空数据当正常渲染，
+    // 页面看起来就是"点了没反应"。必须把真实原因抛给调用方的 toast。
+    if (st && st.ok === false) {
+      throw new Error(st.msg || '读取失败')
+    }
     const isActive = !!(tenure && tenure.status === 'active')
     const cal = buildCalendar(month, st.dailyNew || {})
     const settlement = st.settlement || null
@@ -391,7 +396,11 @@ Page({
   // 点申请记录查看该渠道的历史数据：解绑后佣金仍可查，只是不再显示推广码
   pickHistory(e: any) {
     const id = String(e.currentTarget.dataset.id || '')
-    if (!id || id === this.data.selectedId) return
+    if (!id) {
+      wx.showToast({ title: '该记录未关联渠道，无法查看', icon: 'none' })
+      return
+    }
+    if (id === this.data.selectedId) return
     this._qrChannelId = ''
     this.setData({ qrSrc: '' })
     this.loadStats(id).catch((err: any) => {
