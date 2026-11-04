@@ -116,6 +116,8 @@ function mapTenures(all: PartnerTenure[], selectedId: string) {
       key: t.channelId + '-' + t.boundAt,
       channelId: t.channelId,
       name: t.name,
+      // 渠道码尾号：名称可能重复，靠它区分是不是同一个推广码
+      mark: t.channelId.slice(-6).toUpperCase(),
       timeText: t.boundAt ? '绑定 ' + fmtDT(t.boundAt) : '',
       on: t.channelId === selectedId,
     }))
@@ -147,7 +149,7 @@ Page({
       sameChannel: boolean
       canUnbind: boolean
     }[],
-    tenures: [] as { key: string; channelId: string; name: string; timeText: string; on: boolean }[],
+    tenures: [] as { key: string; channelId: string; name: string; mark: string; timeText: string; on: boolean }[],
     selectedId: '',
     isActive: false,
     name: '',

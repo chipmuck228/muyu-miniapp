@@ -99,7 +99,7 @@
         >
           <view class="row-main">
             <text class="row-name">{{item.name}}</text>
-            <text class="row-st">{{item.timeText}}</text>
+            <text class="row-st">渠道码 {{item.mark}}{{item.timeText ? ' · ' + item.timeText : ''}}</text>
           </view>
         </view>
         <view class="phone-row" wx:if="{{isActive}}">
@@ -122,6 +122,7 @@
             <view class="row-main">
               <text class="row-name">{{item.title}}</text>
               <text class="row-status">{{item.statusText}}</text>
+              <text class="row-st" wx:if="{{item.channelMark}}">渠道码 {{item.channelMark}}</text>
               <text class="row-st" wx:if="{{item.phone}}">联系 {{item.phone}}</text>
               <text class="row-st" wx:if="{{item.timeText}}">{{item.timeText}}</text>
               <text class="row-st" wx:if="{{item.extraText}}">{{item.extraText}}</text>
