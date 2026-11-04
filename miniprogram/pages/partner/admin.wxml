@@ -5,7 +5,16 @@
     <text class="wing-title">管 理</text>
     <text class="wing-kicker ghost"></text>
   </view>
-  <scroll-view class="wing-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+  <scroll-view
+    class="wing-scroll"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    refresher-enabled
+    refresher-background="#0a0806"
+    refresher-triggered="{{refreshing}}"
+    bindrefresherrefresh="onRefresh"
+  >
     <view class="wing-body" wx:if="{{ready}}">
       <view class="block first">
         <text class="block-label">绑定申请</text>
@@ -103,7 +112,7 @@
           >结算</text>
           <text wx:else class="row-act dim">已结算</text>
         </view>
-        <text class="user-note">结算只记录状态，不触发转账；请按手机号线下完成打款</text>
+        <text class="user-note">结算只记录状态，不触发转账；请按手机号线下完成打款。佣金为含税金额，平台不代扣代缴。</text>
       </view>
 
       <text class="wipe" hover-class="hover-dim" bindtap="wipe">清空记录</text>

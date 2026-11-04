@@ -98,6 +98,7 @@ Page({
       refundText: string
       settledText: string
     })[],
+    refreshing: false,
   },
 
   onLoad() {
@@ -114,6 +115,15 @@ Page({
     app.globalData.homeEnterAnim = true
     concealTabBar(this)
     wx.switchTab({ url: '/pages/home/index' })
+  },
+
+  // 内容在 scroll-view 里（页面 disableScroll），下拉刷新用 refresher 实现
+  async onRefresh() {
+    try {
+      await this.boot()
+    } finally {
+      this.setData({ refreshing: false })
+    }
   },
 
   async boot() {
