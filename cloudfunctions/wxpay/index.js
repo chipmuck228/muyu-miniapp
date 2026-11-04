@@ -581,6 +581,9 @@ async function prepay(openid) {
   for (let i = 0; i < rows.length; i++) {
     const t = toMs(rows[i].createdAt)
     if (!t || now - t > ORDER_REUSE_MS) continue
+    // 改价后不能复用旧价订单：同一个 outTradeNo 以新金额重新下单会被微信拒绝，
+    // 用户点支付只会看到失败。金额不一致就新建单号。
+    if (Number(rows[i].goodsPrice) !== cfg.price) continue
     reuse = rows[i]
     break
   }
@@ -664,7 +667,7 @@ async function confirm(openid, outTradeNo) {
 // 本实现没有可用的异步回调（notify_url 是占位地址），所以改为在用户端主动复核：
 // 只要发现已发货订单全部退款，立刻把用户彻底恢复成未付费状态。
 //
-// 已知边界：部分退款时微信查单仍返回 SUCCESS，这里检测不到；6 元买断一般全额退。
+// 已知边界：部分退款时微信查单仍返回 SUCCESS，这里检测不到；19.9 元买断一般全额退。
 
 async function findDeliveredOrders(openid) {
   try {

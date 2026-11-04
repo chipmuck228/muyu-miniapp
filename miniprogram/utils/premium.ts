@@ -123,7 +123,8 @@ function requestPayment(p: {
 function yuanText(fen: number): string {
   if (!(fen > 0)) return ''
   const y = fen / 100
-  return Number.isInteger(y) ? String(y) : y.toFixed(2)
+  // 整数不带小数；其余保留两位有效小数，但去掉末尾多余的 0（19.9 显示 19.9 而非 19.90）
+  return Number.isInteger(y) ? String(y) : y.toFixed(2).replace(/0$/, '')
 }
 
 let priceCache = ''

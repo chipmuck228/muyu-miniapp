@@ -8,7 +8,7 @@
 2. 同一小程序的 **AppSecret**（开发管理 → 开发设置；签名用户态需要，云调用不支持 `auth.code2Session`）。
 3. 在 **虚拟支付 → 道具管理** 新建道具并发布到现网：
    - 道具 ID：现网实际用的是 `Premium`（须与下面 `productId` **完全一致、区分大小写**）
-   - 价格：后台填元，`secrets.js` 里填**分**（例如 6 元 → `600`）
+   - 价格：后台填元，`secrets.js` 里填**分**（例如 19.9 元 → `1990`）
    - **iOS / 苹果支付最低 1 元**（`goodsPrice >= 100`）。现在若是几分钱，安卓或可过，iPhone 会报 `INVALID_PLATFORM` / 参数错误
    - 开发者工具会报 `INVALID_PLATFORM`，请用**安卓真机**预览；iPhone 还须在虚拟支付里开通苹果支付并配置小程序简称
 4. 云开发控制台配置消息推送（见下）。
@@ -27,7 +27,7 @@ module.exports = {
   appKey: '你的现网AppKey',
   appSecret: '小程序AppSecret',
   productId: 'Premium', // 与「道具管理」里的 ID 完全一致，区分大小写
-  goodsPrice: 600, // 分，必须与道具现网价格一致
+  goodsPrice: 1990, // 分，必须与道具现网价格一致
   env: 0,          // 0 现网；沙箱才用 1，并换沙箱 AppKey
 }
 ```

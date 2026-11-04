@@ -9,7 +9,7 @@
 
 const FLAG_KEY = 'muyu_mock_cloud'
 const DB_KEY = 'muyu_mock_db'
-const PREMIUM_PRICE = 600
+const PREMIUM_PRICE = 1990
 const LATENCY_MS = 160
 
 const DEFAULT_SETTINGS = { soundOn: true, vibrateOn: true, autoMode: false, ambience: 'off', theme: 'dawn' }

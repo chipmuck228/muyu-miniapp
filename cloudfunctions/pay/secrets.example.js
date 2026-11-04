@@ -9,8 +9,8 @@ module.exports = {
   appId: '',
   // 必须与「虚拟支付 → 道具管理」发布到现网的道具 ID 完全一致，区分大小写
   productId: 'Premium',
-  // 单位：分。安卓可低于 1 元；iOS / 苹果支付要求不少于 100（1 元）
-  goodsPrice: 600,
+  // 单位：分。1990 = 19.9 元。安卓可低于 1 元；iOS / 苹果支付要求不少于 100（1 元）
+  goodsPrice: 1990,
   env: 0,
   // 补发货扫描脚本的调用密钥，自行生成一串随机字符串。
   // 不填则 scripts/repair-premium.js 会被云函数拒绝。切勿外泄。
