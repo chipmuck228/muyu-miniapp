@@ -223,6 +223,8 @@ exports.main = async (event) => {
         name: a.name || '',
         phone: a.phone || '',
         wechatId: a.wechatId || '',
+        // 授权过的申请带 channelId，前端据此查看该渠道的历史佣金（解绑后也要能看）
+        channelId: a.channelId || '',
         createdAt: toMs(a.createdAt),
         handledAt: toMs(a.handledAt),
         channelStatus: a.channelId ? chStatus[a.channelId] || '' : '',

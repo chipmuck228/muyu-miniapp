@@ -142,6 +142,7 @@ Page({
       timeText: string
       extraText: string
       phone: string
+      channelId: string
       canUnbind: boolean
     }[],
     tenures: [] as { key: string; channelId: string; name: string; timeText: string; on: boolean }[],
@@ -266,11 +267,15 @@ Page({
       const hub = await channelHub()
       this._tenures = hub.tenures || []
       const prevId = this.data.selectedId
-      // 已解绑的渠道不再出现在列表里，之前选中的若是已解绑渠道就回落到当前绑定中的
-      const selectedId = prevId && this._tenures.some((t) => t.channelId === prevId && t.status === 'active')
+      // 「我的推广」只列绑定中的渠道，但已解绑渠道的历史佣金仍要能看：
+      // 优先落在绑定中的渠道，只有在没有绑定中渠道时才回落到最近的已解绑渠道
+      const activeOne = this._tenures.find((t) => t.status === 'active')
+      const selectedId = prevId && this._tenures.some((t) => t.channelId === prevId)
         ? prevId
         : hub.channelId
-          || ((this._tenures.find((t) => t.status === 'active') || {} as PartnerTenure).channelId || '')
+          || (activeOne && activeOne.channelId)
+          || (this._tenures[0] && this._tenures[0].channelId)
+          || ''
       let activateQrSrc = ''
       if (hub.needActivate && hub.activateFileID) {
         activateQrSrc = await resolveCloudFile(hub.activateFileID).catch(() => '')
@@ -295,6 +300,7 @@ Page({
           timeText: a.createdAt ? '申请 ' + fmtDT(a.createdAt) : '',
           extraText: appExtra(a),
           phone: a.phone || '',
+          channelId: a.channelId || '',
           // 只有"当前仍绑定中"的授权记录旁边才放解绑入口
           canUnbind: !!(hub.canApplyUnbind && a.type === 'bind' && a.status === 'authorized' && a.channelStatus === 'active'),
         })),
@@ -375,6 +381,17 @@ Page({
     this.setData({ qrSrc: '' })
     this.loadStats(id).catch((e: any) => {
       wx.showToast({ title: (e && e.message) || '读取失败', icon: 'none' })
+    })
+  },
+
+  // 点申请记录查看该渠道的历史数据：解绑后佣金仍可查，只是不再显示推广码
+  pickHistory(e: any) {
+    const id = String(e.currentTarget.dataset.id || '')
+    if (!id || id === this.data.selectedId) return
+    this._qrChannelId = ''
+    this.setData({ qrSrc: '' })
+    this.loadStats(id).catch((err: any) => {
+      wx.showToast({ title: (err && err.message) || '读取失败', icon: 'none' })
     })
   },
 

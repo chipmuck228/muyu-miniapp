@@ -308,6 +308,8 @@ export interface PartnerAppRow {
   /** 申请时填写的手机号 */
   phone?: string
   wechatId: string
+  /** 授权后对应渠道的 id，用于查看该渠道的历史数据 */
+  channelId?: string
   createdAt: number
   handledAt: number
   /** 授权后对应渠道的当前状态：active=绑定中 / unbound=已解绑 */

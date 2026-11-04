@@ -403,3 +403,14 @@
   flex: none;
   margin-left: 24rpx;
 }
+
+.ch-head {
+  display: flex;
+  align-items: baseline;
+}
+.ch-state {
+  margin-left: 16rpx;
+  font-size: 22rpx;
+  letter-spacing: 2rpx;
+  color: rgba(240, 230, 216, 0.4);
+}
