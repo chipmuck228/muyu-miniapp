@@ -195,6 +195,11 @@ Page({
   _booting: false,
   _tenures: [] as PartnerTenure[],
   _qrChannelId: '',
+  // 统计请求序号：切换渠道/月份时旧请求的结果必须丢弃，否则先发的慢请求
+  // 会在后发的请求之后返回，把 A 渠道的数据渲染到 B 渠道下（看起来像数据串台）
+  _statsSeq: 0,
+  // 申请记录展开请求同样要防串台（快速点开不同记录时）
+  _expandSeq: 0,
 
   onLoad() {
     const app = getApp<IAppOption>()
@@ -331,12 +336,18 @@ Page({
   },
 
   async loadStats(channelId: string) {
+    const seq = ++this._statsSeq
     const tenure = this._tenures.find((t) => t.channelId === channelId)
     const month = (this.data.months[this.data.monthIndex] || { value: '' }).value
     const st = await getChannelStats(channelId, {
       wechatId: String(this.data.userQuery || '').trim(),
       month,
     })
+    // 已经有更新的请求发出：这次结果已过期，直接丢弃，不渲染也不报错，
+    // 否则会出现「A 渠道的佣金显示在 B 渠道下」
+    if (seq !== this._statsSeq) return
+    // 双保险：响应自带的渠道与请求不一致（云端串数据）也不要渲染
+    if (st && st.channelId && st.channelId !== channelId) return
     // 云函数失败时返回 { ok:false, msg }，不检查的话会把空数据当正常渲染，
     // 页面看起来就是"点了没反应"。必须把真实原因抛给调用方的 toast。
     if (st && st.ok === false) {
@@ -383,9 +394,12 @@ Page({
     try {
       const r = await generateChannelQR(channelId)
       const src = await resolveCloudFile(r.fileID)
+      // 生成期间用户可能已切到别的渠道，这时不能再把旧渠道的码贴上去
+      if (this.data.selectedId !== channelId) return
       this._qrChannelId = channelId
       this.setData({ qrSrc: src })
     } catch (e: any) {
+      if (this.data.selectedId !== channelId) return
       wx.showToast({ title: (e && e.message) || '生成失败', icon: 'none' })
     } finally {
       wx.hideLoading()
@@ -414,12 +428,16 @@ Page({
     }
     if (!appId) return
     if (this.data.expandedId === appId) {
+      this._expandSeq++
       this.setData({ expandedId: '', expandedStats: null })
       return
     }
+    const seq = ++this._expandSeq
     this.setData({ expandedId: appId, expandedStats: null })
     try {
       const st = await getChannelStats(id, {})
+      if (seq !== this._expandSeq) return
+      if (st && st.channelId && st.channelId !== id) return
       if (st && st.ok === false) throw new Error(st.msg || '读取失败')
       this.setData({
         expandedStats: {
@@ -431,6 +449,7 @@ Page({
         },
       })
     } catch (err: any) {
+      if (seq !== this._expandSeq) return
       this.setData({ expandedId: '', expandedStats: null })
       wx.showToast({ title: (err && err.message) || '读取失败', icon: 'none' })
     }

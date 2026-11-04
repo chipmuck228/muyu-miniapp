@@ -617,6 +617,7 @@ function handle(name: string, data: any): any {
     }
     return {
       ok: true,
+      channelId: String((data && data.channelId) || ''),
       name: '本地模拟渠道',
       status: 'active',
       userCount: rows.length,

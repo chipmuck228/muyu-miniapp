@@ -74,11 +74,13 @@ exports.main = async (event) => {
     const channel = await canView(channelId, OPENID)
     if (!channel) return { ok: false, msg: '无渠道权限' }
 
-    const conds = [{ channelId }]
     const range = monthRange(month)
-    if (range) conds.push({ boundAt: _.gte(range.start).and(_.lt(range.end)) })
+    // 用单对象合并字段，不用 _.and([...]) 包数组：后者在某些 SDK 版本下
+    // 会把数组当成一个条件对象，导致 channelId 条件被吞掉、返回全部渠道的数据
+    // （表现就是各渠道数字一样、A 的数据在 B 下重复出现）
+    const where = { channelId }
+    if (range) where.boundAt = _.gte(range.start).and(_.lt(range.end))
     // 搜索不再下推到数据库：昵称存在 users 集合里，需要先关联出来才能一起匹配
-    const where = conds.length === 1 ? conds[0] : _.and(conds)
 
     // 用户列表：按绑定时间倒序翻页取，最多 1000 条；超过置 usersTruncated，
     // 否则推广用户多时列表只显示随机的 100 条，搜索也搜不到没取到的人
@@ -107,9 +109,8 @@ exports.main = async (event) => {
 
     // 佣金：按月份过滤（原先没有月份条件，"本月佣金"实际是累计值），
     // 并翻页取全量——单次 get 上限 100 条，原来的 limit(80) 会截断导致少算。
-    const payConds = [{ channelId }]
-    if (range) payConds.push({ createdAt: _.gte(range.start).and(_.lt(range.end)) })
-    const payWhere = payConds.length === 1 ? payConds[0] : _.and(payConds)
+    const payWhere = { channelId }
+    if (range) payWhere.createdAt = _.gte(range.start).and(_.lt(range.end))
     const pays = []
     let truncated = false
     for (let page = 0; page < MAX_PAGES; page++) {
@@ -232,6 +233,9 @@ exports.main = async (event) => {
 
     return {
       ok: true,
+      // 回带 channelId：前端据此校验响应是否属于当前选中的渠道，
+      // 避免快速切换时旧请求的结果渲染到新渠道上（数据串台）
+      channelId,
       name: channel.name || '渠道',
       status: channel.status || '',
       userCount,
