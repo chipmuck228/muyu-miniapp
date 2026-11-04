@@ -118,7 +118,7 @@ async function addOwnerIfMissing(ch, openid) {
   })
 }
 
-async function listTenures(openid) {
+async function listTenures(openid, myApps) {
   await ensureOwners()
   let owners = []
   try {
@@ -169,6 +169,40 @@ async function listTenures(openid) {
       unboundAt: toMs(o.unboundAt),
     })
   }
+
+  // 兜底：channel_owners 是"当前绑定关系"的补充表，历史迁移或多次申请-解绑后
+  // 可能缺记录，导致早期渠道从「我的推广」历史里消失、历史佣金再也点不到。
+  // 申请记录里 grantPending 一定会写 channelId，用它把漏掉的渠道补回来（按已解绑处理）。
+  try {
+    const apps = myApps || (await listMyApps(openid))
+    const known = {}
+    tenures.forEach((t) => {
+      known[t.channelId] = true
+    })
+    const extra = apps.filter((a) => a.status === 'authorized' && a.channelId && !known[a.channelId])
+    for (let i = 0; i < extra.length; i++) {
+      const a = extra[i]
+      if (known[a.channelId]) continue
+      known[a.channelId] = true
+      let name = a.name || '渠道'
+      try {
+        const d = await db.collection('channels').doc(a.channelId).get()
+        if (d && d.data) name = d.data.name || name
+      } catch (e) {
+        // keep
+      }
+      tenures.push({
+        channelId: a.channelId,
+        name,
+        status: 'unbound',
+        wechatId: '',
+        boundAt: toMs(a.handledAt || a.createdAt),
+        unboundAt: 0,
+      })
+    }
+  } catch (e) {
+    // 兜底失败不影响原有列表
+  }
   return tenures
 }
 
@@ -206,8 +240,8 @@ exports.main = async (event) => {
     if (action === 'hub') {
       const owned = await activeByOpenid(OPENID)
       const pendingCh = await authorizedPending(OPENID)
-      const tenures = await listTenures(OPENID)
       const myApps = await listMyApps(OPENID)
+      const tenures = await listTenures(OPENID, myApps)
       // 授权过的申请记了 channelId；查一下对应渠道还在不在绑定中，
       // 申请记录才能显示「绑定中 / 已解绑」这种最终状态（解绑后渠道会被置 unbound）
       const chStatus = {}

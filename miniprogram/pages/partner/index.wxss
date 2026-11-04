@@ -414,3 +414,7 @@
   letter-spacing: 2rpx;
   color: rgba(240, 230, 216, 0.4);
 }
+
+.row-act.ghost {
+  color: rgba(232, 201, 138, 0.5);
+}

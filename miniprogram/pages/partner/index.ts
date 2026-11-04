@@ -173,6 +173,8 @@ Page({
     settledText: '',
     truncated: false,
     usersTruncated: false,
+    /** 是否有已解绑的历史渠道（有则提示去申请记录看历史佣金） */
+    hasHistory: false,
     agreeOpen: false,
     agreeChecked: false,
     refreshing: false,
@@ -280,6 +282,17 @@ Page({
       if (hub.needActivate && hub.activateFileID) {
         activateQrSrc = await resolveCloudFile(hub.activateFileID).catch(() => '')
       }
+      const appRows = (hub.applications || []).map((a) => ({
+        _id: a._id,
+        title: a.name || '渠道',
+        statusText: appStatusText(a),
+        timeText: a.createdAt ? '申请 ' + fmtDT(a.createdAt) : '',
+        extraText: appExtra(a),
+        phone: a.phone || '',
+        channelId: a.channelId || '',
+        // 只有"当前仍绑定中"的授权记录旁边才放解绑入口
+        canUnbind: !!(hub.canApplyUnbind && a.type === 'bind' && a.status === 'authorized' && a.channelStatus === 'active'),
+      }))
       this.setData({
         ready: true,
         phone: hub.phone || '',
@@ -293,17 +306,8 @@ Page({
         activateQrSrc,
         activateExpireText: hub.activateExpireAt ? '有效至 ' + fmtDT(hub.activateExpireAt) : '',
         activateExpired: !!hub.activateExpired,
-        applications: (hub.applications || []).map((a) => ({
-          _id: a._id,
-          title: a.name || '渠道',
-          statusText: appStatusText(a),
-          timeText: a.createdAt ? '申请 ' + fmtDT(a.createdAt) : '',
-          extraText: appExtra(a),
-          phone: a.phone || '',
-          channelId: a.channelId || '',
-          // 只有"当前仍绑定中"的授权记录旁边才放解绑入口
-          canUnbind: !!(hub.canApplyUnbind && a.type === 'bind' && a.status === 'authorized' && a.channelStatus === 'active'),
-        })),
+        applications: appRows,
+        hasHistory: appRows.some((a) => a.channelStatus === 'unbound' && !!a.channelId),
         tenures: mapTenures(this._tenures, selectedId),
         selectedId,
         qrSrc: selectedId === prevId ? this.data.qrSrc : '',

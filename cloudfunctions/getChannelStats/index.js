@@ -30,6 +30,17 @@ async function canView(channelId, openid) {
   } catch (e) {
     // ignore
   }
+  // 兜底：解绑会清空渠道上的 openid，channel_owners 若有缺失（历史数据、
+  // 多次申请解绑），申请记录里被授权过的渠道仍应能看历史佣金
+  try {
+    const a = await db.collection('channel_applications').where({ channelId }).limit(20).get()
+    const mine = (a.data || []).some(
+      (x) => (x.openid || x._openid) === openid && x.status === 'authorized'
+    )
+    if (mine) return channel
+  } catch (e) {
+    // ignore
+  }
   return null
 }
 

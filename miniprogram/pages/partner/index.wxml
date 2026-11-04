@@ -126,6 +126,7 @@
             <text class="row-st" wx:if="{{item.extraText}}">{{item.extraText}}</text>
           </view>
           <text class="row-act inline" wx:if="{{item.canUnbind}}" hover-class="hover-dim" catchtap="applyUnbind">申请解绑</text>
+          <text class="row-act inline ghost" wx:elif="{{item.channelId}}" hover-class="hover-dim">查看 ›</text>
         </view>
         <text class="hint" wx:if="{{pendingUnbind}}">解绑申请已提交，等待管理员处理</text>
         <text class="hint" wx:if="{{applications.length}}">点记录可查看对应渠道的数据，已解绑的也能查</text>
@@ -154,6 +155,8 @@
             <text class="st-label">待结</text>
           </view>
         </view>
+
+        <text class="hint" wx:if="{{hasHistory && totalText === '0.00'}}">这个渠道还没有佣金；历史渠道的佣金见下方「申请记录」，点对应记录即可查看</text>
 
         <view class="settle-head" wx:if="{{monthValue}}">
           <text class="settle-sum">{{monthValue}} 新增 {{calTotal}} 人</text>
