@@ -5,7 +5,16 @@
     <text class="wing-title">合 作</text>
     <text class="wing-kicker ghost"></text>
   </view>
-  <scroll-view class="wing-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+  <scroll-view
+    class="wing-scroll"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    refresher-enabled
+    refresher-background="#0a0806"
+    refresher-triggered="{{refreshing}}"
+    bindrefresherrefresh="onRefresh"
+  >
     <view class="wing-body" wx:if="{{ready}}">
       <view class="block first" wx:if="{{needActivate}}">
         <text class="block-label">待激活</text>
@@ -51,6 +60,26 @@
           bindinput="onPhone"
         />
         <text class="hint">申请渠道合作需提供真实手机号，仅用于佣金结算与联系，不会在推广列表中展示。提交后可在下方自助修改。</text>
+
+        <view class="agree">
+          <view class="agree-head" hover-class="hover-dim" bindtap="toggleAgree">
+            <text class="agree-title">渠道商须知（佣金 / 结算 / 解绑）</text>
+            <text class="agree-arrow">{{agreeOpen ? '收起' : '展开'}}</text>
+          </view>
+          <scroll-view scroll-y class="agree-body" wx:if="{{agreeOpen}}">
+            <text class="agree-line">一、佣金计算：佣金 = 用户实付金额 × 渠道费率。费率由管理员设置（最高 30%），按笔记录；订单发生退款时，对应佣金一并冲销，不计入结算。</text>
+            <text class="agree-line">二、结算日期：佣金按自然月归集，次月由管理员核对后统一结算。当月数据要等次月才能结算，小程序内的「结算」只标记状态，不会自动打款，打款由管理员线下完成。</text>
+            <text class="agree-line">三、解绑后的佣金：解绑生效后，名下用户的后续付款不再计入你的佣金；解绑前已产生的佣金仍按正常流程结算，不受解绑影响。解绑后用户归属不变，但无法转投其他渠道商名下。</text>
+            <text class="agree-line">四、联系与结算义务：需提供真实有效的手机号用于结算联系，号码变更应及时在本页自助更新；因号码错误导致无法打款的，由渠道商自行承担。</text>
+            <text class="agree-line">五、税务：佣金属于个人收入，涉及的个人所得税按国家规定处理，具体承担方式与开票要求以管理员通知及双方约定为准。</text>
+            <text class="agree-line">六、你的权利：可随时查看推广用户、当月新增与结算状态，可自助修改结算手机号；对结算金额有异议可向管理员提出核对。</text>
+          </scroll-view>
+          <view class="agree-check" hover-class="hover-dim" bindtap="toggleAgreeCheck">
+            <view class="agree-box {{agreeChecked ? 'on' : ''}}">{{agreeChecked ? '✓' : ''}}</view>
+            <text class="agree-check-text">我已阅读并同意以上须知</text>
+          </view>
+        </view>
+
         <view class="submit" hover-class="hover-dim" bindtap="doApply">提交申请</view>
       </view>
       <view class="hint pending-row" wx:elif="{{pendingBind}}">

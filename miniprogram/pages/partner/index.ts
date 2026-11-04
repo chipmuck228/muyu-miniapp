@@ -145,6 +145,9 @@ Page({
     settlementStatus: '' as '' | 'settled' | 'unsettled',
     settledText: '',
     truncated: false,
+    agreeOpen: false,
+    agreeChecked: false,
+    refreshing: false,
   },
 
   _name: '',
@@ -168,6 +171,16 @@ Page({
     app.globalData.homeEnterAnim = true
     concealTabBar(this)
     wx.switchTab({ url: '/pages/home/index' })
+  },
+
+  // 页面本体 disableScroll、内容在 scroll-view 里，页面级下拉刷新不会触发，
+  // 所以用 scroll-view 的 refresher 做下拉刷新
+  async onRefresh() {
+    try {
+      await this.boot()
+    } finally {
+      this.setData({ refreshing: false })
+    }
   },
 
   onName(e: any) {
@@ -373,6 +386,14 @@ Page({
     if (this.data.selectedId) this.searchUsers()
   },
 
+  toggleAgree() {
+    this.setData({ agreeOpen: !this.data.agreeOpen })
+  },
+
+  toggleAgreeCheck() {
+    this.setData({ agreeChecked: !this.data.agreeChecked })
+  },
+
   async doApply() {
     const name = this._name.trim()
     const phone = this._phone.trim()
@@ -384,10 +405,16 @@ Page({
       wx.showToast({ title: '请填写正确的 11 位手机号', icon: 'none' })
       return
     }
+    // 须知必须显式勾选：佣金规则、结算节奏、解绑后果都在里面，不能默认同意
+    if (!this.data.agreeChecked) {
+      wx.showToast({ title: '请先阅读并勾选渠道商须知', icon: 'none' })
+      return
+    }
     wx.showLoading({ title: '提交中', mask: true })
     try {
       await applyChannel(name, this._contact.trim(), phone)
       await this.boot()
+      this.setData({ agreeChecked: false, agreeOpen: false })
       wx.showToast({ title: '已提交', icon: 'none' })
     } catch (e: any) {
       wx.showToast({ title: (e && e.message) || '提交失败', icon: 'none' })

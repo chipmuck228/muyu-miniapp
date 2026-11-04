@@ -5,7 +5,16 @@
     <text class="wing-title">管 理</text>
     <text class="wing-kicker ghost"></text>
   </view>
-  <scroll-view class="wing-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+  <scroll-view
+    class="wing-scroll"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    refresher-enabled
+    refresher-background="#0a0806"
+    refresher-triggered="{{refreshing}}"
+    bindrefresherrefresh="onRefresh"
+  >
     <view class="wing-body" wx:if="{{ready}}">
       <view class="block first">
         <text class="block-label">绑定申请</text>
