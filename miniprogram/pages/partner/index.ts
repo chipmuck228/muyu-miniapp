@@ -65,6 +65,116 @@ function appExtra(row: PartnerAppRow): string {
   return ''
 }
 
+// 申请记录按渠道码聚合：一个渠道码一行，状态显示完整生命周期
+// （申请 → 绑定 → 解绑申请待处理 → 已解绑），不再把同一渠道的
+// 绑定申请和解绑申请重复列成两行。没有 channelId 的申请
+// （待授权 / 被拒绝，还没生成渠道）单独成行。
+export interface AppRow {
+  key: string
+  title: string
+  statusText: string
+  timeLines: string[]
+  extraText: string
+  phone: string
+  channelId: string
+  channelMark: string
+  chStatus: string
+  canUnbind: boolean
+}
+
+function buildAppRows(apps: PartnerAppRow[], canApplyUnbind: boolean): AppRow[] {
+  const groups: { [cid: string]: PartnerAppRow[] } = {}
+  const loose: PartnerAppRow[] = []
+  apps.forEach((a) => {
+    if (a.channelId) (groups[a.channelId] = groups[a.channelId] || []).push(a)
+    else loose.push(a)
+  })
+
+  const rows: AppRow[] = []
+  Object.keys(groups).forEach((cid) => {
+    const list = groups[cid]
+    const bind = list.find((a) => a.type === 'bind') || list[0]
+    const unbinds = list.filter((a) => a.type === 'unbind')
+    const pendingUnbind = unbinds.some((a) => a.status === 'pending')
+    const doneUnbind = unbinds.find((a) => a.status === 'authorized')
+    const chStatus = list[0].channelStatus || ''
+
+    let statusText: string
+    if (bind.type === 'unbind') {
+      // 数据不全时兜底：组里只有解绑申请（绑定申请缺失）
+      statusText = pendingUnbind ? '解绑申请 · 待处理' : doneUnbind ? '已解绑' : '解绑申请'
+    } else if (bind.status === 'pending') {
+      statusText = '绑定申请 · 待授权'
+    } else if (bind.status === 'rejected') {
+      statusText = '绑定申请 · 已拒绝'
+    } else if (pendingUnbind) {
+      statusText = '解绑申请 · 待处理'
+    } else if (chStatus === 'active') {
+      statusText = '绑定中'
+    } else if (chStatus === 'unbound') {
+      statusText = '已解绑'
+    } else {
+      statusText = '绑定申请 · 已授权'
+    }
+
+    const timeLines: string[] = []
+    if (bind.createdAt) timeLines.push('申请 ' + fmtDT(bind.createdAt))
+    if (bind.status === 'authorized' && bind.handledAt) timeLines.push('绑定 ' + fmtDT(bind.handledAt))
+    if (bind.status === 'rejected' && bind.handledAt) timeLines.push('拒绝 ' + fmtDT(bind.handledAt))
+    const pendingUnbindRow = unbinds.find((a) => a.status === 'pending')
+    if (pendingUnbindRow && pendingUnbindRow.createdAt) {
+      timeLines.push('申请解绑 ' + fmtDT(pendingUnbindRow.createdAt))
+    }
+    if (doneUnbind && doneUnbind.handledAt) timeLines.push('解绑 ' + fmtDT(doneUnbind.handledAt))
+
+    // 最近活动时间，用于整列表排序
+    let latest = bind.createdAt || 0
+    list.forEach((a) => {
+      latest = Math.max(latest, a.createdAt || 0, a.handledAt || 0)
+    })
+
+    rows.push({
+      key: cid,
+      title: bind.name || '渠道',
+      statusText,
+      timeLines,
+      extraText: appExtra(bind),
+      phone: bind.phone || '',
+      channelId: cid,
+      channelMark: cid.slice(-6).toUpperCase(),
+      chStatus,
+      canUnbind: !!(canApplyUnbind && bind.status === 'authorized' && chStatus === 'active' && !pendingUnbind),
+    })
+    ;(rows[rows.length - 1] as any)._latest = latest
+  })
+
+  loose.forEach((a) => {
+    const timeLines: string[] = []
+    if (a.createdAt) timeLines.push('申请 ' + fmtDT(a.createdAt))
+    if (a.handledAt && a.status !== 'pending') timeLines.push((a.status === 'rejected' ? '拒绝 ' : '处理 ') + fmtDT(a.handledAt))
+    rows.push({
+      key: a._id,
+      title: a.name || '渠道',
+      statusText: appStatusText(a),
+      timeLines,
+      extraText: '',
+      phone: a.phone || '',
+      channelId: '',
+      channelMark: '',
+      chStatus: '',
+      canUnbind: false,
+    })
+    ;(rows[rows.length - 1] as any)._latest = a.createdAt || 0
+  })
+
+  rows.sort((x, y) => (y as any)._latest - (x as any)._latest)
+  // 排序用的临时字段不要带进 setData
+  rows.forEach((r) => {
+    delete (r as any)._latest
+  })
+  return rows
+}
+
 const PHONE_RE = /^1[3-9]\d{9}$/
 
 const WEEK_NAMES = ['一', '二', '三', '四', '五', '六', '日']
@@ -137,18 +247,7 @@ Page({
     activateQrSrc: '',
     activateExpireText: '',
     activateExpired: false,
-    applications: [] as {
-      _id: string
-      title: string
-      statusText: string
-      timeText: string
-      extraText: string
-      phone: string
-      channelId: string
-      channelMark: string
-      sameChannel: boolean
-      canUnbind: boolean
-    }[],
+    applications: [] as AppRow[],
     tenures: [] as { key: string; channelId: string; name: string; mark: string; timeText: string; on: boolean }[],
     selectedId: '',
     isActive: false,
@@ -300,29 +399,8 @@ Page({
       if (hub.needActivate && hub.activateFileID) {
         activateQrSrc = await resolveCloudFile(hub.activateFileID).catch(() => '')
       }
-      // 同一渠道会有多条申请（绑定申请 + 解绑申请），它们的 channelId 完全相同，
-      // 统计也是同一份数据。只保留第一条「查看」入口，其余标「同一渠道」，
-      // 否则看起来像两个推广码都能看到同样数据。
-      const seenCh: { [k: string]: boolean } = {}
-      const appRows = (hub.applications || []).map((a) => {
-        const cid = a.channelId || ''
-        const sameChannel = !!cid && !!seenCh[cid]
-        if (cid) seenCh[cid] = true
-        return {
-          _id: a._id,
-          title: a.name || '渠道',
-          statusText: appStatusText(a),
-          timeText: a.createdAt ? '申请 ' + fmtDT(a.createdAt) : '',
-          extraText: appExtra(a),
-          phone: a.phone || '',
-          channelId: cid,
-          // 渠道标识尾号：展开时显示，方便确认两条记录是不是同一个渠道
-          channelMark: cid ? cid.slice(-6).toUpperCase() : '',
-          sameChannel,
-          // 只有"当前仍绑定中"的授权记录旁边才放解绑入口
-          canUnbind: !!(hub.canApplyUnbind && a.type === 'bind' && a.status === 'authorized' && a.channelStatus === 'active'),
-        }
-      })
+      // 申请记录按渠道码聚合：一个渠道码一行，状态显示生命周期
+      const appRows = buildAppRows(hub.applications || [], !!hub.canApplyUnbind)
       this.setData({
         ready: true,
         phone: hub.phone || '',
@@ -337,7 +415,7 @@ Page({
         activateExpireText: hub.activateExpireAt ? '有效至 ' + fmtDT(hub.activateExpireAt) : '',
         activateExpired: !!hub.activateExpired,
         applications: appRows,
-        hasHistory: appRows.some((a) => a.channelStatus === 'unbound' && !!a.channelId),
+        hasHistory: appRows.some((a) => a.channelId && a.chStatus === 'unbound'),
         tenures: mapTenures(this._tenures, selectedId),
         selectedId,
         qrSrc: selectedId === prevId ? this.data.qrSrc : '',
@@ -434,27 +512,20 @@ Page({
 
   // 点申请记录查看该渠道的历史数据：解绑后佣金仍可查，只是不再显示推广码
   // 点「查看」在申请记录行内展开该渠道的累计统计（用户/付费/佣金/待结/已结算），
-  // 再点一次收起。历史渠道（已解绑）也能看。
+  // 再点一次收起。历史渠道（已解绑）也能看。expandedId 即渠道 id。
   async pickHistory(e: any) {
     const id = String(e.currentTarget.dataset.id || '')
-    const appId = String(e.currentTarget.dataset.app || '')
-    // 同一渠道的第二条及以后记录，统计与上方完全一致，没必要重复展开
-    if (String(e.currentTarget.dataset.same || '') === '1') {
-      wx.showToast({ title: '与上方记录是同一渠道，数据相同', icon: 'none' })
-      return
-    }
     if (!id) {
       wx.showToast({ title: '该记录未关联渠道，无法查看', icon: 'none' })
       return
     }
-    if (!appId) return
-    if (this.data.expandedId === appId) {
+    if (this.data.expandedId === id) {
       this._expandSeq++
       this.setData({ expandedId: '', expandedStats: null })
       return
     }
     const seq = ++this._expandSeq
-    this.setData({ expandedId: appId, expandedStats: null })
+    this.setData({ expandedId: id, expandedStats: null })
     try {
       const st = await getChannelStats(id, {})
       if (seq !== this._expandSeq) return

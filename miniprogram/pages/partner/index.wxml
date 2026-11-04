@@ -111,12 +111,10 @@
       <view class="block">
         <text class="block-label">申请记录</text>
         <text class="empty" wx:if="{{!applications.length}}">暂无记录</text>
-        <block wx:for="{{applications}}" wx:key="_id">
+        <block wx:for="{{applications}}" wx:key="key">
           <view
             class="row {{item.channelId === selectedId ? 'on' : ''}}"
             data-id="{{item.channelId}}"
-            data-app="{{item._id}}"
-            data-same="{{item.sameChannel ? '1' : ''}}"
             bindtap="pickHistory"
           >
             <view class="row-main">
@@ -124,14 +122,12 @@
               <text class="row-status">{{item.statusText}}</text>
               <text class="row-st" wx:if="{{item.channelMark}}">渠道码 {{item.channelMark}}</text>
               <text class="row-st" wx:if="{{item.phone}}">联系 {{item.phone}}</text>
-              <text class="row-st" wx:if="{{item.timeText}}">{{item.timeText}}</text>
-              <text class="row-st" wx:if="{{item.extraText}}">{{item.extraText}}</text>
+              <text class="row-st" wx:for="{{item.timeLines}}" wx:for-item="tl" wx:key="*this">{{tl}}</text>
             </view>
             <text class="row-act inline" wx:if="{{item.canUnbind}}" hover-class="hover-dim" catchtap="applyUnbind">申请解绑</text>
-            <text class="row-act inline ghost" wx:elif="{{item.channelId && !item.sameChannel}}" hover-class="hover-dim">{{expandedId === item._id ? '收起' : '查看 ›'}}</text>
-            <text class="row-act inline ghost" wx:elif="{{item.channelId}}">同一渠道</text>
+            <text class="row-act inline ghost" wx:elif="{{item.channelId}}" hover-class="hover-dim">{{expandedId === item.channelId ? '收起' : '查看 ›'}}</text>
           </view>
-          <view class="app-detail" wx:if="{{expandedId === item._id}}">
+          <view class="app-detail" wx:if="{{expandedId === item.channelId}}">
             <view class="d-grid" wx:if="{{expandedStats}}">
               <view class="d-item">
                 <text class="d-num">{{expandedStats.userCount}}</text>
