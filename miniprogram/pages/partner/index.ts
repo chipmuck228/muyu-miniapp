@@ -175,6 +175,15 @@ Page({
     usersTruncated: false,
     /** 是否有已解绑的历史渠道（有则提示去申请记录看历史佣金） */
     hasHistory: false,
+    /** 申请记录中展开「查看」的记录 id */
+    expandedId: '',
+    expandedStats: null as null | {
+      userCount: number
+      paidCount: number
+      totalText: string
+      pendingText: string
+      settledText: string
+    },
     agreeOpen: false,
     agreeChecked: false,
     refreshing: false,
@@ -394,18 +403,37 @@ Page({
   },
 
   // 点申请记录查看该渠道的历史数据：解绑后佣金仍可查，只是不再显示推广码
-  pickHistory(e: any) {
+  // 点「查看」在申请记录行内展开该渠道的累计统计（用户/付费/佣金/待结/已结算），
+  // 再点一次收起。历史渠道（已解绑）也能看。
+  async pickHistory(e: any) {
     const id = String(e.currentTarget.dataset.id || '')
+    const appId = String(e.currentTarget.dataset.app || '')
     if (!id) {
       wx.showToast({ title: '该记录未关联渠道，无法查看', icon: 'none' })
       return
     }
-    if (id === this.data.selectedId) return
-    this._qrChannelId = ''
-    this.setData({ qrSrc: '' })
-    this.loadStats(id).catch((err: any) => {
+    if (!appId) return
+    if (this.data.expandedId === appId) {
+      this.setData({ expandedId: '', expandedStats: null })
+      return
+    }
+    this.setData({ expandedId: appId, expandedStats: null })
+    try {
+      const st = await getChannelStats(id, {})
+      if (st && st.ok === false) throw new Error(st.msg || '读取失败')
+      this.setData({
+        expandedStats: {
+          userCount: st.userCount || 0,
+          paidCount: st.paidCount || 0,
+          totalText: fenText(st.totalCommission),
+          pendingText: fenText(st.pendingCommission),
+          settledText: fenText(st.settledCommission || 0),
+        },
+      })
+    } catch (err: any) {
+      this.setData({ expandedId: '', expandedStats: null })
       wx.showToast({ title: (err && err.message) || '读取失败', icon: 'none' })
-    })
+    }
   },
 
   async searchUsers() {

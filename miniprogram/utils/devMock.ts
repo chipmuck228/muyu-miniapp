@@ -623,6 +623,7 @@ function handle(name: string, data: any): any {
       paidCount: rows.filter((r) => r.paid).length,
       totalCommission: 0,
       pendingCommission: 0,
+      settledCommission: 0,
       refundedAmount: 0,
       dailyNew,
       settlement: month

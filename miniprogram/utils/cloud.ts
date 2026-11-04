@@ -500,6 +500,8 @@ export interface ChannelStats {
   paidCount: number
   totalCommission: number
   pendingCommission: number
+  /** 已被管理员标记结算的佣金合计，申请记录「查看」展开时显示 */
+  settledCommission?: number
   /** 该月被退款冲销的佣金，用于在结算页提示差异 */
   refundedAmount?: number
   /** 该月每天新增推广用户数，key 为 YYYY-MM-DD */

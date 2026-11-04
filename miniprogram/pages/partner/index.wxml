@@ -111,25 +111,52 @@
       <view class="block">
         <text class="block-label">申请记录</text>
         <text class="empty" wx:if="{{!applications.length}}">暂无记录</text>
-        <view
-          class="row {{item.channelId === selectedId ? 'on' : ''}}"
-          wx:for="{{applications}}"
-          wx:key="_id"
-          data-id="{{item.channelId}}"
-          bindtap="pickHistory"
-        >
-          <view class="row-main">
-            <text class="row-name">{{item.title}}</text>
-            <text class="row-status">{{item.statusText}}</text>
-            <text class="row-st" wx:if="{{item.phone}}">联系 {{item.phone}}</text>
-            <text class="row-st" wx:if="{{item.timeText}}">{{item.timeText}}</text>
-            <text class="row-st" wx:if="{{item.extraText}}">{{item.extraText}}</text>
+        <block wx:for="{{applications}}" wx:key="_id">
+          <view
+            class="row {{item.channelId === selectedId ? 'on' : ''}}"
+            data-id="{{item.channelId}}"
+            data-app="{{item._id}}"
+            bindtap="pickHistory"
+          >
+            <view class="row-main">
+              <text class="row-name">{{item.title}}</text>
+              <text class="row-status">{{item.statusText}}</text>
+              <text class="row-st" wx:if="{{item.phone}}">联系 {{item.phone}}</text>
+              <text class="row-st" wx:if="{{item.timeText}}">{{item.timeText}}</text>
+              <text class="row-st" wx:if="{{item.extraText}}">{{item.extraText}}</text>
+            </view>
+            <text class="row-act inline" wx:if="{{item.canUnbind}}" hover-class="hover-dim" catchtap="applyUnbind">申请解绑</text>
+            <text class="row-act inline ghost" wx:elif="{{item.channelId}}" hover-class="hover-dim">{{expandedId === item._id ? '收起' : '查看 ›'}}</text>
           </view>
-          <text class="row-act inline" wx:if="{{item.canUnbind}}" hover-class="hover-dim" catchtap="applyUnbind">申请解绑</text>
-          <text class="row-act inline ghost" wx:elif="{{item.channelId}}" hover-class="hover-dim">查看 ›</text>
-        </view>
+          <view class="app-detail" wx:if="{{expandedId === item._id}}">
+            <view class="d-grid" wx:if="{{expandedStats}}">
+              <view class="d-item">
+                <text class="d-num">{{expandedStats.userCount}}</text>
+                <text class="d-label">推广用户</text>
+              </view>
+              <view class="d-item">
+                <text class="d-num">{{expandedStats.paidCount}}</text>
+                <text class="d-label">付费</text>
+              </view>
+              <view class="d-item">
+                <text class="d-num">{{expandedStats.totalText}}</text>
+                <text class="d-label">佣金</text>
+              </view>
+              <view class="d-item">
+                <text class="d-num">{{expandedStats.pendingText}}</text>
+                <text class="d-label">待结</text>
+              </view>
+              <view class="d-item">
+                <text class="d-num">{{expandedStats.settledText}}</text>
+                <text class="d-label">已结算</text>
+              </view>
+            </view>
+            <text class="d-hint" wx:if="{{expandedStats}}">累计口径，含该渠道全部月份</text>
+            <text class="d-hint" wx:if="{{!expandedStats}}">读取中…</text>
+          </view>
+        </block>
         <text class="hint" wx:if="{{pendingUnbind}}">解绑申请已提交，等待管理员处理</text>
-        <text class="hint" wx:if="{{applications.length}}">点记录可查看对应渠道的数据，已解绑的也能查</text>
+        <text class="hint" wx:if="{{applications.length}}">点「查看」可展开该渠道的累计数据，已解绑的也能看</text>
       </view>
 
       <view wx:if="{{selectedId}}">

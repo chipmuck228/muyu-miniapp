@@ -129,6 +129,7 @@ exports.main = async (event) => {
     let totalCommission = 0
     let pendingCommission = 0
     let refundedAmount = 0
+    let settledCommission = 0
     pays.forEach((p) => {
       // 已退款冲销的单不计入佣金，但单独累计，结算页要提示差异
       if (p.status === 'failed') {
@@ -140,6 +141,8 @@ exports.main = async (event) => {
       totalCommission += n
       // 已被管理员结算过的行不再算「待结」，否则结算完这个数永远不降
       if (p.status === 'pending' && !p.settledAt) pendingCommission += n
+      // 已结算的部分单列：申请记录「查看」展开时要显示「已结算多少」
+      if (p.settledAt) settledCommission += n
     })
 
     // 当月新增：单独翻页统计（上面的列表已翻到 1000 上限，不能拿来当总数），同时按天聚合，供日历展示
@@ -235,6 +238,7 @@ exports.main = async (event) => {
       paidCount: Object.keys(paidSet).length,
       totalCommission,
       pendingCommission,
+      settledCommission,
       refundedAmount,
       dailyNew,
       settlement,
