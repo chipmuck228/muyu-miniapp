@@ -494,16 +494,12 @@ exports.main = async (event) => {
       const month = String((event && event.month) || '').trim() || prevMonthKey()
       if (!monthRange(month)) return { ok: false, msg: '月份格式应为 YYYY-MM' }
       const r = await db.collection('channels').limit(80).get()
-      const all = r.data || []
-      // 不能只按"当前活跃"过滤：解绑会把 status/boundOpenid/authorizedOpenid 全部清空，
-      // 但该渠道历史月份的佣金仍要能出现在看板里结算。因此对每个渠道先算聚合，
-      // 已不活跃且该月没有任何推广数据的渠道才跳过。
+      // 只列有实际推广关系的渠道：已激活的，或者至少绑定过推广商
+      const channels = (r.data || []).filter((c) => c.status === 'active' || c.boundOpenid || c.authorizedOpenid)
       const list = []
-      for (let i = 0; i < all.length; i++) {
-        const c = all[i]
+      for (let i = 0; i < channels.length; i++) {
+        const c = channels[i]
         const agg = await collectMonth(c._id, month)
-        const isActive = c.status === 'active' || c.boundOpenid || c.authorizedOpenid
-        if (!isActive && !agg.userCount && !agg.commissionAmount) continue
         const settlement = await readSettlement(c._id, month)
         const settled = !!(settlement && settlement.status === 'settled')
         // 已结算的显示当时快照，避免退款冲销后数字和已打款的金额对不上
