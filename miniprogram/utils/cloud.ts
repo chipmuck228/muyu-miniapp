@@ -305,9 +305,13 @@ export interface PartnerAppRow {
   type: 'bind' | 'unbind'
   status: string
   name: string
+  /** 申请时填写的手机号 */
+  phone?: string
   wechatId: string
   createdAt: number
   handledAt: number
+  /** 授权后对应渠道的当前状态：active=绑定中 / unbound=已解绑 */
+  channelStatus?: string
 }
 
 export interface PartnerTenure {

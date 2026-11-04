@@ -392,3 +392,14 @@
   font-size: 24rpx;
   color: rgba(240, 230, 216, 0.7);
 }
+
+.row-status {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  letter-spacing: 2rpx;
+  color: rgba(232, 201, 138, 0.85);
+}
+.row-act.inline {
+  flex: none;
+  margin-left: 24rpx;
+}

@@ -87,23 +87,6 @@
         <text class="phone-edit" hover-class="hover-dim" bindtap="editPhone">修改手机号</text>
       </view>
 
-      <view class="block" wx:if="{{canApplyUnbind}}">
-        <text class="row-act lone" hover-class="hover-dim" bindtap="applyUnbind">申请解绑</text>
-      </view>
-      <text class="hint" wx:elif="{{pendingUnbind}}">解绑申请已提交，等待管理员处理</text>
-
-      <view class="block">
-        <text class="block-label">申请记录</text>
-        <text class="empty" wx:if="{{!applications.length}}">暂无记录</text>
-        <view class="row" wx:for="{{applications}}" wx:key="_id">
-          <view class="row-main">
-            <text class="row-name">{{item.title}}</text>
-            <text class="row-st">{{item.timeText}}</text>
-            <text class="row-st" wx:if="{{item.extraText}}">{{item.extraText}}</text>
-          </view>
-        </view>
-      </view>
-
       <view class="block">
         <text class="block-label">我的推广</text>
         <text class="empty" wx:if="{{!tenures.length}}">暂无推广</text>
@@ -116,13 +99,29 @@
         >
           <view class="row-main">
             <text class="row-name">{{item.name}}</text>
-            <text class="row-st">{{item.statusText}}{{item.timeText ? ' · ' + item.timeText : ''}}</text>
+            <text class="row-st">{{item.timeText}}</text>
           </view>
         </view>
         <view class="phone-row" wx:if="{{isActive}}">
           <text class="phone-text">{{phone ? '结算联系 ' + phone : '未填写结算手机号'}}</text>
           <text class="phone-edit" hover-class="hover-dim" bindtap="editPhone">{{phone ? '修改' : '填写'}}</text>
         </view>
+      </view>
+
+      <view class="block">
+        <text class="block-label">申请记录</text>
+        <text class="empty" wx:if="{{!applications.length}}">暂无记录</text>
+        <view class="row" wx:for="{{applications}}" wx:key="_id">
+          <view class="row-main">
+            <text class="row-name">{{item.title}}</text>
+            <text class="row-status">{{item.statusText}}</text>
+            <text class="row-st" wx:if="{{item.phone}}">联系 {{item.phone}}</text>
+            <text class="row-st" wx:if="{{item.timeText}}">{{item.timeText}}</text>
+            <text class="row-st" wx:if="{{item.extraText}}">{{item.extraText}}</text>
+          </view>
+          <text class="row-act inline" wx:if="{{item.canUnbind}}" hover-class="hover-dim" catchtap="applyUnbind">申请解绑</text>
+        </view>
+        <text class="hint" wx:if="{{pendingUnbind}}">解绑申请已提交，等待管理员处理</text>
       </view>
 
       <view wx:if="{{selectedId}}">

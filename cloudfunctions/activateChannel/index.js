@@ -207,14 +207,25 @@ exports.main = async (event) => {
       const owned = await activeByOpenid(OPENID)
       const pendingCh = await authorizedPending(OPENID)
       const tenures = await listTenures(OPENID)
-      const applications = (await listMyApps(OPENID)).map((a) => ({
+      const myApps = await listMyApps(OPENID)
+      // 授权过的申请记了 channelId；查一下对应渠道还在不在绑定中，
+      // 申请记录才能显示「绑定中 / 已解绑」这种最终状态（解绑后渠道会被置 unbound）
+      const chStatus = {}
+      const chIds = Array.from(new Set(myApps.map((a) => a.channelId).filter(Boolean)))
+      for (let i = 0; i < chIds.length; i++) {
+        const d = await db.collection('channels').doc(chIds[i]).get().catch(() => null)
+        if (d && d.data) chStatus[chIds[i]] = d.data.status || ''
+      }
+      const applications = myApps.map((a) => ({
         _id: a._id,
         type: appType(a),
         status: a.status || '',
         name: a.name || '',
+        phone: a.phone || '',
         wechatId: a.wechatId || '',
         createdAt: toMs(a.createdAt),
         handledAt: toMs(a.handledAt),
+        channelStatus: a.channelId ? chStatus[a.channelId] || '' : '',
       }))
       const pendingBind = applications.some((a) => a.type === 'bind' && a.status === 'pending')
       const pendingUnbind = applications.some((a) => a.type === 'unbind' && a.status === 'pending')

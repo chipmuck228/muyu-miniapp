@@ -40,13 +40,18 @@ function fmtDT(ms: number): string {
 function appStatusText(row: PartnerAppRow): string {
   if (row.type === 'unbind') {
     if (row.status === 'pending') return '解绑申请 · 待处理'
-    if (row.status === 'authorized') return '解绑申请 · 已解绑'
+    if (row.status === 'authorized') return '已解绑'
     if (row.status === 'rejected') return '解绑申请 · 已拒绝'
     return '解绑申请'
   }
   if (row.status === 'pending') return '绑定申请 · 待授权'
-  if (row.status === 'authorized') return '绑定申请 · 已授权'
   if (row.status === 'rejected') return '绑定申请 · 已拒绝'
+  if (row.status === 'authorized') {
+    // 授权之后看渠道现状，那才是这条申请的最终归宿
+    if (row.channelStatus === 'active') return '绑定中'
+    if (row.channelStatus === 'unbound') return '已解绑'
+    return '绑定申请 · 已授权'
+  }
   return '绑定申请'
 }
 
@@ -103,6 +108,19 @@ function monthOptions(): { value: string; label: string }[] {
   return out
 }
 
+// 「我的推广」只列绑定中的渠道；已解绑的到「申请记录」里看状态
+function mapTenures(all: PartnerTenure[], selectedId: string) {
+  return all
+    .filter((t) => t.status === 'active')
+    .map((t) => ({
+      key: t.channelId + '-' + t.boundAt,
+      channelId: t.channelId,
+      name: t.name,
+      timeText: t.boundAt ? '绑定 ' + fmtDT(t.boundAt) : '',
+      on: t.channelId === selectedId,
+    }))
+}
+
 Page({
   data: {
     statusBarHeight: 20,
@@ -117,8 +135,16 @@ Page({
     activateQrSrc: '',
     activateExpireText: '',
     activateExpired: false,
-    applications: [] as { _id: string; title: string; timeText: string; extraText: string }[],
-    tenures: [] as { key: string; channelId: string; name: string; statusText: string; timeText: string; on: boolean; active: boolean }[],
+    applications: [] as {
+      _id: string
+      title: string
+      statusText: string
+      timeText: string
+      extraText: string
+      phone: string
+      canUnbind: boolean
+    }[],
+    tenures: [] as { key: string; channelId: string; name: string; timeText: string; on: boolean }[],
     selectedId: '',
     isActive: false,
     name: '',
@@ -239,9 +265,11 @@ Page({
       const hub = await channelHub()
       this._tenures = hub.tenures || []
       const prevId = this.data.selectedId
-      const selectedId = prevId && this._tenures.some((t) => t.channelId === prevId)
+      // 已解绑的渠道不再出现在列表里，之前选中的若是已解绑渠道就回落到当前绑定中的
+      const selectedId = prevId && this._tenures.some((t) => t.channelId === prevId && t.status === 'active')
         ? prevId
-        : hub.channelId || (this._tenures[0] && this._tenures[0].channelId) || ''
+        : hub.channelId
+          || ((this._tenures.find((t) => t.status === 'active') || {} as PartnerTenure).channelId || '')
       let activateQrSrc = ''
       if (hub.needActivate && hub.activateFileID) {
         activateQrSrc = await resolveCloudFile(hub.activateFileID).catch(() => '')
@@ -261,23 +289,15 @@ Page({
         activateExpired: !!hub.activateExpired,
         applications: (hub.applications || []).map((a) => ({
           _id: a._id,
-          title: appStatusText(a),
+          title: a.name || '渠道',
+          statusText: appStatusText(a),
           timeText: a.createdAt ? '申请 ' + fmtDT(a.createdAt) : '',
           extraText: appExtra(a),
+          phone: a.phone || '',
+          // 只有"当前仍绑定中"的授权记录旁边才放解绑入口
+          canUnbind: !!(hub.canApplyUnbind && a.type === 'bind' && a.status === 'authorized' && a.channelStatus === 'active'),
         })),
-        tenures: this._tenures.map((t) => ({
-          key: t.channelId + '-' + t.boundAt,
-          channelId: t.channelId,
-          name: t.name,
-          statusText: t.status === 'active' ? '绑定中' : '已解绑',
-          timeText: t.status === 'unbound' && t.unboundAt
-            ? '解绑 ' + fmtDT(t.unboundAt)
-            : t.boundAt
-              ? '绑定 ' + fmtDT(t.boundAt)
-              : '',
-          on: t.channelId === selectedId,
-          active: t.status === 'active',
-        })),
+        tenures: mapTenures(this._tenures, selectedId),
         selectedId,
         qrSrc: selectedId === prevId ? this.data.qrSrc : '',
       })
@@ -322,19 +342,7 @@ Page({
         timeText: fmtDT(u.boundAt),
         paidText: u.paid ? '已付费' : '未付费',
       })),
-      tenures: this._tenures.map((t) => ({
-        key: t.channelId + '-' + t.boundAt,
-        channelId: t.channelId,
-        name: t.name,
-        statusText: t.status === 'active' ? '绑定中' : '已解绑',
-        timeText: t.status === 'unbound' && t.unboundAt
-          ? '解绑 ' + fmtDT(t.unboundAt)
-          : t.boundAt
-            ? '绑定 ' + fmtDT(t.boundAt)
-            : '',
-        on: t.channelId === channelId,
-        active: t.status === 'active',
-      })),
+      tenures: mapTenures(this._tenures, channelId),
     })
     if (isActive) {
       if (this._qrChannelId !== channelId) await this.makeQr(channelId)
