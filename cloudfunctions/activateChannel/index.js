@@ -148,17 +148,20 @@ async function listTenures(openid, myApps) {
     if (!channelId || seen[channelId + ':' + o.status + ':' + toMs(o.boundAt)]) continue
     seen[channelId + ':' + o.status + ':' + toMs(o.boundAt)] = true
     let name = o.name || ''
-    let chStatus = o.status
+    // 以渠道文档为准：只有渠道确实是 active 且属于当前微信，才算绑定中；
+    // 取不到渠道、或渠道已 unbound，一律按已解绑。
+    // 原来以 owner 记录的 status 兜底，closeOwners 一旦漏更新，
+    // 已解绑渠道会继续出现在「我的推广」里，看起来像两个渠道都有数据。
+    let chStatus = 'unbound'
     try {
       const doc = await db.collection('channels').doc(channelId).get()
       const ch = doc && doc.data
       if (ch) {
         name = ch.name || name
         if (ch.status === 'active' && ownsChannel(ch, openid)) chStatus = 'active'
-        else if (o.status === 'unbound' || ch.status === 'unbound') chStatus = 'unbound'
       }
     } catch (e) {
-      // keep
+      // 渠道不存在，按已解绑处理
     }
     tenures.push({
       channelId,
@@ -185,9 +188,15 @@ async function listTenures(openid, myApps) {
       if (known[a.channelId]) continue
       known[a.channelId] = true
       let name = a.name || '渠道'
+      let boundAt = toMs(a.handledAt || a.createdAt)
       try {
         const d = await db.collection('channels').doc(a.channelId).get()
-        if (d && d.data) name = d.data.name || name
+        if (d && d.data) {
+          name = d.data.name || name
+          // 用渠道的创建/激活时间更接近真实绑定时间，排序才不会把新渠道排到旧渠道后面
+          const t = toMs(d.data.activatedAt) || toMs(d.data.createdAt)
+          if (t) boundAt = t
+        }
       } catch (e) {
         // keep
       }
@@ -196,7 +205,7 @@ async function listTenures(openid, myApps) {
         name,
         status: 'unbound',
         wechatId: '',
-        boundAt: toMs(a.handledAt || a.createdAt),
+        boundAt,
         unboundAt: 0,
       })
     }

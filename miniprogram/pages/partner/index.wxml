@@ -116,6 +116,7 @@
             class="row {{item.channelId === selectedId ? 'on' : ''}}"
             data-id="{{item.channelId}}"
             data-app="{{item._id}}"
+            data-same="{{item.sameChannel ? '1' : ''}}"
             bindtap="pickHistory"
           >
             <view class="row-main">
@@ -126,7 +127,8 @@
               <text class="row-st" wx:if="{{item.extraText}}">{{item.extraText}}</text>
             </view>
             <text class="row-act inline" wx:if="{{item.canUnbind}}" hover-class="hover-dim" catchtap="applyUnbind">申请解绑</text>
-            <text class="row-act inline ghost" wx:elif="{{item.channelId}}" hover-class="hover-dim">{{expandedId === item._id ? '收起' : '查看 ›'}}</text>
+            <text class="row-act inline ghost" wx:elif="{{item.channelId && !item.sameChannel}}" hover-class="hover-dim">{{expandedId === item._id ? '收起' : '查看 ›'}}</text>
+            <text class="row-act inline ghost" wx:elif="{{item.channelId}}">同一渠道</text>
           </view>
           <view class="app-detail" wx:if="{{expandedId === item._id}}">
             <view class="d-grid" wx:if="{{expandedStats}}">
@@ -151,7 +153,7 @@
                 <text class="d-label">已结算</text>
               </view>
             </view>
-            <text class="d-hint" wx:if="{{expandedStats}}">累计口径，含该渠道全部月份</text>
+            <text class="d-hint" wx:if="{{expandedStats}}">渠道 {{item.channelMark}} · 累计口径，含该渠道全部月份</text>
             <text class="d-hint" wx:if="{{!expandedStats}}">读取中…</text>
           </view>
         </block>

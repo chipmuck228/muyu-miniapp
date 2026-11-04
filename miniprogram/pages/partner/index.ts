@@ -143,6 +143,8 @@ Page({
       extraText: string
       phone: string
       channelId: string
+      channelMark: string
+      sameChannel: boolean
       canUnbind: boolean
     }[],
     tenures: [] as { key: string; channelId: string; name: string; timeText: string; on: boolean }[],
@@ -296,17 +298,29 @@ Page({
       if (hub.needActivate && hub.activateFileID) {
         activateQrSrc = await resolveCloudFile(hub.activateFileID).catch(() => '')
       }
-      const appRows = (hub.applications || []).map((a) => ({
-        _id: a._id,
-        title: a.name || '渠道',
-        statusText: appStatusText(a),
-        timeText: a.createdAt ? '申请 ' + fmtDT(a.createdAt) : '',
-        extraText: appExtra(a),
-        phone: a.phone || '',
-        channelId: a.channelId || '',
-        // 只有"当前仍绑定中"的授权记录旁边才放解绑入口
-        canUnbind: !!(hub.canApplyUnbind && a.type === 'bind' && a.status === 'authorized' && a.channelStatus === 'active'),
-      }))
+      // 同一渠道会有多条申请（绑定申请 + 解绑申请），它们的 channelId 完全相同，
+      // 统计也是同一份数据。只保留第一条「查看」入口，其余标「同一渠道」，
+      // 否则看起来像两个推广码都能看到同样数据。
+      const seenCh: { [k: string]: boolean } = {}
+      const appRows = (hub.applications || []).map((a) => {
+        const cid = a.channelId || ''
+        const sameChannel = !!cid && !!seenCh[cid]
+        if (cid) seenCh[cid] = true
+        return {
+          _id: a._id,
+          title: a.name || '渠道',
+          statusText: appStatusText(a),
+          timeText: a.createdAt ? '申请 ' + fmtDT(a.createdAt) : '',
+          extraText: appExtra(a),
+          phone: a.phone || '',
+          channelId: cid,
+          // 渠道标识尾号：展开时显示，方便确认两条记录是不是同一个渠道
+          channelMark: cid ? cid.slice(-6).toUpperCase() : '',
+          sameChannel,
+          // 只有"当前仍绑定中"的授权记录旁边才放解绑入口
+          canUnbind: !!(hub.canApplyUnbind && a.type === 'bind' && a.status === 'authorized' && a.channelStatus === 'active'),
+        }
+      })
       this.setData({
         ready: true,
         phone: hub.phone || '',
@@ -422,6 +436,11 @@ Page({
   async pickHistory(e: any) {
     const id = String(e.currentTarget.dataset.id || '')
     const appId = String(e.currentTarget.dataset.app || '')
+    // 同一渠道的第二条及以后记录，统计与上方完全一致，没必要重复展开
+    if (String(e.currentTarget.dataset.same || '') === '1') {
+      wx.showToast({ title: '与上方记录是同一渠道，数据相同', icon: 'none' })
+      return
+    }
     if (!id) {
       wx.showToast({ title: '该记录未关联渠道，无法查看', icon: 'none' })
       return
