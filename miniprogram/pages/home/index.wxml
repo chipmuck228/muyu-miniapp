@@ -44,7 +44,7 @@
             <text class="lh-cur">{{headCurText}}</text>
             <text class="lh-goal"> / {{headGoalText}}</text>
           </view>
-          <view class="lh-bar"><view class="lh-fill" style="width: {{headPct}}"></view></view>
+          <view class="lh-bar"><view class="lh-fill" style="width: {{headPct}}%;"></view></view>
           <view class="lh-meta">
             <text>今日 {{todayCount}}</text>
             <text wx:if="{{headDue}}" class="lh-due {{headLate ? 'late' : ''}}">{{headDue}}</text>
@@ -121,7 +121,7 @@
             wx:for="{{floats}}"
             wx:key="key"
             class="float-text {{item.kind}}"
-            style="left: {{item.left}}"
+            style="left: {{item.left}}%;"
           >{{item.text}}</view>
         </view>
       </view>
@@ -244,7 +244,7 @@
           <text class="sheet-name">{{item.name}}</text>
           <text class="sheet-mark">{{item.cur ? '当前 · ' : ''}}{{item.mark}}</text>
         </view>
-        <view class="sheet-bar"><view class="sheet-bar-fill" style="width: {{item.pct}}"></view></view>
+        <view class="sheet-bar"><view class="sheet-bar-fill" style="width: {{item.pct}}%;"></view></view>
       </view>
       <view class="sheet-row {{sheetRandomCur ? 'cur' : ''}}" hover-class="sheet-hover" bindtap="onSheetRandom">
         <view class="sheet-line">
