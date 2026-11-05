@@ -4,11 +4,12 @@
 
   <block wx:if="{{readyToKnock}}">
     <view class="home-stage">
-      <view class="dawn {{pulsing ? 'breathing' : ''}}">
-        <!-- 主题天色：常驻，不随进度变；进度推进时背景图再叠上来 -->
+      <!-- 纯净星夜流场动态背景 (完全替代旧版 dawn 静态壁纸) -->
+      <view class="starry-bg-stage {{pulsing ? 'breathing' : ''}}">
+        <!-- 主题深空天色底色 -->
         <view class="theme-sky"></view>
         <view class="theme-glow"></view>
-        <!-- 星夜流场：画布透明，只画星尘；敲一下（strikeSeq）泛起一次暖光 -->
+        <!-- 核心星夜流场 (Canvas 2D 硬件加速，彻底无死点驻留) -->
         <starry-sky
           id="sky"
           theme="{{theme}}"
@@ -22,8 +23,7 @@
           field="{{skyField}}"
           trail="{{skyTrail}}"
         />
-        <!-- 背景壁纸暂时停用，只保留星夜：需要恢复时把这整块放回来 -->
-        <!-- 上下压暗：给顶部功课名和底部菜单留出干净的底，不被星尘吃掉对比度 -->
+        <!-- 上下压暗渐变：保证顶部功课名与底部木鱼界面文字清晰度 -->
         <view class="sky-scrim"></view>
       </view>
       <smoke-gl class="smoke-gl-fill" theme="{{theme}}" fade="{{celebrateOn || sheetOn || sessionSheetOn || sessionDoneOn ? 0 : smokeFade}}" bind:risen="onSmokeRisen" />
@@ -44,7 +44,7 @@
             <text class="lh-cur">{{headCurText}}</text>
             <text class="lh-goal"> / {{headGoalText}}</text>
           </view>
-          <view class="lh-bar"><view class="lh-fill" style="width: {{headPct}}%;"></view></view>
+          <view class="lh-bar"><view class="lh-fill" style="width: {{headPct}}"></view></view>
           <view class="lh-meta">
             <text>今日 {{todayCount}}</text>
             <text wx:if="{{headDue}}" class="lh-due {{headLate ? 'late' : ''}}">{{headDue}}</text>
@@ -121,7 +121,7 @@
             wx:for="{{floats}}"
             wx:key="key"
             class="float-text {{item.kind}}"
-            style="left: {{item.left}}%;"
+            style="left: {{item.left}}"
           >{{item.text}}</view>
         </view>
       </view>
@@ -162,7 +162,7 @@
       </view>
     </view>
     <view class="sky-row">
-      <text class="sky-label">光晕</text>
+      <text class="sky-label">余晖</text>
       <view class="sky-seg">
         <view
           wx:for="{{skyTrails}}"
@@ -244,7 +244,7 @@
           <text class="sheet-name">{{item.name}}</text>
           <text class="sheet-mark">{{item.cur ? '当前 · ' : ''}}{{item.mark}}</text>
         </view>
-        <view class="sheet-bar"><view class="sheet-bar-fill" style="width: {{item.pct}}%;"></view></view>
+        <view class="sheet-bar"><view class="sheet-bar-fill" style="width: {{item.pct}}"></view></view>
       </view>
       <view class="sheet-row {{sheetRandomCur ? 'cur' : ''}}" hover-class="sheet-hover" bindtap="onSheetRandom">
         <view class="sheet-line">

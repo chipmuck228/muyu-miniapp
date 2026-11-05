@@ -6,12 +6,11 @@
 // 这样即使被置顶，也只有稀疏的星点浮在上面，菜单文字照样看得清。
 import { winInfo } from '../../utils/util'
 
-const MOVE_SPEED = 0.45
 const MOVE_SCALE = 750
 /** 星点半径（直径 2.8px） */
 const DOT_RADIUS = 1.4
-/** 默认光晕强度 0..1 */
-const TRAIL = 0.157
+/** 默认每帧擦除比例，越小拖尾越长（对应 12/255） */
+const TRAIL = 12 / 255
 
 interface SkyPalette {
   colors: string[]
@@ -124,11 +123,13 @@ function flow(model: string, x: number, y: number, e: FlowEnv): { x: number; y: 
         // 纯向心场 + 定步长没有离心力平衡，粒子必然塌缩成一个点，
         // 所以用「远吸近斥」把粒子锚在半径 ~75px 的环带上绕转
         const pull = Math.max(-0.45, Math.min(1, (dist - 110) / 140))
-        fx += (dxh / dist) * f * 0.5 * pull + (-dyh / dist) * f * 1.4
-        fy += (dyh / dist) * f * 0.5 * pull + (dxh / dist) * f * 1.4
+        fx += (dxh / dist) * f * 0.52 * pull + (-dyh / dist) * f * 1.48
+        fy += (dyh / dist) * f * 0.52 * pull + (dxh / dist) * f * 1.48
       }
+      // 增加磁旋转热压湍流扰动，杜绝 4 点拉格朗日驻波死锁
       const bg = n * Math.PI * 4
-      return { x: fx + Math.cos(bg) * e.step * 0.35, y: fy + Math.sin(bg) * e.step * 0.35 }
+      const thermal = (Math.random() - 0.5) * 0.12
+      return { x: fx + Math.cos(bg) * e.step * 0.35 + thermal, y: fy + Math.sin(bg) * e.step * 0.35 + thermal }
     }
     // 4.2 林家翘-徐遐生密度波：对数螺旋切向流（螺距角约 18.5°）
     case 'spiral': {
@@ -357,6 +358,8 @@ interface Particle {
   x: number
   y: number
   c: number
+  age: number
+  maxAge: number
 }
 
 /**
@@ -430,15 +433,15 @@ Component({
       type: Number,
       value: 0.25,
     },
-    /** 动力学 / 热力学模型 id，见 flow() */
+    /** 动力学 / 热力学模型 id，默认启用双黑洞引力吸积模型 */
     field: {
       type: String,
-      value: 'perlin',
+      value: 'binary',
     },
     /** 拖尾余晖衰减 0~255：0 = 几乎不衰减（长轨迹），255 = 每帧擦净（无拖尾） */
     trail: {
       type: Number,
-      value: 18,
+      value: 12,
     },
   },
 
@@ -602,22 +605,22 @@ Component({
       const anyWx: any = wx
       if (typeof anyWx.createOffscreenCanvas !== 'function' || !s._pal) return null
       const colors: string[] = s._pal.colors
-      const core = s._dot || DOT_RADIUS
-      const glow = 1.1 + (s._trailA != null ? s._trailA : TRAIL) * 2.4
-      const d = Math.ceil(core * glow + 1)
+      const d = Math.ceil((s._dot || DOT_RADIUS) + 1)
       const out: any[] = []
       for (let i = 0; i < colors.length; i++) {
         try {
           const oc = anyWx.createOffscreenCanvas({ type: '2d', width: d * 2, height: d * 2 })
           const octx = oc.getContext('2d')
-          // 余晖式光点：中心亮核 + 向外柔散的光晕，边缘完全透明。
-          // 移动时看到的是一团光在飘，没有历史轨迹
+          // 发光点：亮核 + 快速衰减的柔边。
+          // 实心圆排成轨迹是一条硬边实线，在深底上就是"重重的笔触"；
+          // 渐变点的边缘是透明的，轨迹变成中心亮、两侧渐散的光带
           const m = parseRgba(colors[i])
           const mk = (al: number) =>
             'rgba(' + Math.round(m[0]) + ',' + Math.round(m[1]) + ',' + Math.round(m[2]) + ',' + al.toFixed(3) + ')'
-          const grd = octx.createRadialGradient(d, d, 0, d, d, core * glow)
+          const rad = s._dot || DOT_RADIUS
+          const grd = octx.createRadialGradient(d, d, 0, d, d, rad)
           grd.addColorStop(0, mk(Math.min(1, m[3] * 0.95)))
-          grd.addColorStop(Math.min(0.9, 0.5 / glow), mk(m[3] * 0.75))
+          grd.addColorStop(0.45, mk(m[3] * 0.4))
           grd.addColorStop(1, mk(0))
           octx.fillStyle = grd
           octx.fillRect(0, 0, d * 2, d * 2)
@@ -640,6 +643,8 @@ Component({
           x: Math.random() * w,
           y: Math.random() * h,
           c: Math.floor(Math.random() * total),
+          age: Math.floor(Math.random() * 450),
+          maxAge: Math.floor(450 + Math.random() * 650),
         })
       }
       return pts
@@ -675,10 +680,34 @@ Component({
         return
       }
 
-      // 只留余晖、不留尾迹：每帧清屏，光点的"余晖"由 sprite 自带的
-      // 光晕（glow）承担，而不是靠画布上残留的历史轨迹
-      ctx.clearRect(0, 0, w, h)
-      const glow = 1.1 + (s._trailA != null ? s._trailA : TRAIL) * 2.4
+      // 擦除上一帧的一部分：留下渐隐的拖尾余晖，画布本身仍然透明
+      // 长拖尾时还要同时把点画淡，否则叠加几十次后变成不透明色块
+      let dotA = 1
+      if (s._trim) {
+        const trailA = s._trailA != null ? s._trailA : TRAIL
+        // 255 档：每帧直接清屏，不留任何拖尾
+        if (trailA >= 0.999) {
+          ctx.clearRect(0, 0, w, h)
+        } else {
+          // 拖尾可见长度 L ≈ 3 * 每帧位移 / 擦除比例。
+          // 两件事要同时成立：
+          // 1) alpha 跟着流速缩放，L 才只由档位决定（否则缓速看不出余晖）
+          // 2) 0 档不能真的为 0，否则轨迹永久堆积、几十秒后满屏根须
+          // 指数插值把 0..1 映射到擦除率：0 档 ≈ 55px 轨迹，255 档清屏
+          const speedK = (s._speed || 0.25) / 0.25
+          const alpha = Math.min(1, 0.0136 * Math.pow(73.5, trailA) * speedK)
+          ctx.globalCompositeOperation = 'destination-out'
+          ctx.fillStyle = 'rgba(0,0,0,' + alpha.toFixed(4) + ')'
+          ctx.fillRect(0, 0, w, h)
+          ctx.globalCompositeOperation = 'source-over'
+          // 轨迹越长，同一位置被重复叠加的次数越多，稳态亮度 ≈ a/(a+b)。
+          // b 很小的时候不管 a 多小都会趋近 1，所以还要按档位整体压暗，
+          // 让长拖尾呈现为"淡淡的雾"而不是糊上一块实色
+          dotA = 0.4 + 0.6 * Math.min(1, trailA / 0.35)
+        }
+      } else {
+        ctx.clearRect(0, 0, w, h)
+      }
 
       // 定课暖色：按标记在绘制前重建一次色板
       if (s._needWarm) {
@@ -694,7 +723,7 @@ Component({
       }
 
       const spin = Math.PI * 2 * MOVE_SCALE
-      const d = Math.ceil((s._dot || DOT_RADIUS) * glow + 1)
+      const d = Math.ceil((s._dot || DOT_RADIUS) + 1)
       const vx = s._vortex
       const vorR = 140
       const vorR2 = vorR * vorR
@@ -715,19 +744,32 @@ Component({
         holes: [],
       }
       if (model === 'binary') {
-        const orbitR = Math.min(w, h) * 0.28
+        const wobble = 1 + 0.055 * Math.sin(s._frame * 0.016)
+        const orbitR = Math.min(w, h) * 0.28 * wobble
         const ta = s._frame * 0.01
+        const precess = s._frame * 0.00035
         env.holes = [
-          [w / 2 + Math.cos(ta) * orbitR, h / 2 + Math.sin(ta) * orbitR],
-          [w / 2 - Math.cos(ta) * orbitR, h / 2 - Math.sin(ta) * orbitR],
+          [w / 2 + Math.cos(ta + precess) * orbitR, h / 2 + Math.sin(ta + precess) * orbitR],
+          [w / 2 - Math.cos(ta - precess) * orbitR, h / 2 - Math.sin(ta - precess) * orbitR],
         ]
       }
+      if (dotA < 0.999) ctx.globalAlpha = dotA
       for (let i = 0; i < pts.length; i++) {
         const p = pts[i]
+        p.age = (p.age || 0) + 1
         if (model === 'perlin') {
-          const angle = noise2(p.x / MOVE_SCALE, p.y / MOVE_SCALE) * spin
+          // 慢速 3D 时间漂移微扰：保持梵高纹理质感的同时消除奇点停滞
+          const angle = noise2(p.x / MOVE_SCALE + s._frame * 0.00025, p.y / MOVE_SCALE) * spin
           p.x += Math.cos(angle) * step
           p.y += Math.sin(angle) * step
+        } else if (model === 'binary') {
+          // 双黑洞引力场：切向自旋与向心引力随距离平滑变化
+          const v = flow(model, p.x, p.y, env)
+          const curSpeed = Math.sqrt(v.x * v.x + v.y * v.y) || 0.0001
+          const maxV = step * 3.8
+          const scale = curSpeed > maxV ? maxV / curSpeed : step * 1.6
+          p.x += v.x * scale
+          p.y += v.y * scale
         } else {
           // 模型只给方向场，归一化后按流速档位走，各模型幅度天然一致
           const v = flow(model, p.x, p.y, env)
@@ -749,9 +791,12 @@ Component({
           }
         }
 
-        if (p.x < 0 || p.x > w || p.y < 0 || p.y > h) {
+        // 自然新陈代谢生命周期与边界重置 (杜绝长时间停滞聚团)
+        if (p.x < 0 || p.x > w || p.y < 0 || p.y > h || p.age > p.maxAge) {
           p.x = Math.random() * w
           p.y = Math.random() * h
+          p.age = 0
+          p.maxAge = Math.floor(450 + Math.random() * 650)
         } else if (model === 'binary') {
           // 掉进视界内的粒子重新抛回外围，避免长期累积成两个亮点
           for (let k = 0; k < 2; k++) {
@@ -762,6 +807,7 @@ Component({
               const r = 90 + Math.random() * Math.min(w, h) * 0.35
               p.x = env.holes[k][0] + Math.cos(a) * r
               p.y = env.holes[k][1] + Math.sin(a) * r
+              p.age = 0
               break
             }
           }
@@ -776,6 +822,8 @@ Component({
           ctx.fill()
         }
       }
+      if (dotA < 0.999) ctx.globalAlpha = 1
+
 
       if (s._vortex) {
         s._vortex.life *= 0.975

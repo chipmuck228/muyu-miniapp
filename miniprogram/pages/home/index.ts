@@ -14,7 +14,6 @@ import { playKnock, vibrate, vibrateLong, ensureKnock, ensureBell, playBell, Kno
 import { KnockQueue, TapSource } from '../../utils/knockQueue'
 import { mockEnabled } from '../../utils/devMock'
 import { concealTabBar, winInfo, fmtInt, dueText } from '../../utils/util'
-import { DAWN_FILE_ID, resolveCloudFile } from '../../utils/cloudFile'
 import { startAmbience, stopAmbience, fadeOutAmbience } from '../../utils/ambience'
 import { AmbienceId } from '../../utils/audioCatalog'
 import { parseTheme, themeEnds, ThemeId } from '../../utils/theme'
@@ -154,10 +153,12 @@ function planMinutes(p: SessionPlan): number {
 }
 
 function clockText(ms: number): string {
-  const sec = Math.max(0, Math.ceil(ms / 1000))
-  const m = Math.floor(sec / 60)
-  const s = sec % 60
-  return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s
+  const safeSec = Math.max(0, Math.ceil((Number(ms) || 0) / 1000))
+  const m = Math.floor(safeSec / 60)
+  const s = safeSec % 60
+  const mm = m < 10 ? '0' + m : String(m)
+  const ss = s < 10 ? '0' + s : String(s)
+  return `${mm}:${ss}`
 }
 
 // 木鱼材质（渲染参数在 pkg-smoke/muyuFish.ts；分包代码主包不能同步引用，这里只放名字和色点）
@@ -285,14 +286,14 @@ Page({
       { id: 'normal', name: '常', v: 0.25 },
       { id: 'fast', name: '疾', v: 0.45 },
     ],
-    skyField: 'perlin',
-    skyTrail: 40,
+    skyField: 'binary',
+    skyTrail: 12,
     skyTrails: [
-      { id: 'none', name: '无', v: 0 },
-      { id: 'small', name: '小', v: 16 },
-      { id: 'mid', name: '中', v: 40 },
-      { id: 'big', name: '大', v: 90 },
-      { id: 'full', name: '满', v: 255 },
+      { id: 'eternal', name: '绵绵', v: 0 },
+      { id: 'long', name: '悠长', v: 6 },
+      { id: 'std', name: '标准', v: 12 },
+      { id: 'short', name: '短促', v: 36 },
+      { id: 'none', name: '无', v: 255 },
     ],
     skyFields: [
       { id: 'perlin', name: '梵高相位' },
@@ -484,24 +485,12 @@ Page({
   },
 
   loadDawn() {
-    resolveCloudFile(DAWN_FILE_ID)
-      .then((src) => {
-        if (!this._alive) return
-        this.setData({ dawnSrc: src })
-        this.applyPaper()
-      })
-      .catch((e) => {
-        console.warn('dawn load failed', e)
-      })
+    // 纯星夜流场背景：停用原 dawn 晨曦图网络请求与挂接
   },
 
-  /** 该铺哪张背景图：心愿有自己的壁纸就用它；随机专注、没有壁纸或壁纸加载不了时用晨曦图 */
+  /** 纯星夜背景：停用静态壁纸遮罩 */
   paperPick(): { src: string; kind: 'dawn' | 'wish' } {
-    // 心愿进度还没拉回来：先不铺，免得先闪一下晨曦再换成壁纸
-    if (!this._lessonKind) return { src: '', kind: 'dawn' }
-    const id = this._lessonKind === 'wish' ? this._wishId : null
-    if (id && paperUrls[id]) return { src: paperUrls[id], kind: 'wish' }
-    return { src: this.data.dawnSrc, kind: 'dawn' }
+    return { src: '', kind: 'dawn' }
   },
 
   applyPaper() {
@@ -1261,7 +1250,7 @@ Page({
 
   onPickSkyTrail(e: any) {
     const v = Number(e.currentTarget.dataset.v)
-    this.setData({ skyTrail: isNaN(v) ? 40 : v })
+    this.setData({ skyTrail: isNaN(v) ? 12 : v })
   },
 
   onToggleSkyPause() {
