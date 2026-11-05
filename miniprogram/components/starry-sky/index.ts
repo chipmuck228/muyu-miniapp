@@ -17,6 +17,168 @@ interface SkyPalette {
   colors: string[]
 }
 
+/** 模型速度场的公共环境量，每帧算一次，循环内不再重复 */
+interface FlowEnv {
+  w: number
+  h: number
+  halfW: number
+  halfH: number
+  /** 累计帧数，驱动时间演化 */
+  t: number
+  scale: number
+  spin: number
+  /** 双黑洞本帧的公转位置 */
+  holes: number[][]
+}
+
+/**
+ * 各动力学 / 热力学模型的本征速度向量（未按 step 缩放）。
+ * tick 里统一做归一化后再乘流速档位，所以这里只关心方向场的形态，
+ * 不必担心某个模型的输出幅度不一致。
+ */
+function flow(model: string, x: number, y: number, e: FlowEnv): { x: number; y: number } {
+  const S = e.scale
+  const n = noise2(x / S, y / S)
+  switch (model) {
+    // 2.2 旋度不可压缩流场：标量流函数的中心差分旋度，处处零散度
+    case 'curl': {
+      const eps = 3.0
+      const nY1 = noise2(x / S, (y + eps) / S)
+      const nY0 = noise2(x / S, (y - eps) / S)
+      const nX1 = noise2((x + eps) / S, y / S)
+      const nX0 = noise2((x - eps) / S, y / S)
+      return { x: (nY1 - nY0) / (2 * eps), y: -(nX1 - nX0) / (2 * eps) }
+    }
+    // 2.3 泰勒-格林中尺度涡列（纳维-斯托克斯周期域解析解）+ 湍流微扰
+    case 'taylor': {
+      const k = (Math.PI * 4) / Math.min(e.w, e.h)
+      const na = n * Math.PI * 4
+      return {
+        x: Math.sin(k * x) * Math.cos(k * y) * 0.8 + Math.cos(na) * 0.2,
+        y: -Math.cos(k * x) * Math.sin(k * y) * 0.8 + Math.sin(na) * 0.2,
+      }
+    }
+    // 2.4 低频层流：角度倍频降到 8π，流线平滑
+    case 'laminar': {
+      const a = n * Math.PI * 8
+      return { x: Math.cos(a), y: Math.sin(a) }
+    }
+    // 3.1 瑞利-贝纳德热对流胞 + 垂直浮力（底热顶冷）
+    case 'benard': {
+      const uK = (Math.PI * 4) / e.w
+      const vK = Math.PI / e.h
+      const thermal = (n - 0.5) * 0.3
+      const buoyancy = ((e.h - y) / e.h - 0.5) * 0.4
+      return {
+        x: Math.sin(uK * x) * Math.cos(vK * y) + thermal,
+        y: -Math.cos(uK * x) * Math.sin(vK * y) - buoyancy + thermal,
+      }
+    }
+    // 3.2 朗之万方程（过阻尼极限）：漂移场 + Box-Muller 高斯热涨落
+    case 'langevin': {
+      const da = n * Math.PI * 4
+      const u1 = Math.max(0.0001, Math.random())
+      const u2 = Math.random()
+      const r = Math.sqrt(-2 * Math.log(u1))
+      const T = 0.85
+      return {
+        x: Math.cos(da) * 0.6 + r * Math.cos(2 * Math.PI * u2) * T,
+        y: Math.sin(da) * 0.6 + r * Math.sin(2 * Math.PI * u2) * T,
+      }
+    }
+    // 3.3 傅里叶热传导：沿温度负梯度扩散 + 等温线切向环流
+    case 'fourier': {
+      const rX = x - e.halfW
+      const rY = y - e.halfH
+      const dist = Math.sqrt(rX * rX + rY * rY) + 1
+      const gX = rX / dist
+      const gY = rY / dist
+      const flux = Math.min(2.5, 300 / (dist + 50))
+      const ent = n * Math.PI * 2
+      return {
+        x: gX * flux - gY * 0.5 + Math.cos(ent) * 0.3,
+        y: gY * flux + gX * 0.5 + Math.sin(ent) * 0.3,
+      }
+    }
+    // 3.4 麦克斯韦-玻尔兹曼：核心高压的径向绝热膨胀
+    case 'maxwell': {
+      const rX = x - e.halfW
+      const rY = y - e.halfH
+      const r = Math.sqrt(rX * rX + rY * rY) + 1
+      const force = Math.min(2.2, 500 / (r + 80))
+      const mb = noise2(x * 0.005 + e.t * 0.005, y * 0.005) + 0.4
+      return { x: (rX / r) * force * mb, y: (rY / r) * force * mb }
+    }
+    // 4.1 双黑洞引力轨 + 吸积盘切向角动量（软化 eps=35）
+    case 'binary': {
+      let fx = 0
+      let fy = 0
+      for (let i = 0; i < 2; i++) {
+        const dxh = e.holes[i][0] - x
+        const dyh = e.holes[i][1] - y
+        const dist = Math.sqrt(dxh * dxh + dyh * dyh) + 35
+        const f = 1400 / (dist * dist)
+        fx += (dxh / dist) * f * 0.5 + (-dyh / dist) * f * 1.4
+        fy += (dyh / dist) * f * 0.5 + (dxh / dist) * f * 1.4
+      }
+      const bg = n * Math.PI * 4
+      return { x: fx + Math.cos(bg) * 0.3, y: fy + Math.sin(bg) * 0.3 }
+    }
+    // 4.2 林家翘-徐遐生密度波：对数螺旋切向流（螺距角约 18.5°）
+    case 'spiral': {
+      const theta = Math.atan2(y - e.halfH, x - e.halfW)
+      const angle = (theta + Math.PI / 2 + 0.32) * 0.72 + n * Math.PI * 2 * 0.28
+      return { x: Math.cos(angle), y: Math.sin(angle) }
+    }
+    // 4.3 太阳风：辐射状帕克流 + 磁绳扭转波（时间维用帧相位近似）
+    case 'solar': {
+      const rX = x - e.halfW
+      const rY = y - e.halfH
+      const rad = Math.sqrt(rX * rX + rY * rY) + 1
+      const flare = noise2(x / S, y / S + e.t * 0.01)
+      const angle = Math.atan2(rY, rX) + Math.sin(rad * 0.02 + flare * Math.PI) * 1.2
+      return { x: Math.cos(angle), y: Math.sin(angle) }
+    }
+    // 5.1 克利福德奇异吸引子 (a=-1.4, b=1.6, c=1.0, d=0.7)
+    case 'clifford': {
+      const nx = (x - e.halfW) / (e.halfW * 0.45)
+      const ny = (y - e.halfH) / (e.halfH * 0.45)
+      const tx = Math.sin(-1.4 * ny) + Math.cos(-1.4 * nx)
+      const ty = Math.sin(1.6 * nx) + 0.7 * Math.cos(1.6 * ny)
+      const angle = Math.atan2(ty - ny, tx - nx) + (n - 0.5) * 1.2
+      return { x: Math.cos(angle), y: Math.sin(angle) }
+    }
+    // 5.2 克拉尼驻波：微尘沿节线（W=0 等位线）沉降
+    case 'chladni': {
+      const u = x * (Math.PI / e.w)
+      const v = y * (Math.PI / e.h)
+      const dWdu = -3 * Math.sin(3 * u) * Math.cos(5 * v) + 5 * Math.sin(5 * u) * Math.cos(3 * v)
+      const dWdv = -5 * Math.cos(3 * u) * Math.sin(5 * v) + 3 * Math.cos(5 * u) * Math.sin(3 * v)
+      const angle = Math.atan2(dWdu, -dWdv) + (n - 0.5) * 1.2
+      return { x: Math.cos(angle), y: Math.sin(angle) }
+    }
+    // 5.3 磁偶极子：两极磁通量线矢量和的切向
+    case 'dipole': {
+      const poleDist = Math.min(e.halfW, e.halfH) * 0.35
+      const rNx = x - (e.halfW - poleDist)
+      const rNy = y - e.halfH
+      const rSx = x - (e.halfW + poleDist)
+      const rSy = y - e.halfH
+      const dN = Math.sqrt(rNx * rNx + rNy * rNy) + 25
+      const dS = Math.sqrt(rSx * rSx + rSy * rSy) + 25
+      const bx = rNx / (dN * dN * dN) - rSx / (dS * dS * dS)
+      const by = rNy / (dN * dN * dN) - rSy / (dS * dS * dS)
+      const angle = Math.atan2(by, bx) + (n - 0.5) * 0.8
+      return { x: Math.cos(angle), y: Math.sin(angle) }
+    }
+    // 2.1 原版高频相位缠绕（默认）
+    default: {
+      const a = n * e.spin
+      return { x: Math.cos(a), y: Math.sin(a) }
+    }
+  }
+}
+
 const PALETTES: { [k: string]: SkyPalette } = {
   // 翡翠极光（参考实现原版）
   emerald: {
@@ -257,10 +419,15 @@ Component({
       type: Number,
       value: 0,
     },
-    /** 流速倍率：0.3 ~ 3，1 为参考实现原速 */
+    /** 流速：每帧位移 px（缓 0.1 / 常 0.25 / 疾 0.45） */
     speed: {
       type: Number,
-      value: 1,
+      value: 0.25,
+    },
+    /** 动力学 / 热力学模型 id，见 flow() */
+    field: {
+      type: String,
+      value: 'perlin',
     },
   },
 
@@ -308,7 +475,7 @@ Component({
     },
     speed(v: number) {
       const s: any = this
-      s._speed = Math.max(0.3, Math.min(3, v || 1))
+      s._speed = Math.max(0.05, Math.min(2, v || 0.25))
     },
     'theme, palette'(theme: string, palette: string) {
       const s: any = this
@@ -367,7 +534,7 @@ Component({
           s._running = false
           s._dot = dotRadiusOf(info.width)
           s._tint = Math.max(0, Math.min(1, s.data.tint || 0))
-          s._speed = Math.max(0.3, Math.min(3, s.data.speed || 1))
+          s._speed = Math.max(0.05, Math.min(2, s.data.speed || 0.25))
           s._base = paletteOf(s.data.theme, s.data.palette)
 
           canvas.width = Math.floor(info.width * dpr)
@@ -511,12 +678,42 @@ Component({
       const vx = s._vortex
       const vorR = 140
       const vorR2 = vorR * vorR
-      const step = MOVE_SPEED * (s._speed || 1)
+      // 流速档位直接就是每帧位移 px
+      const step = s._speed || 0.25
+      s._frame = (s._frame || 0) + 1
+      const model = s.data.field || 'perlin'
+      // 每帧只算一次的环境量（双黑洞位置等）
+      const env: FlowEnv = {
+        w: w,
+        h: h,
+        halfW: w / 2,
+        halfH: h / 2,
+        t: s._frame,
+        scale: MOVE_SCALE,
+        spin: spin,
+        holes: [],
+      }
+      if (model === 'binary') {
+        const orbitR = Math.min(w, h) * 0.28
+        const ta = s._frame * 0.01
+        env.holes = [
+          [w / 2 + Math.cos(ta) * orbitR, h / 2 + Math.sin(ta) * orbitR],
+          [w / 2 - Math.cos(ta) * orbitR, h / 2 - Math.sin(ta) * orbitR],
+        ]
+      }
       for (let i = 0; i < pts.length; i++) {
         const p = pts[i]
-        const angle = noise2(p.x / MOVE_SCALE, p.y / MOVE_SCALE) * spin
-        p.x += Math.cos(angle) * step
-        p.y += Math.sin(angle) * step
+        if (model === 'perlin') {
+          const angle = noise2(p.x / MOVE_SCALE, p.y / MOVE_SCALE) * spin
+          p.x += Math.cos(angle) * step
+          p.y += Math.sin(angle) * step
+        } else {
+          // 模型只给方向场，归一化后按流速档位走，各模型幅度天然一致
+          const v = flow(model, p.x, p.y, env)
+          const len = Math.sqrt(v.x * v.x + v.y * v.y) || 0.0001
+          p.x += (v.x / len) * step
+          p.y += (v.y / len) * step
+        }
 
         // 漩涡：切向力把粒子卷向中心，随 life 衰减
         if (vx && vx.life > 0.02) {

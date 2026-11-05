@@ -281,10 +281,28 @@ Page({
     skyPaused: false,
     skySpeed: 1,
     skySpeeds: [
-      { id: 'slow', name: '缓', v: 0.55 },
-      { id: 'normal', name: '常', v: 1 },
-      { id: 'fast', name: '疾', v: 2 },
+      { id: 'slow', name: '缓', v: 0.1 },
+      { id: 'normal', name: '常', v: 0.25 },
+      { id: 'fast', name: '疾', v: 0.45 },
     ],
+    skyField: 'perlin',
+    skyFields: [
+      { id: 'perlin', name: '梵高相位' },
+      { id: 'curl', name: '旋度流体' },
+      { id: 'taylor', name: '洋流涡列' },
+      { id: 'laminar', name: '层流天河' },
+      { id: 'benard', name: '热对流' },
+      { id: 'langevin', name: '布朗运动' },
+      { id: 'fourier', name: '热传导' },
+      { id: 'maxwell', name: '气体膨胀' },
+      { id: 'binary', name: '双黑洞' },
+      { id: 'spiral', name: '银河旋臂' },
+      { id: 'solar', name: '太阳风' },
+      { id: 'clifford', name: '吸引子' },
+      { id: 'chladni', name: '克拉尼波' },
+      { id: 'dipole', name: '磁偶极' },
+    ],
+    sheetTop: 68,
     skyDensities: [
       { id: 'low', name: '少' },
       { id: 'mid', name: '中' },
@@ -424,6 +442,14 @@ Page({
       Object.assign(
         {
           statusBarHeight: app.globalData.statusBarHeight || 20,
+          // 调参面板从顶部下拉，顶端要沉到胶囊按钮之下才点得到内容
+          sheetTop: (() => {
+            try {
+              const rect = wx.getMenuButtonBoundingClientRect()
+              if (rect && rect.bottom) return Math.round(rect.bottom + 10)
+            } catch (e) {}
+            return (app.globalData.statusBarHeight || 20) + 48
+          })(),
           readyToKnock: !!app.globalData.lessonChosen,
           ambience: cached.ambience,
           theme: cached.theme,
@@ -1217,8 +1243,12 @@ Page({
   },
 
   onPickSkySpeed(e: any) {
-    const v = Number(e.currentTarget.dataset.v) || 1
+    const v = Number(e.currentTarget.dataset.v) || 0.25
     this.setData({ skySpeed: v })
+  },
+
+  onPickSkyField(e: any) {
+    this.setData({ skyField: e.currentTarget.dataset.id })
   },
 
   onToggleSkyPause() {

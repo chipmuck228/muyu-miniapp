@@ -19,6 +19,7 @@
           pulse="{{strikeSeq}}"
           tint="{{skyTint}}"
           speed="{{skySpeed}}"
+          field="{{skyField}}"
         />
         <!-- 背景壁纸暂时停用，只保留星夜：需要恢复时把这整块放回来 -->
         <!-- 上下压暗：给顶部功课名和底部菜单留出干净的底，不被星尘吃掉对比度 -->
@@ -130,7 +131,7 @@
 
   <!-- 星夜调参：长按顶部功课名打开，不影响原有入口 -->
   <view class="sheet-mask" wx:if="{{skyPanelOn}}" catchtouchmove="noop" bindtap="closeSkyPanel"></view>
-  <view class="sky-sheet" wx:if="{{skyPanelOn}}" catchtouchmove="noop" style="padding-top: {{statusBarHeight + 16}}px;">
+  <view class="sky-sheet" wx:if="{{skyPanelOn}}" catchtouchmove="noop" style="padding-top: {{sheetTop}}px;">
     <view class="sky-head">
       <text class="sky-title">星 夜</text>
       <text class="sky-close" catchtap="closeSkyPanel">收起</text>
@@ -168,6 +169,18 @@
           class="sky-chip {{skyPalette === item.id ? 'on' : ''}}"
           data-id="{{item.id}}"
           catchtap="onPickSkyPalette"
+        >{{item.name}}</view>
+      </view>
+    </view>
+    <view class="sky-row">
+      <text class="sky-label">模型</text>
+      <view class="sky-seg">
+        <view
+          wx:for="{{skyFields}}"
+          wx:key="id"
+          class="sky-chip {{skyField === item.id ? 'on' : ''}}"
+          data-id="{{item.id}}"
+          catchtap="onPickSkyField"
         >{{item.name}}</view>
       </view>
     </view>

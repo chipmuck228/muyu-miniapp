@@ -1496,6 +1496,9 @@
   flex-direction: column;
   padding: calc(env(safe-area-inset-top) + 48rpx) 40rpx 36rpx;
   box-sizing: border-box;
+  /* 模型列表有 14 项，面板加高后允许内部滚动，且不越过屏幕 */
+  max-height: 82vh;
+  overflow-y: scroll;
   background: linear-gradient(180deg, #1d1610 0%, #15100b 55%, #120d09 100%);
   border-bottom: 1rpx solid rgba(224, 181, 119, 0.26);
   border-radius: 0 0 32rpx 32rpx;
