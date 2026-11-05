@@ -10,16 +10,8 @@
         <view class="theme-glow"></view>
         <!-- 星夜流场：翡翠星尘在光晕之上、壁纸之下，pointer-events 已关闭不挡敲击 -->
         <starry-sky theme="{{theme}}" active="{{readyToKnock}}" />
-        <!-- 背景图随进度从雾里浮现：糊开的一层先隐约显出，清楚的一层过了三成才显，敲满时完全清楚；每敲一下雾里亮一下 -->
-        <view wx:if="{{paperSrc}}" class="paper paper-{{paperKind}} {{paperOn ? 'on' : ''}}">
-          <image class="paper-mist" src="{{paperSrc}}" mode="aspectFill" style="opacity: {{paperMist}};" bindload="onPaperLoad" binderror="onPaperError" />
-          <image class="paper-breath" src="{{paperSrc}}" mode="aspectFill" />
-          <image class="paper-clear" src="{{paperSrc}}" mode="aspectFill" style="opacity: {{paperClear}};" />
-          <view class="paper-scrim" style="opacity: {{paperMist}};"></view>
-          <!-- 竖排功课名后面一团淡淡的暗，壁纸中间亮的时候字也看得清 -->
-          <view class="paper-title-veil" style="opacity: {{paperClear}};"></view>
-        </view>
-        <!-- 上下压暗：给顶部功课名和底部菜单留出干净的底，不被星尘和壁纸吃掉对比度 -->
+        <!-- 背景壁纸暂时停用，只保留星夜：需要恢复时把这整块放回来 -->
+        <!-- 上下压暗：给顶部功课名和底部菜单留出干净的底，不被星尘吃掉对比度 -->
         <view class="sky-scrim"></view>
       </view>
       <smoke-gl class="smoke-gl-fill" theme="{{theme}}" fade="{{celebrateOn || sheetOn || sessionSheetOn || sessionDoneOn ? 0 : smokeFade}}" bind:risen="onSmokeRisen" />
