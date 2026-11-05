@@ -120,8 +120,12 @@ function flow(model: string, x: number, y: number, e: FlowEnv): { x: number; y: 
         const dyh = e.holes[i][1] - y
         const dist = Math.sqrt(dxh * dxh + dyh * dyh) + 35
         const f = 1400 / (dist * dist)
-        fx += (dxh / dist) * f * 0.5 + (-dyh / dist) * f * 1.4
-        fy += (dyh / dist) * f * 0.5 + (dxh / dist) * f * 1.4
+        // 径向引力在近洞处翻成斥力，形成一个稳定的吸积环：
+        // 纯向心场 + 定步长没有离心力平衡，粒子必然塌缩成一个点，
+        // 所以用「远吸近斥」把粒子锚在半径 ~75px 的环带上绕转
+        const pull = Math.max(-0.45, Math.min(1, (dist - 110) / 140))
+        fx += (dxh / dist) * f * 0.5 * pull + (-dyh / dist) * f * 1.4
+        fy += (dyh / dist) * f * 0.5 * pull + (dxh / dist) * f * 1.4
       }
       const bg = n * Math.PI * 4
       return { x: fx + Math.cos(bg) * e.step * 0.35, y: fy + Math.sin(bg) * e.step * 0.35 }
@@ -746,6 +750,19 @@ Component({
         if (p.x < 0 || p.x > w || p.y < 0 || p.y > h) {
           p.x = Math.random() * w
           p.y = Math.random() * h
+        } else if (model === 'binary') {
+          // 掉进视界内的粒子重新抛回外围，避免长期累积成两个亮点
+          for (let k = 0; k < 2; k++) {
+            const hx = p.x - env.holes[k][0]
+            const hy = p.y - env.holes[k][1]
+            if (hx * hx + hy * hy < 900) {
+              const a = Math.random() * Math.PI * 2
+              const r = 90 + Math.random() * Math.min(w, h) * 0.35
+              p.x = env.holes[k][0] + Math.cos(a) * r
+              p.y = env.holes[k][1] + Math.sin(a) * r
+              break
+            }
+          }
         }
 
         if (sprites) {
