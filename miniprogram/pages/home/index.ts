@@ -928,11 +928,11 @@ Page({
   },
 
   onKnockTap() {
-    // 刚拖过木鱼：这次松手不算敲击
-    if (this._dragging) {
-      this._dragging = false
-      return
-    }
+    // 只有真的拖动过（位移超过阈值）才吞掉这一下，
+    // 避免某些机型 touchmove 抖一下就把 _dragging 留在 true，之后每下都被丢掉
+    const dragged = !!this._dragging && (this._touchMoved || 0) > DRAG_SLOP * 2
+    this._dragging = false
+    if (dragged) return
     this.knock('hand')
   },
 
@@ -995,7 +995,7 @@ Page({
   },
 
   knock(source: TapSource) {
-    if (!this._alive || this.entering() || !this.data.readyToKnock || this.overlayOn()) return
+    if (!this._alive || !this.data.readyToKnock || this.overlayOn()) return
     const d = this.data
     playKnock(d.soundOn, this.knockTimbre())
     vibrate(d.vibrateOn, source === 'auto' ? 'light' : 'heavy')
@@ -1154,7 +1154,13 @@ Page({
 
   /** 弹窗 / 面板盖在香案上：画布是原生层，要暂停木鱼、隐去烟和竖排标题 */
   overlayOn(): boolean {
-    return this.data.celebrateOn || this.data.sheetOn || this.data.sessionSheetOn || this.data.sessionDoneOn
+    return (
+      this.data.celebrateOn ||
+      this.data.sheetOn ||
+      this.data.sessionSheetOn ||
+      this.data.sessionDoneOn ||
+      this.data.skyPanelOn
+    )
   },
 
   onOpenLessonPanel() {

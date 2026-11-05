@@ -660,7 +660,7 @@
   position: absolute;
   left: 50%;
   /* 下移，让木鱼下缘与右侧「定课」的下缘齐平 */
-  bottom: -44rpx;
+  bottom: -30rpx;
   z-index: 2;
   width: 520rpx;
   height: 480rpx;
@@ -674,7 +674,8 @@
   height: 100%;
 }
 .knock-pad {
-  bottom: 0;
+  bottom: 36rpx;
+  z-index: 7;
   width: 400rpx;
   height: 400rpx;
   margin-left: -200rpx;
@@ -1488,17 +1489,21 @@
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  top: 0;
   z-index: 86;
   display: flex;
   flex-direction: column;
-  padding: 36rpx 40rpx calc(32rpx + env(safe-area-inset-bottom));
+  padding: calc(env(safe-area-inset-top) + 48rpx) 40rpx 36rpx;
   box-sizing: border-box;
-  background: linear-gradient(180deg, #1d1610 0%, #15100b 45%, #120d09 100%);
-  border-top: 1rpx solid rgba(224, 181, 119, 0.26);
-  border-radius: 32rpx 32rpx 0 0;
-  box-shadow: 0 -24rpx 64rpx rgba(0, 0, 0, 0.5);
-  animation: sheet-up 0.36s ease both;
+  background: linear-gradient(180deg, #1d1610 0%, #15100b 55%, #120d09 100%);
+  border-bottom: 1rpx solid rgba(224, 181, 119, 0.26);
+  border-radius: 0 0 32rpx 32rpx;
+  box-shadow: 0 24rpx 64rpx rgba(0, 0, 0, 0.5);
+  animation: sheet-down 0.36s ease both;
+}
+@keyframes sheet-down {
+  from { transform: translateY(-100%); }
+  to { transform: none; }
 }
 .sky-head {
   display: flex;
