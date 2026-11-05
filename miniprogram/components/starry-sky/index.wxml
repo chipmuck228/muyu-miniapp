@@ -1,1 +1,31 @@
-<canvas type="2d" id="sky" class="sky-canvas"></canvas>
+<!-- 纯 DOM 星尘：三层不同速度缓慢漂移 + 星点呼吸，层级由 CSS 决定，不会遮挡菜单 -->
+<view class="sky {{active ? '' : 'paused'}}">
+  <view class="nebula" style="background: radial-gradient(ellipse 60% 40% at 50% 42%, {{nebula}} 0%, rgba(0,0,0,0) 70%);"></view>
+
+  <view class="layer layer-a">
+    <view
+      wx:for="{{layerA}}"
+      wx:key="k"
+      class="dot breathe"
+      style="left: {{item.x}}%; top: {{item.y}}%; width: {{item.s}}rpx; height: {{item.s}}rpx; background: {{item.c}}; animation-duration: {{item.dur}}s; animation-delay: {{item.d}}s;"
+    ></view>
+  </view>
+
+  <view class="layer layer-b">
+    <view
+      wx:for="{{layerB}}"
+      wx:key="k"
+      class="dot breathe"
+      style="left: {{item.x}}%; top: {{item.y}}%; width: {{item.s}}rpx; height: {{item.s}}rpx; background: {{item.c}}; animation-duration: {{item.dur}}s; animation-delay: {{item.d}}s;"
+    ></view>
+  </view>
+
+  <view class="layer layer-c">
+    <view
+      wx:for="{{layerC}}"
+      wx:key="k"
+      class="dot breathe"
+      style="left: {{item.x}}%; top: {{item.y}}%; width: {{item.s}}rpx; height: {{item.s}}rpx; background: {{item.c}}; animation-duration: {{item.dur}}s; animation-delay: {{item.d}}s;"
+    ></view>
+  </view>
+</view>

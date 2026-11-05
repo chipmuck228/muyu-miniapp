@@ -5,18 +5,120 @@
   top: 0;
   width: 100%;
   height: 100%;
-  /* 压在主题天色之上、壁纸与 UI 之下，避免盖住菜单和木鱼 */
+  /* 常规 view 层：压在主题天色之上、壁纸与所有 UI 之下 */
   z-index: 1;
   pointer-events: none;
   overflow: hidden;
-  /* 整层再压一档透明度：星尘只做背景质感，不能跟前景文字抢注意力。
-     万一某机型 canvas 同层渲染失效被强制置顶，半透明也不至于把菜单全部盖死 */
-  opacity: 0.6;
 }
 
-.sky-canvas {
-  display: block;
+.sky {
+  position: absolute;
+  left: 0;
+  top: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none;
+  overflow: hidden;
+}
+
+/* 一团极淡的星云，给整片底色一点起伏 */
+.nebula {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  animation: nebula-breathe 26s ease-in-out infinite;
+}
+
+/* 三层各自漂移，速度不同形成景深 */
+.layer {
+  position: absolute;
+  left: -10%;
+  top: -10%;
+  width: 120%;
+  height: 120%;
+  will-change: transform;
+}
+
+.layer-a {
+  animation: drift-a 96s ease-in-out infinite;
+}
+.layer-b {
+  animation: drift-b 74s ease-in-out infinite;
+}
+.layer-c {
+  animation: drift-c 58s ease-in-out infinite;
+}
+
+.dot {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.5;
+  animation-name: twinkle;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.paused .nebula,
+.paused .layer,
+.paused .dot {
+  animation-play-state: paused;
+}
+
+@keyframes drift-a {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-2.6%, 1.8%, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes drift-b {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(2.2%, -1.6%, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes drift-c {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-1.4%, -2.4%, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.18;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+
+@keyframes nebula-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
 }
