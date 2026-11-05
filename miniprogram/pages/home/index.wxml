@@ -17,6 +17,7 @@
           paused="{{skyPaused}}"
           active="{{readyToKnock}}"
           pulse="{{strikeSeq}}"
+          tint="{{skyTint}}"
         />
         <!-- 背景壁纸暂时停用，只保留星夜：需要恢复时把这整块放回来 -->
         <!-- 上下压暗：给顶部功课名和底部菜单留出干净的底，不被星尘吃掉对比度 -->
@@ -128,7 +129,7 @@
 
   <!-- 星夜调参：长按顶部功课名打开，不影响原有入口 -->
   <view class="sheet-mask" wx:if="{{skyPanelOn}}" catchtouchmove="noop" bindtap="closeSkyPanel"></view>
-  <view class="sky-sheet" wx:if="{{skyPanelOn}}" catchtouchmove="noop">
+  <view class="sky-sheet" wx:if="{{skyPanelOn}}" catchtouchmove="noop" style="padding-top: {{statusBarHeight + 16}}px;">
     <view class="sky-head">
       <text class="sky-title">星 夜</text>
       <text class="sky-close" catchtap="closeSkyPanel">收起</text>

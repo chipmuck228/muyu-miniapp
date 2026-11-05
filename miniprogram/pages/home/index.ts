@@ -275,6 +275,7 @@ Page({
     floats: [] as FloatItem[],
     rippleOn: false,
     skyPanelOn: false,
+    skyTint: 0,
     skyDensity: 'mid',
     skyPalette: 'auto',
     skyPaused: false,
@@ -1455,16 +1456,21 @@ Page({
     if (this.data.autoMode && !this.entering() && !this.overlayOn()) this.startAuto()
   },
 
-  sessionPatch(): { sessionBig: string; sessionSmall: string; sessionStick: number } {
+  sessionPatch(): { sessionBig: string; sessionSmall: string; sessionStick: number; skyTint: number } {
     const s = this._session
-    if (!s) return { sessionBig: '', sessionSmall: '', sessionStick: STICK_ICON_LEN }
+    if (!s) return { sessionBig: '', sessionSmall: '', sessionStick: STICK_ICON_LEN, skyTint: 0 }
     const n = s.hand + s.auto
-    if (s.kind === 'count') return { sessionBig: String(n), sessionSmall: '/ ' + s.value, sessionStick: STICK_ICON_LEN }
+    if (s.kind === 'count') {
+      // 计数定课：敲到目标，星尘从冷色走满金色
+      const t = Math.min(1, n / Math.max(1, s.value))
+      return { sessionBig: String(n), sessionSmall: '/ ' + s.value, sessionStick: STICK_ICON_LEN, skyTint: t }
+    }
     const burnt = Math.max(0, Math.min(1, s.elapsedMs / s.goalMs))
     return {
       sessionBig: clockText(s.goalMs - s.elapsedMs),
       sessionSmall: '已敲 ' + n,
       sessionStick: Math.max(4, Math.round(STICK_ICON_LEN * (1 - burnt))),
+      skyTint: burnt,
     }
   },
 
@@ -1515,7 +1521,7 @@ Page({
   endSession() {
     this.stopSessionTick()
     this._session = null
-    this.setData({ sessionOn: false })
+    this.setData({ sessionOn: false, skyTint: 0 })
   },
 
   /** 时间到 / 念珠满：停下自动敲；成品定课先让声音淡出，再响一声钟钵，给小结 */

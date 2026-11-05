@@ -363,7 +363,8 @@
   position: relative;
   flex-shrink: 0;
   height: 320rpx;
-  z-index: 3;
+  /* 提到竖排功课名 canvas（z-index 7）之上，飘字和涟漪才不会被它压住 */
+  z-index: 9;
 }
 
 .knock-pad {
@@ -690,7 +691,7 @@
 }
 /* 飘字从木鱼上方升起，不压在木鱼身上 */
 .float-text {
-  bottom: 72%;
+  bottom: 96%;
 }
 
 /* 木鱼材质色点：竖排在左侧，避开中间的敲击热区 */

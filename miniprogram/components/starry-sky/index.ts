@@ -94,6 +94,40 @@ const THEME_PALETTE: { [k: string]: string } = {
   dusk: 'dusk',
 }
 
+/** 定课推进时的目标色：暖金 */
+const GOLD_COLORS = [
+  'rgba(247,208,70,0.66)',
+  'rgba(255,226,150,0.58)',
+  'rgba(224,159,62,0.6)',
+  'rgba(255,238,219,0.5)',
+  'rgba(240,186,96,0.56)',
+  'rgba(255,214,120,0.52)',
+  'rgba(210,150,60,0.5)',
+]
+
+function parseRgba(str: string): number[] {
+  const m = /rgba?\(([^)]+)\)/.exec(str)
+  if (!m) return [255, 255, 255, 1]
+  const p = m[1].split(',').map((v) => parseFloat(v))
+  return [p[0] || 0, p[1] || 0, p[2] || 0, p[3] === undefined ? 1 : p[3]]
+}
+
+function mixColor(from: string, to: string, t: number): string {
+  const a = parseRgba(from)
+  const b = parseRgba(to)
+  const r = Math.round(a[0] + (b[0] - a[0]) * t)
+  const g = Math.round(a[1] + (b[1] - a[1]) * t)
+  const bl = Math.round(a[2] + (b[2] - a[2]) * t)
+  const al = a[3] + (b[3] - a[3]) * t
+  return 'rgba(' + r + ',' + g + ',' + bl + ',' + al.toFixed(3) + ')'
+}
+
+/** 把一套冷色按 t 向金色过渡 */
+function warmPalette(base: SkyPalette, t: number): SkyPalette {
+  const colors = base.colors.map((c, i) => mixColor(c, GOLD_COLORS[i % GOLD_COLORS.length], t))
+  return { colors }
+}
+
 function paletteOf(theme: string, want: string): SkyPalette {
   const key = want && want !== 'auto' ? want : THEME_PALETTE[theme] || 'dawn'
   return PALETTES[key] || PALETTES.dawn
@@ -217,6 +251,11 @@ Component({
       type: Number,
       value: 0,
     },
+    /** 暖化程度 0..1：定课推进时冷色逐渐转金 */
+    tint: {
+      type: Number,
+      value: 0,
+    },
   },
 
   data: {},
@@ -241,7 +280,24 @@ Component({
       s._ctx.clearRect(0, 0, s._w, s._h)
     },
     pulse() {
-      ;(this as any)._pulse = 1
+      const s: any = this
+      s._pulse = 1
+      // 随机漩涡：敲击时有概率在某处卷起一股涡流
+      if (s._inited && s._w && Math.random() < 0.45) {
+        s._vortex = {
+          x: s._w * (0.25 + Math.random() * 0.5),
+          y: s._h * (0.2 + Math.random() * 0.55),
+          life: 1,
+        }
+      }
+    },
+    tint(v: number) {
+      const s: any = this
+      if (!s._inited) return
+      const t = Math.max(0, Math.min(1, v || 0))
+      if (Math.abs(t - (s._tint || 0)) < 0.04) return
+      s._tint = t
+      s.applyPalette(s._base || paletteOf(s.data.theme, s.data.palette))
     },
     'theme, palette'(theme: string, palette: string) {
       const s: any = this
@@ -300,13 +356,15 @@ Component({
           s._running = false
           s._inited = true
           s._dot = dotRadiusOf(info.width)
-          s._pal = paletteOf(s.data.theme, s.data.palette)
+          s._tint = Math.max(0, Math.min(1, s.data.tint || 0))
+          s._base = paletteOf(s.data.theme, s.data.palette)
 
           canvas.width = Math.floor(info.width * dpr)
           canvas.height = Math.floor(info.height * dpr)
           ctx.scale(dpr, dpr)
 
-          s._sprites = this.buildSprites()
+          // 首次按 tint 直接生成（定课中途重新进入时不会是纯冷色）
+          this.applyPalette(s._base)
           s._pts = this.makeParticles(particleCount(info.width, info.height, s.data.density))
 
           // 画布保持透明：不铺底色，靠 destination-out 擦出拖尾
@@ -321,7 +379,9 @@ Component({
     /** 换调色盘：重建 sprite 并清屏 */
     applyPalette(pal: SkyPalette) {
       const s: any = this
-      s._pal = pal
+      s._base = pal
+      const t = Math.max(0, Math.min(1, s._tint || 0))
+      s._pal = t > 0.01 ? warmPalette(pal, t) : pal
       s._sprites = this.buildSprites()
       if (s._ctx) s._ctx.clearRect(0, 0, s._w, s._h)
     },
@@ -412,11 +472,27 @@ Component({
 
       const spin = Math.PI * 2 * MOVE_SCALE
       const d = Math.ceil((s._dot || DOT_RADIUS) + 1)
+      const vx = s._vortex
+      const vorR = 140
+      const vorR2 = vorR * vorR
       for (let i = 0; i < pts.length; i++) {
         const p = pts[i]
         const angle = noise2(p.x / MOVE_SCALE, p.y / MOVE_SCALE) * spin
         p.x += Math.cos(angle) * MOVE_SPEED
         p.y += Math.sin(angle) * MOVE_SPEED
+
+        // 漩涡：切向力把粒子卷向中心，随 life 衰减
+        if (vx && vx.life > 0.02) {
+          const ddx = p.x - vx.x
+          const ddy = p.y - vx.y
+          const dd = ddx * ddx + ddy * ddy
+          if (dd < vorR2 && dd > 4) {
+            const dist = Math.sqrt(dd)
+            const f = (1 - dist / vorR) * 2.1 * vx.life
+            p.x += (-ddy / dist) * f
+            p.y += (ddx / dist) * f
+          }
+        }
 
         if (p.x < 0 || p.x > w || p.y < 0 || p.y > h) {
           p.x = Math.random() * w
@@ -431,6 +507,11 @@ Component({
           ctx.arc(p.x, p.y, s._dot, 0, Math.PI * 2)
           ctx.fill()
         }
+      }
+
+      if (s._vortex) {
+        s._vortex.life *= 0.975
+        if (s._vortex.life < 0.02) s._vortex = null
       }
 
       // 敲击脉冲：木鱼位置泛起一团暖光，随 _pulse 衰减
