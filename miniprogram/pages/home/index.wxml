@@ -162,7 +162,7 @@
       </view>
     </view>
     <view class="sky-row">
-      <text class="sky-label">余晖</text>
+      <text class="sky-label">光晕</text>
       <view class="sky-seg">
         <view
           wx:for="{{skyTrails}}"

@@ -288,11 +288,11 @@ Page({
     skyField: 'perlin',
     skyTrail: 40,
     skyTrails: [
-      { id: 'eternal', name: '绵绵', v: 0 },
-      { id: 'long', name: '悠长', v: 16 },
-      { id: 'std', name: '标准', v: 40 },
-      { id: 'short', name: '短促', v: 90 },
-      { id: 'none', name: '无', v: 255 },
+      { id: 'none', name: '无', v: 0 },
+      { id: 'small', name: '小', v: 16 },
+      { id: 'mid', name: '中', v: 40 },
+      { id: 'big', name: '大', v: 90 },
+      { id: 'full', name: '满', v: 255 },
     ],
     skyFields: [
       { id: 'perlin', name: '梵高相位' },

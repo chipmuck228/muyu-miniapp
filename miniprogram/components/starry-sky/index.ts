@@ -10,8 +10,8 @@ const MOVE_SPEED = 0.45
 const MOVE_SCALE = 750
 /** 星点半径（直径 2.8px） */
 const DOT_RADIUS = 1.4
-/** 每帧擦除比例，越小拖尾越长 */
-const TRAIL = 0.07
+/** 默认光晕强度 0..1 */
+const TRAIL = 0.157
 
 interface SkyPalette {
   colors: string[]
@@ -602,22 +602,22 @@ Component({
       const anyWx: any = wx
       if (typeof anyWx.createOffscreenCanvas !== 'function' || !s._pal) return null
       const colors: string[] = s._pal.colors
-      const d = Math.ceil((s._dot || DOT_RADIUS) + 1)
+      const core = s._dot || DOT_RADIUS
+      const glow = 1.1 + (s._trailA != null ? s._trailA : TRAIL) * 2.4
+      const d = Math.ceil(core * glow + 1)
       const out: any[] = []
       for (let i = 0; i < colors.length; i++) {
         try {
           const oc = anyWx.createOffscreenCanvas({ type: '2d', width: d * 2, height: d * 2 })
           const octx = oc.getContext('2d')
-          // 发光点：亮核 + 快速衰减的柔边。
-          // 实心圆排成轨迹是一条硬边实线，在深底上就是"重重的笔触"；
-          // 渐变点的边缘是透明的，轨迹变成中心亮、两侧渐散的光带
+          // 余晖式光点：中心亮核 + 向外柔散的光晕，边缘完全透明。
+          // 移动时看到的是一团光在飘，没有历史轨迹
           const m = parseRgba(colors[i])
           const mk = (al: number) =>
             'rgba(' + Math.round(m[0]) + ',' + Math.round(m[1]) + ',' + Math.round(m[2]) + ',' + al.toFixed(3) + ')'
-          const rad = s._dot || DOT_RADIUS
-          const grd = octx.createRadialGradient(d, d, 0, d, d, rad)
+          const grd = octx.createRadialGradient(d, d, 0, d, d, core * glow)
           grd.addColorStop(0, mk(Math.min(1, m[3] * 0.95)))
-          grd.addColorStop(0.45, mk(m[3] * 0.4))
+          grd.addColorStop(Math.min(0.9, 0.5 / glow), mk(m[3] * 0.75))
           grd.addColorStop(1, mk(0))
           octx.fillStyle = grd
           octx.fillRect(0, 0, d * 2, d * 2)
@@ -675,34 +675,10 @@ Component({
         return
       }
 
-      // 擦除上一帧的一部分：留下渐隐的拖尾，画布本身仍然透明
-      // 长拖尾时还要同时把点画淡，否则叠加几十次后变成不透明色块
-      let dotA = 1
-      if (s._trim) {
-        const trailA = s._trailA != null ? s._trailA : TRAIL
-        // 255 档：每帧直接清屏，不留任何拖尾
-        if (trailA >= 0.999) {
-          ctx.clearRect(0, 0, w, h)
-        } else {
-          // 拖尾可见长度 L ≈ 3 * 每帧位移 / 擦除比例。
-          // 两件事要同时成立：
-          // 1) alpha 跟着流速缩放，L 才只由档位决定（否则缓速看不出余晖）
-          // 2) 0 档不能真的为 0，否则轨迹永久堆积、几十秒后满屏根须
-          // 指数插值把 0..1 映射到擦除率：0 档 ≈ 55px 轨迹，255 档清屏
-          const speedK = (s._speed || 0.25) / 0.25
-          const alpha = Math.min(1, 0.0136 * Math.pow(73.5, trailA) * speedK)
-          ctx.globalCompositeOperation = 'destination-out'
-          ctx.fillStyle = 'rgba(0,0,0,' + alpha.toFixed(4) + ')'
-          ctx.fillRect(0, 0, w, h)
-          ctx.globalCompositeOperation = 'source-over'
-          // 轨迹越长，同一位置被重复叠加的次数越多，稳态亮度 ≈ a/(a+b)。
-          // b 很小的时候不管 a 多小都会趋近 1，所以还要按档位整体压暗，
-          // 让长拖尾呈现为"淡淡的雾"而不是糊上一块实色
-          dotA = 0.4 + 0.6 * Math.min(1, trailA / 0.35)
-        }
-      } else {
-        ctx.clearRect(0, 0, w, h)
-      }
+      // 只留余晖、不留尾迹：每帧清屏，光点的"余晖"由 sprite 自带的
+      // 光晕（glow）承担，而不是靠画布上残留的历史轨迹
+      ctx.clearRect(0, 0, w, h)
+      const glow = 1.1 + (s._trailA != null ? s._trailA : TRAIL) * 2.4
 
       // 定课暖色：按标记在绘制前重建一次色板
       if (s._needWarm) {
@@ -718,7 +694,7 @@ Component({
       }
 
       const spin = Math.PI * 2 * MOVE_SCALE
-      const d = Math.ceil((s._dot || DOT_RADIUS) + 1)
+      const d = Math.ceil((s._dot || DOT_RADIUS) * glow + 1)
       const vx = s._vortex
       const vorR = 140
       const vorR2 = vorR * vorR
@@ -746,7 +722,6 @@ Component({
           [w / 2 - Math.cos(ta) * orbitR, h / 2 - Math.sin(ta) * orbitR],
         ]
       }
-      if (dotA < 0.999) ctx.globalAlpha = dotA
       for (let i = 0; i < pts.length; i++) {
         const p = pts[i]
         if (model === 'perlin') {
@@ -801,8 +776,6 @@ Component({
           ctx.fill()
         }
       }
-
-      if (dotA < 0.999) ctx.globalAlpha = 1
 
       if (s._vortex) {
         s._vortex.life *= 0.975
