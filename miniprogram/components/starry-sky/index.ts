@@ -25,6 +25,8 @@ interface FlowEnv {
   halfH: number
   /** 累计帧数，驱动时间演化 */
   t: number
+  /** 流速档位：每帧位移 px（对应文档的 moveSpeed） */
+  step: number
   scale: number
   spin: number
   /** 双黑洞本帧的公转位置 */
@@ -122,7 +124,7 @@ function flow(model: string, x: number, y: number, e: FlowEnv): { x: number; y: 
         fy += (dyh / dist) * f * 0.5 + (dxh / dist) * f * 1.4
       }
       const bg = n * Math.PI * 4
-      return { x: fx + Math.cos(bg) * 0.3, y: fy + Math.sin(bg) * 0.3 }
+      return { x: fx + Math.cos(bg) * e.step * 0.35, y: fy + Math.sin(bg) * e.step * 0.35 }
     }
     // 4.2 林家翘-徐遐生密度波：对数螺旋切向流（螺距角约 18.5°）
     case 'spiral': {
@@ -701,6 +703,7 @@ Component({
         halfW: w / 2,
         halfH: h / 2,
         t: s._frame,
+        step: step,
         scale: MOVE_SCALE,
         spin: spin,
         holes: [],
