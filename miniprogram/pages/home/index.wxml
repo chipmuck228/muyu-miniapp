@@ -8,6 +8,8 @@
         <!-- 主题天色：常驻，不随进度变；进度推进时背景图再叠上来 -->
         <view class="theme-sky"></view>
         <view class="theme-glow"></view>
+        <!-- 星夜流场：翡翠星尘在光晕之上、壁纸之下，pointer-events 已关闭不挡敲击 -->
+        <starry-sky theme="{{theme}}" active="{{readyToKnock}}" />
         <!-- 背景图随进度从雾里浮现：糊开的一层先隐约显出，清楚的一层过了三成才显，敲满时完全清楚；每敲一下雾里亮一下 -->
         <view wx:if="{{paperSrc}}" class="paper paper-{{paperKind}} {{paperOn ? 'on' : ''}}">
           <image class="paper-mist" src="{{paperSrc}}" mode="aspectFill" style="opacity: {{paperMist}};" bindload="onPaperLoad" binderror="onPaperError" />
