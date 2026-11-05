@@ -667,6 +667,8 @@ Component({
       }
 
       // 擦除上一帧的一部分：留下渐隐的拖尾，画布本身仍然透明
+      // 长拖尾时还要同时把点画淡，否则叠加几十次后变成不透明色块
+      let dotA = 1
       if (s._trim) {
         const trailA = s._trailA != null ? s._trailA : TRAIL
         // 255 档：每帧直接清屏，不留任何拖尾
@@ -677,13 +679,17 @@ Component({
           // 两件事要同时成立：
           // 1) alpha 跟着流速缩放，L 才只由档位决定（否则缓速看不出余晖）
           // 2) 0 档不能真的为 0，否则轨迹永久堆积、几十秒后满屏根须
-          // 用指数插值把 0..1 映射到擦除率：0 档 ≈ 95px 轨迹，255 档清屏
+          // 指数插值把 0..1 映射到擦除率：0 档 ≈ 55px 轨迹，255 档清屏
           const speedK = (s._speed || 0.25) / 0.25
-          const alpha = Math.min(1, 0.008 * Math.pow(125, trailA) * speedK)
+          const alpha = Math.min(1, 0.0136 * Math.pow(73.5, trailA) * speedK)
           ctx.globalCompositeOperation = 'destination-out'
           ctx.fillStyle = 'rgba(0,0,0,' + alpha.toFixed(4) + ')'
           ctx.fillRect(0, 0, w, h)
           ctx.globalCompositeOperation = 'source-over'
+          // 轨迹越长，同一位置被重复叠加的次数越多，稳态亮度 ≈ a/(a+b)。
+          // b 很小的时候不管 a 多小都会趋近 1，所以还要按档位整体压暗，
+          // 让长拖尾呈现为"淡淡的雾"而不是糊上一块实色
+          dotA = 0.45 + 0.55 * Math.min(1, trailA / 0.35)
         }
       } else {
         ctx.clearRect(0, 0, w, h)
@@ -731,6 +737,7 @@ Component({
           [w / 2 - Math.cos(ta) * orbitR, h / 2 - Math.sin(ta) * orbitR],
         ]
       }
+      if (dotA < 0.999) ctx.globalAlpha = dotA
       for (let i = 0; i < pts.length; i++) {
         const p = pts[i]
         if (model === 'perlin') {
@@ -785,6 +792,8 @@ Component({
           ctx.fill()
         }
       }
+
+      if (dotA < 0.999) ctx.globalAlpha = 1
 
       if (s._vortex) {
         s._vortex.life *= 0.975
