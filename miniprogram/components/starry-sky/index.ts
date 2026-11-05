@@ -608,10 +608,19 @@ Component({
         try {
           const oc = anyWx.createOffscreenCanvas({ type: '2d', width: d * 2, height: d * 2 })
           const octx = oc.getContext('2d')
-          octx.fillStyle = colors[i]
-          octx.beginPath()
-          octx.arc(d, d, s._dot || DOT_RADIUS, 0, Math.PI * 2)
-          octx.fill()
+          // 发光点：亮核 + 快速衰减的柔边。
+          // 实心圆排成轨迹是一条硬边实线，在深底上就是"重重的笔触"；
+          // 渐变点的边缘是透明的，轨迹变成中心亮、两侧渐散的光带
+          const m = parseRgba(colors[i])
+          const mk = (al: number) =>
+            'rgba(' + Math.round(m[0]) + ',' + Math.round(m[1]) + ',' + Math.round(m[2]) + ',' + al.toFixed(3) + ')'
+          const rad = s._dot || DOT_RADIUS
+          const grd = octx.createRadialGradient(d, d, 0, d, d, rad)
+          grd.addColorStop(0, mk(Math.min(1, m[3] * 0.95)))
+          grd.addColorStop(0.45, mk(m[3] * 0.4))
+          grd.addColorStop(1, mk(0))
+          octx.fillStyle = grd
+          octx.fillRect(0, 0, d * 2, d * 2)
           out.push(oc)
         } catch (e) {
           return null
@@ -689,7 +698,7 @@ Component({
           // 轨迹越长，同一位置被重复叠加的次数越多，稳态亮度 ≈ a/(a+b)。
           // b 很小的时候不管 a 多小都会趋近 1，所以还要按档位整体压暗，
           // 让长拖尾呈现为"淡淡的雾"而不是糊上一块实色
-          dotA = 0.45 + 0.55 * Math.min(1, trailA / 0.35)
+          dotA = 0.4 + 0.6 * Math.min(1, trailA / 0.35)
         }
       } else {
         ctx.clearRect(0, 0, w, h)
