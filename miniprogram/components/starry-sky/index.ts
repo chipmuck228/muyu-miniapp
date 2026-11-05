@@ -257,6 +257,11 @@ Component({
       type: Number,
       value: 0,
     },
+    /** 流速倍率：0.3 ~ 3，1 为参考实现原速 */
+    speed: {
+      type: Number,
+      value: 1,
+    },
   },
 
   data: {},
@@ -300,6 +305,10 @@ Component({
       s._tint = t
       // 只打标记，真正的换色在下一帧做：初始化路径上不碰 sprite 重建
       s._needWarm = true
+    },
+    speed(v: number) {
+      const s: any = this
+      s._speed = Math.max(0.3, Math.min(3, v || 1))
     },
     'theme, palette'(theme: string, palette: string) {
       const s: any = this
@@ -358,6 +367,7 @@ Component({
           s._running = false
           s._dot = dotRadiusOf(info.width)
           s._tint = Math.max(0, Math.min(1, s.data.tint || 0))
+          s._speed = Math.max(0.3, Math.min(3, s.data.speed || 1))
           s._base = paletteOf(s.data.theme, s.data.palette)
 
           canvas.width = Math.floor(info.width * dpr)
@@ -501,11 +511,12 @@ Component({
       const vx = s._vortex
       const vorR = 140
       const vorR2 = vorR * vorR
+      const step = MOVE_SPEED * (s._speed || 1)
       for (let i = 0; i < pts.length; i++) {
         const p = pts[i]
         const angle = noise2(p.x / MOVE_SCALE, p.y / MOVE_SCALE) * spin
-        p.x += Math.cos(angle) * MOVE_SPEED
-        p.y += Math.sin(angle) * MOVE_SPEED
+        p.x += Math.cos(angle) * step
+        p.y += Math.sin(angle) * step
 
         // 漩涡：切向力把粒子卷向中心，随 life 衰减
         if (vx && vx.life > 0.02) {

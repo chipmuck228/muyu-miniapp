@@ -279,6 +279,12 @@ Page({
     skyDensity: 'mid',
     skyPalette: 'auto',
     skyPaused: false,
+    skySpeed: 1,
+    skySpeeds: [
+      { id: 'slow', name: '缓', v: 0.55 },
+      { id: 'normal', name: '常', v: 1 },
+      { id: 'fast', name: '疾', v: 2 },
+    ],
     skyDensities: [
       { id: 'low', name: '少' },
       { id: 'mid', name: '中' },
@@ -1022,6 +1028,7 @@ Page({
       knockHint: false,
       pulsing: false,
       rippleOn: false,
+      skyTint: this.skyWarmth(),
     })
     if (floats) patch.floats = floats
     this.setData(patch)
@@ -1176,6 +1183,22 @@ Page({
     this.setData({ skyPanelOn: true })
   },
 
+  /**
+   * 星尘暖化程度：定课中按定课进度，平时按当前功课进度。
+   * 敲满一遍，星尘从冷色走到纯金
+   */
+  skyWarmth(): number {
+    const s = this._session
+    if (s) {
+      const p =
+        s.kind === 'count'
+          ? (s.hand + s.auto) / Math.max(1, s.value)
+          : s.elapsedMs / Math.max(1, s.goalMs)
+      return Math.max(0, Math.min(1, p))
+    }
+    return Math.max(0, Math.min(1, this._titleCurrent / Math.max(1, this._titleGoal)))
+  },
+
   closeSkyPanel() {
     if (!this.data.skyPanelOn) return
     this.setData({ skyPanelOn: false })
@@ -1188,6 +1211,11 @@ Page({
 
   onPickSkyPalette(e: any) {
     this.setData({ skyPalette: e.currentTarget.dataset.id })
+  },
+
+  onPickSkySpeed(e: any) {
+    const v = Number(e.currentTarget.dataset.v) || 1
+    this.setData({ skySpeed: v })
   },
 
   onToggleSkyPause() {

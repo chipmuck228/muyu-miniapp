@@ -18,6 +18,7 @@
           active="{{readyToKnock}}"
           pulse="{{strikeSeq}}"
           tint="{{skyTint}}"
+          speed="{{skySpeed}}"
         />
         <!-- 背景壁纸暂时停用，只保留星夜：需要恢复时把这整块放回来 -->
         <!-- 上下压暗：给顶部功课名和底部菜单留出干净的底，不被星尘吃掉对比度 -->
@@ -143,6 +144,18 @@
           class="sky-chip {{skyDensity === item.id ? 'on' : ''}}"
           data-id="{{item.id}}"
           catchtap="onPickSkyDensity"
+        >{{item.name}}</view>
+      </view>
+    </view>
+    <view class="sky-row">
+      <text class="sky-label">流速</text>
+      <view class="sky-seg">
+        <view
+          wx:for="{{skySpeeds}}"
+          wx:key="id"
+          class="sky-chip {{skySpeed === item.v ? 'on' : ''}}"
+          data-v="{{item.v}}"
+          catchtap="onPickSkySpeed"
         >{{item.name}}</view>
       </view>
     </view>
