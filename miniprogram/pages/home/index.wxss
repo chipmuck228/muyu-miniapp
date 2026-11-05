@@ -162,6 +162,8 @@
   top: 0;
   right: 0;
   bottom: 0;
+  /* 压在星夜层（z-index 1）之上：壁纸是前景，星尘只做背景 */
+  z-index: 2;
   opacity: 0;
   transition: opacity 0.6s ease;
 }

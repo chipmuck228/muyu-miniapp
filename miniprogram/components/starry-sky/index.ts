@@ -4,21 +4,75 @@ import { winInfo } from '../../utils/util'
 
 const MOVE_SPEED = 0.4
 const MOVE_SCALE = 800
-/** 与参考实现一致：每帧盖一层 20/255 的底色做拖尾 */
-const TRAIL_ALPHA = 0.08
-const BASE_RGB = '0,10,15'
+/** 每帧盖一层底色做拖尾，与参考实现的 20/255 一致 */
+const TRAIL_ALPHA = 0.075
 
-/** 翡翠调色盘 */
-const PALETTE = [
-  '#77c39c',
-  '#2f5e36',
-  '#55aba5',
-  '#2d7063',
-  '#3f6829',
-  '#44a872',
-  '#215964',
-  '#cdedae',
-]
+/**
+ * 每个主题一套星尘配色与底色：星夜层要跟系统主题同色系，
+ * 否则暖金香案上飘一片翡翠绿，跟界面完全脱节。
+ * 颜色都带透明度，整体压得比较淡，不抢菜单和木鱼。
+ */
+interface SkyTheme {
+  /** 拖尾/底色，rgb 三元组 */
+  base: string
+  /** 星尘颜色（rgba） */
+  colors: string[]
+}
+
+const SKY_THEMES: { [k: string]: SkyTheme } = {
+  // 晨：暖金香案，星尘取琥珀与米金
+  dawn: {
+    base: '14,10,6',
+    colors: [
+      'rgba(232,201,138,0.60)',
+      'rgba(200,138,74,0.52)',
+      'rgba(245,226,192,0.46)',
+      'rgba(176,122,60,0.44)',
+      'rgba(217,176,106,0.38)',
+      'rgba(255,217,138,0.34)',
+    ],
+  },
+  // 夜：月下银蓝
+  night: {
+    base: '5,7,12',
+    colors: [
+      'rgba(198,216,246,0.58)',
+      'rgba(111,147,196,0.50)',
+      'rgba(223,233,250,0.44)',
+      'rgba(134,166,207,0.42)',
+      'rgba(159,184,220,0.36)',
+      'rgba(77,109,155,0.32)',
+    ],
+  },
+  // 墨：只留骨白，几乎无色相
+  ink: {
+    base: '12,12,12',
+    colors: [
+      'rgba(216,212,200,0.46)',
+      'rgba(168,164,154,0.40)',
+      'rgba(234,231,222,0.36)',
+      'rgba(140,136,126,0.34)',
+      'rgba(192,188,176,0.30)',
+      'rgba(120,116,108,0.26)',
+    ],
+  },
+  // 霞：落日霞红
+  dusk: {
+    base: '16,9,7',
+    colors: [
+      'rgba(240,160,112,0.56)',
+      'rgba(224,120,74,0.50)',
+      'rgba(255,210,176,0.42)',
+      'rgba(192,90,58,0.40)',
+      'rgba(245,188,148,0.34)',
+      'rgba(210,101,60,0.30)',
+    ],
+  },
+}
+
+function skyThemeOf(id: string): SkyTheme {
+  return SKY_THEMES[id] || SKY_THEMES.dawn
+}
 
 // —— 2D 柏林噪声（无依赖，够用）——
 const PERM = new Uint8Array(512)
@@ -88,24 +142,36 @@ interface Particle {
   c: number
 }
 
-/** 按设备性能定粒子数：参考实现是 2000，中低端机按比例降 */
-function particleCount(): number {
+/**
+ * 按屏幕面积算粒子数，而不是写死 2000：
+ * 参考实现跑在桌面浏览器上（1400×900 ≈ 126 万像素），手机上只有 25 万，
+ * 同样 2000 颗会挤成一片噪点，看不出流场形态。
+ * 目标密度 0.0026 颗/px²：375×667 约 650 颗，间距约 20px，能看清星尘走向。
+ */
+function particleCount(w: number, h: number): number {
+  const area = Math.max(1, w * h)
+  let n = Math.round(area * 0.0026)
+  n = Math.max(320, Math.min(n, 1400))
+  // 低端机再降一档，优先保住帧率
   let level = -1
   try {
-    const info: any = wx.getSystemInfoSync()
-    level = Number(info.benchmarkLevel)
+    level = Number((wx.getSystemInfoSync() as any).benchmarkLevel)
   } catch (e) {
     level = -1
   }
-  if (level >= 30) return 2000
-  if (level >= 20) return 1500
-  if (level > 0) return 900
-  return 1200
+  if (level > 0 && level < 20) n = Math.round(n * 0.7)
+  return n
+}
+
+/** 星点直径跟着屏幕宽度走，小屏别糊成一片 */
+function dotSize(w: number): number {
+  const s = (w / 375) * 2.6
+  return Math.max(2.0, Math.min(s, 3.4))
 }
 
 Component({
   properties: {
-    /** 仅用于将来按主题换色，当前调色盘固定 */
+    /** 跟随香案主题换色 */
     theme: {
       type: String,
       value: 'dawn',
@@ -125,6 +191,15 @@ Component({
       if (!s._inited) return
       if (v) s.start()
       else s.stop()
+    },
+    theme(id: string) {
+      const s: any = this
+      if (!s._inited) return
+      s._theme = skyThemeOf(id)
+      s._sprites = s.buildSprites()
+      // 底色变了，清一次屏，避免旧主题的拖尾残留
+      s._ctx.fillStyle = 'rgb(' + s._theme.base + ')'
+      s._ctx.fillRect(0, 0, s._w, s._h)
     },
   },
 
@@ -178,16 +253,18 @@ Component({
           s._raf = 0
           s._running = false
           s._inited = true
+          s._theme = skyThemeOf(s.data.theme)
+          s._dot = dotSize(info.width)
 
           canvas.width = Math.floor(info.width * dpr)
           canvas.height = Math.floor(info.height * dpr)
           ctx.scale(dpr, dpr)
 
-          s._sprites = this.makeSprites()
-          s._pts = this.makeParticles(particleCount())
+          s._sprites = this.buildSprites()
+          s._pts = this.makeParticles(particleCount(info.width, info.height))
 
           // 第一帧直接铺底色，避免从白屏渐变过来
-          ctx.fillStyle = 'rgb(' + BASE_RGB + ')'
+          ctx.fillStyle = 'rgb(' + s._theme.base + ')'
           ctx.fillRect(0, 0, s._w, s._h)
 
           // 离屏 canvas 作为 drawImage 源在部分基础库上不可用，
@@ -204,18 +281,21 @@ Component({
         })
     },
 
-    /** 预渲染 8 个颜色的小圆，绘制时用 drawImage 比逐个 arc 快很多 */
-    makeSprites(): any[] | null {
+    /** 预渲染各色小圆，绘制时用 drawImage 比逐个 arc 快很多 */
+    buildSprites(): any[] | null {
+      const s: any = this
       const anyWx: any = wx
-      if (typeof anyWx.createOffscreenCanvas !== 'function') return null
+      if (typeof anyWx.createOffscreenCanvas !== 'function' || !s._theme) return null
+      const colors: string[] = s._theme.colors
+      const d = Math.ceil((s._dot || 2.6) + 2)
       const out: any[] = []
-      for (let i = 0; i < PALETTE.length; i++) {
+      for (let i = 0; i < colors.length; i++) {
         try {
-          const oc = anyWx.createOffscreenCanvas({ type: '2d', width: 8, height: 8 })
+          const oc = anyWx.createOffscreenCanvas({ type: '2d', width: d * 2, height: d * 2 })
           const octx = oc.getContext('2d')
-          octx.fillStyle = PALETTE[i]
+          octx.fillStyle = colors[i]
           octx.beginPath()
-          octx.arc(4, 4, 1.6, 0, Math.PI * 2)
+          octx.arc(d, d, s._dot || 1.3, 0, Math.PI * 2)
           octx.fill()
           out.push(oc)
         } catch (e) {
@@ -234,7 +314,7 @@ Component({
         pts.push({
           x: Math.random() * w,
           y: Math.random() * h,
-          c: Math.floor(Math.random() * PALETTE.length),
+          c: Math.floor(Math.random() * s._theme.colors.length),
         })
       }
       return pts
@@ -244,7 +324,7 @@ Component({
       const s: any = this
       if (!s._inited || s._running) return
       s._running = true
-      s._raf = s._canvas.requestAnimationFrame((t: number) => s.tick(t))
+      s._raf = s._canvas.requestAnimationFrame(() => s.tick())
     },
 
     stop() {
@@ -264,9 +344,11 @@ Component({
       const h = s._h
       const pts: Particle[] = s._pts
       const sprites: any[] | null = s._sprites
+      const colors: string[] = s._theme.colors
+      const d = Math.ceil((s._dot || 2.6) + 2)
 
       // 半透明底色叠一层：旧帧自然衰减成拖尾
-      ctx.fillStyle = 'rgba(' + BASE_RGB + ',' + TRAIL_ALPHA + ')'
+      ctx.fillStyle = 'rgba(' + s._theme.base + ',' + TRAIL_ALPHA + ')'
       ctx.fillRect(0, 0, w, h)
 
       const spin = Math.PI * 2 * MOVE_SCALE
@@ -283,10 +365,10 @@ Component({
         }
 
         if (sprites) {
-          ctx.drawImage(sprites[p.c], p.x - 4, p.y - 4, 8, 8)
+          ctx.drawImage(sprites[p.c], p.x - d, p.y - d, d * 2, d * 2)
         } else {
-          ctx.fillStyle = PALETTE[p.c]
-          ctx.fillRect(p.x, p.y, 2.4, 2.4)
+          ctx.fillStyle = colors[p.c]
+          ctx.fillRect(p.x, p.y, s._dot, s._dot)
         }
       }
 
