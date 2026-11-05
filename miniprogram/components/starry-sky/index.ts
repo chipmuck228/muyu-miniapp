@@ -668,12 +668,22 @@ Component({
 
       // 擦除上一帧的一部分：留下渐隐的拖尾，画布本身仍然透明
       if (s._trim) {
-        // 拖尾余晖：每帧按 _trailA 比例擦掉一点旧轨迹
-        // 0 = 不擦（轨迹一直留着），1 = 全擦（没有拖尾）
-        ctx.globalCompositeOperation = 'destination-out'
-        ctx.fillStyle = 'rgba(0,0,0,' + (s._trailA != null ? s._trailA : TRAIL).toFixed(3) + ')'
-        ctx.fillRect(0, 0, w, h)
-        ctx.globalCompositeOperation = 'source-over'
+        const trailA = s._trailA != null ? s._trailA : TRAIL
+        // 255 档：每帧直接清屏，不留任何拖尾
+        if (trailA >= 0.999) {
+          ctx.clearRect(0, 0, w, h)
+        } else {
+          // 拖尾的视觉长度由「每帧位移 / 每帧擦除比例」共同决定。
+          // 只按 trail 给固定 alpha 的话，缓速档每帧只走 0.1px，
+          // 同样 7% 的擦除只能画出几像素的轨迹，看起来就是没有余晖。
+          // 所以 alpha 跟着流速缩放，让轨迹长度只由档位决定。
+          const speedK = (s._speed || 0.25) / 0.25
+          const alpha = Math.min(1, Math.max(trailA * 0.2, 0.004) * speedK)
+          ctx.globalCompositeOperation = 'destination-out'
+          ctx.fillStyle = 'rgba(0,0,0,' + alpha.toFixed(4) + ')'
+          ctx.fillRect(0, 0, w, h)
+          ctx.globalCompositeOperation = 'source-over'
+        }
       } else {
         ctx.clearRect(0, 0, w, h)
       }
