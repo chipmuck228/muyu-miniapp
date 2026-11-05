@@ -11,12 +11,14 @@
   overflow: hidden;
 }
 
+/* 用 fixed 铺满视口：即使组件宿主节点因为 :host 未生效而高度为 0，
+   这一层也不依赖父级尺寸，必定能显示出来 */
 .sky {
-  position: absolute;
+  position: fixed;
   left: 0;
   top: 0;
-  width: 100%;
-  height: 100%;
+  right: 0;
+  bottom: 0;
   overflow: hidden;
 }
 
@@ -53,7 +55,7 @@
 .dot {
   position: absolute;
   border-radius: 50%;
-  opacity: 0.5;
+  opacity: 0.75;
   animation-name: twinkle;
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
@@ -104,10 +106,10 @@
 @keyframes twinkle {
   0%,
   100% {
-    opacity: 0.18;
+    opacity: 0.35;
   }
   50% {
-    opacity: 0.72;
+    opacity: 1;
   }
 }
 

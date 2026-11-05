@@ -7,7 +7,7 @@
       wx:for="{{layerA}}"
       wx:key="k"
       class="dot breathe"
-      style="left: {{item.x}}%; top: {{item.y}}%; width: {{item.s}}rpx; height: {{item.s}}rpx; background: {{item.c}}; animation-duration: {{item.dur}}s; animation-delay: {{item.d}}s;"
+      style="left: {{item.x}}%; top: {{item.y}}%; width: {{item.s}}px; height: {{item.s}}px; box-shadow: 0 0 6px {{item.c}}; background: {{item.c}}; animation-duration: {{item.dur}}s; animation-delay: {{item.d}}s;"
     ></view>
   </view>
 
@@ -16,7 +16,7 @@
       wx:for="{{layerB}}"
       wx:key="k"
       class="dot breathe"
-      style="left: {{item.x}}%; top: {{item.y}}%; width: {{item.s}}rpx; height: {{item.s}}rpx; background: {{item.c}}; animation-duration: {{item.dur}}s; animation-delay: {{item.d}}s;"
+      style="left: {{item.x}}%; top: {{item.y}}%; width: {{item.s}}px; height: {{item.s}}px; box-shadow: 0 0 6px {{item.c}}; background: {{item.c}}; animation-duration: {{item.dur}}s; animation-delay: {{item.d}}s;"
     ></view>
   </view>
 
@@ -25,7 +25,7 @@
       wx:for="{{layerC}}"
       wx:key="k"
       class="dot breathe"
-      style="left: {{item.x}}%; top: {{item.y}}%; width: {{item.s}}rpx; height: {{item.s}}rpx; background: {{item.c}}; animation-duration: {{item.dur}}s; animation-delay: {{item.d}}s;"
+      style="left: {{item.x}}%; top: {{item.y}}%; width: {{item.s}}px; height: {{item.s}}px; box-shadow: 0 0 6px {{item.c}}; background: {{item.c}}; animation-duration: {{item.dur}}s; animation-delay: {{item.d}}s;"
     ></view>
   </view>
 </view>

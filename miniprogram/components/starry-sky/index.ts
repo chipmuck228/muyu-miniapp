@@ -127,9 +127,9 @@ function makeLayer(n: number, pal: SkyPalette, sizeBase: number, sizeSpan: numbe
 
 /** 每层光点数：小屏少一些，避免糊成一片 */
 function dotsPerLayer(w: number): number {
-  if (w <= 340) return 16
-  if (w <= 400) return 20
-  return 24
+  if (w <= 340) return 20
+  if (w <= 400) return 24
+  return 28
 }
 
 Component({
@@ -175,10 +175,10 @@ Component({
       const w = Number((winInfo() || {}).windowWidth) || 375
       const n = dotsPerLayer(w)
       this.setData({
-        // 三层不同大小与速度，拉开景深
-        layerA: makeLayer(n, pal, 3.2, 3.6),
-        layerB: makeLayer(n, pal, 2.2, 2.4),
-        layerC: makeLayer(n + 4, pal, 1.4, 1.6),
+        // 三层不同大小与速度，拉开景深（尺寸单位 px，2~6px 才看得见）
+        layerA: makeLayer(n, pal, 3.4, 2.4),
+        layerB: makeLayer(n, pal, 2.4, 1.6),
+        layerC: makeLayer(n + 4, pal, 1.6, 1.2),
         nebula: pal.nebula,
       })
     },
