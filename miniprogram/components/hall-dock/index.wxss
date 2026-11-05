@@ -54,7 +54,8 @@
   font-size: 28rpx;
   letter-spacing: 8rpx;
   padding: 16rpx 8rpx 16rpx 16rpx;
-  color: rgba(224, 181, 119, 0.55);
+  color: rgba(224, 181, 119, 0.8);
+  text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.7);
   opacity: 0;
   transform: translateY(10rpx);
   transition: opacity 0.5s ease, transform 0.5s ease, color 0.3s ease;

@@ -1,5 +1,6 @@
 {
   "usingComponents": {
+    "starry-sky": "/components/starry-sky/index",
     "hall-dock": "/components/hall-dock/index",
     "smoke-gl": "/pkg-smoke/smoke-gl/index",
     "muyu-gl": "/pkg-smoke/muyu-gl/index"

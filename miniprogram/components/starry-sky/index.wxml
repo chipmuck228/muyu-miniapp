@@ -1,0 +1,2 @@
+<!-- 透明底 canvas：只画星点，不铺底色，即使被系统置顶也不会整块盖住界面 -->
+<canvas type="2d" id="sky" class="sky-canvas"></canvas>
