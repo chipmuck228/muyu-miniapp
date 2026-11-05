@@ -8,8 +8,16 @@
         <!-- 主题天色：常驻，不随进度变；进度推进时背景图再叠上来 -->
         <view class="theme-sky"></view>
         <view class="theme-glow"></view>
-        <!-- 星夜流场：翡翠星尘在光晕之上、壁纸之下，pointer-events 已关闭不挡敲击 -->
-        <starry-sky theme="{{theme}}" active="{{readyToKnock}}" />
+        <!-- 星夜流场：画布透明，只画星尘；敲一下（strikeSeq）泛起一次暖光 -->
+        <starry-sky
+          id="sky"
+          theme="{{theme}}"
+          palette="{{skyPalette}}"
+          density="{{skyDensity}}"
+          paused="{{skyPaused}}"
+          active="{{readyToKnock}}"
+          pulse="{{strikeSeq}}"
+        />
         <!-- 背景壁纸暂时停用，只保留星夜：需要恢复时把这整块放回来 -->
         <!-- 上下压暗：给顶部功课名和底部菜单留出干净的底，不被星尘吃掉对比度 -->
         <view class="sky-scrim"></view>
@@ -21,6 +29,7 @@
         style="top: {{statusBarHeight + 10}}px;"
         hover-class="lesson-head-hover"
         bindtap="onOpenLessonPanel"
+        bindlongpress="onOpenSkyPanel"
       >
         <view class="lh-row">
           <text class="lh-name">{{lessonTitle}}{{headWish ? '' : ' · 今日 ' + todayCount}}</text>
@@ -116,6 +125,44 @@
       <hall-dock mode="hall" current="{{0}}" />
     </view>
   </block>
+
+  <!-- 星夜调参：长按顶部功课名打开，不影响原有入口 -->
+  <view class="sheet-mask" wx:if="{{skyPanelOn}}" catchtouchmove="noop" bindtap="closeSkyPanel"></view>
+  <view class="sky-sheet" wx:if="{{skyPanelOn}}" catchtouchmove="noop">
+    <view class="sky-head">
+      <text class="sky-title">星 夜</text>
+      <text class="sky-close" catchtap="closeSkyPanel">收起</text>
+    </view>
+    <view class="sky-row">
+      <text class="sky-label">密度</text>
+      <view class="sky-seg">
+        <view
+          wx:for="{{skyDensities}}"
+          wx:key="id"
+          class="sky-chip {{skyDensity === item.id ? 'on' : ''}}"
+          data-id="{{item.id}}"
+          catchtap="onPickSkyDensity"
+        >{{item.name}}</view>
+      </view>
+    </view>
+    <view class="sky-row">
+      <text class="sky-label">配色</text>
+      <view class="sky-seg">
+        <view
+          wx:for="{{skyPalettes}}"
+          wx:key="id"
+          class="sky-chip {{skyPalette === item.id ? 'on' : ''}}"
+          data-id="{{item.id}}"
+          catchtap="onPickSkyPalette"
+        >{{item.name}}</view>
+      </view>
+    </view>
+    <view class="sky-actions">
+      <view class="sky-btn" catchtap="onToggleSkyPause">{{skyPaused ? '继续流动' : '暂停流动'}}</view>
+      <view class="sky-btn" catchtap="onReseedSky">重置星尘</view>
+    </view>
+    <text class="sky-tip">长按顶部功课名可再次打开</text>
+  </view>
 
   <!-- 今日功课：底部面板，切换心愿 / 随机专注 / 立新愿 -->
   <view class="sheet-mask" wx:if="{{sheetOn}}" catchtouchmove="noop" bindtap="closeSheet"></view>

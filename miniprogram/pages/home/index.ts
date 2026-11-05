@@ -274,6 +274,21 @@ Page({
     theme: 'dawn' as ThemeId,
     floats: [] as FloatItem[],
     rippleOn: false,
+    skyPanelOn: false,
+    skyDensity: 'mid',
+    skyPalette: 'auto',
+    skyPaused: false,
+    skyDensities: [
+      { id: 'low', name: '少' },
+      { id: 'mid', name: '中' },
+      { id: 'high', name: '多' },
+    ],
+    skyPalettes: [
+      { id: 'auto', name: '跟随主题' },
+      { id: 'starry', name: '梵高' },
+      { id: 'emerald', name: '翡翠' },
+      { id: 'nebula', name: '星云' },
+    ],
     pulsing: false,
     enterPhase: 'done' as EnterPhase,
     enterKind: 'first' as EnterKind,
@@ -1145,6 +1160,36 @@ Page({
   onOpenLessonPanel() {
     if (this.entering() || this.overlayOn()) return
     this.openSheet(false)
+  },
+
+  /** 星夜调参：长按顶部功课名打开 */
+  onOpenSkyPanel() {
+    if (this.entering() || this.overlayOn()) return
+    this.stopAuto()
+    this.setData({ skyPanelOn: true })
+  },
+
+  closeSkyPanel() {
+    if (!this.data.skyPanelOn) return
+    this.setData({ skyPanelOn: false })
+    if (this.data.autoMode && !this.entering() && !this.data.celebrateOn) this.startAuto()
+  },
+
+  onPickSkyDensity(e: any) {
+    this.setData({ skyDensity: e.currentTarget.dataset.id })
+  },
+
+  onPickSkyPalette(e: any) {
+    this.setData({ skyPalette: e.currentTarget.dataset.id })
+  },
+
+  onToggleSkyPause() {
+    this.setData({ skyPaused: !this.data.skyPaused })
+  },
+
+  onReseedSky() {
+    const c: any = this.selectComponent('#sky')
+    if (c && typeof c.reseed === 'function') c.reseed()
   },
 
   openSheet(first: boolean) {

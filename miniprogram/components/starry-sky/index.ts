@@ -159,12 +159,19 @@ interface Particle {
 
 /**
  * 按屏幕面积算粒子数：参考实现写死 1200 是给 375 屏的，
- * 真机上过密会糊住菜单。0.0018 颗/px²：375×667 约 450 颗，间距约 24px。
+ * 真机上过密会糊住菜单。mid 档 0.0018 颗/px²：375×667 约 450 颗。
  */
-function particleCount(w: number, h: number): number {
+const DENSITY: { [k: string]: number } = {
+  low: 0.0011,
+  mid: 0.0018,
+  high: 0.0028,
+}
+
+function particleCount(w: number, h: number, level?: string): number {
   const area = Math.max(1, w * h)
-  let n = Math.round(area * 0.0018)
-  n = Math.max(220, Math.min(n, 900))
+  const k = DENSITY[level || 'mid'] || DENSITY.mid
+  let n = Math.round(area * k)
+  n = Math.max(180, Math.min(n, 1200))
   let level = -1
   try {
     level = Number((wx.getSystemInfoSync() as any).benchmarkLevel)
@@ -195,6 +202,21 @@ Component({
       type: Boolean,
       value: true,
     },
+    /** 密度档位：low / mid / high */
+    density: {
+      type: String,
+      value: 'mid',
+    },
+    /** 暂停流动（省电 / 调试） */
+    paused: {
+      type: Boolean,
+      value: false,
+    },
+    /** 敲击脉冲：页面每敲一下 +1，星夜亮一下 */
+    pulse: {
+      type: Number,
+      value: 0,
+    },
   },
 
   data: {},
@@ -205,6 +227,21 @@ Component({
       if (!s._inited) return
       if (v) s.start()
       else s.stop()
+    },
+    paused(v: boolean) {
+      const s: any = this
+      if (!s._inited) return
+      if (v) s.stop()
+      else if (s.data.active) s.start()
+    },
+    density() {
+      const s: any = this
+      if (!s._inited) return
+      s._pts = s.makeParticles(particleCount(s._w, s._h, s.data.density))
+      s._ctx.clearRect(0, 0, s._w, s._h)
+    },
+    pulse() {
+      ;(this as any)._pulse = 1
     },
     'theme, palette'(theme: string, palette: string) {
       const s: any = this
@@ -270,7 +307,7 @@ Component({
           ctx.scale(dpr, dpr)
 
           s._sprites = this.buildSprites()
-          s._pts = this.makeParticles(particleCount(info.width, info.height))
+          s._pts = this.makeParticles(particleCount(info.width, info.height, s.data.density))
 
           // 画布保持透明：不铺底色，靠 destination-out 擦出拖尾
           ctx.globalCompositeOperation = 'destination-out'
@@ -287,6 +324,14 @@ Component({
       s._pal = pal
       s._sprites = this.buildSprites()
       if (s._ctx) s._ctx.clearRect(0, 0, s._w, s._h)
+    },
+
+    /** 重新撒一遍星尘（调参面板的「重置」） */
+    reseed() {
+      const s: any = this
+      if (!s._inited) return
+      s._pts = s.makeParticles(particleCount(s._w, s._h, s.data.density))
+      s._ctx.clearRect(0, 0, s._w, s._h)
     },
 
     /** 预渲染各色小圆，drawImage 比逐颗 arc 快很多 */
@@ -386,6 +431,23 @@ Component({
           ctx.arc(p.x, p.y, s._dot, 0, Math.PI * 2)
           ctx.fill()
         }
+      }
+
+      // 敲击脉冲：木鱼位置泛起一团暖光，随 _pulse 衰减
+      const pulse = s._pulse || 0
+      if (pulse > 0.03) {
+        const cx = w / 2
+        const cy = h * 0.56
+        const rad = Math.max(w, h) * (0.2 + (1 - pulse) * 0.4)
+        const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad)
+        grd.addColorStop(0, 'rgba(255,214,150,' + (pulse * 0.16).toFixed(3) + ')')
+        grd.addColorStop(0.55, 'rgba(255,214,150,' + (pulse * 0.05).toFixed(3) + ')')
+        grd.addColorStop(1, 'rgba(255,214,150,0)')
+        ctx.fillStyle = grd
+        ctx.beginPath()
+        ctx.arc(cx, cy, rad, 0, Math.PI * 2)
+        ctx.fill()
+        s._pulse = pulse * 0.9
       }
 
       s._raf = s._canvas.requestAnimationFrame(() => s.tick())
