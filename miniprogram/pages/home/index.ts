@@ -286,12 +286,12 @@ Page({
       { id: 'fast', name: '疾', v: 0.45 },
     ],
     skyField: 'perlin',
-    skyTrail: 18,
+    skyTrail: 40,
     skyTrails: [
       { id: 'eternal', name: '绵绵', v: 0 },
-      { id: 'long', name: '悠长', v: 8 },
-      { id: 'std', name: '标准', v: 18 },
-      { id: 'short', name: '短促', v: 48 },
+      { id: 'long', name: '悠长', v: 16 },
+      { id: 'std', name: '标准', v: 40 },
+      { id: 'short', name: '短促', v: 90 },
       { id: 'none', name: '无', v: 255 },
     ],
     skyFields: [
@@ -1261,7 +1261,7 @@ Page({
 
   onPickSkyTrail(e: any) {
     const v = Number(e.currentTarget.dataset.v)
-    this.setData({ skyTrail: isNaN(v) ? 18 : v })
+    this.setData({ skyTrail: isNaN(v) ? 40 : v })
   },
 
   onToggleSkyPause() {

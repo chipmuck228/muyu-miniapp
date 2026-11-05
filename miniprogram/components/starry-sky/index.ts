@@ -673,12 +673,13 @@ Component({
         if (trailA >= 0.999) {
           ctx.clearRect(0, 0, w, h)
         } else {
-          // 拖尾的视觉长度由「每帧位移 / 每帧擦除比例」共同决定。
-          // 只按 trail 给固定 alpha 的话，缓速档每帧只走 0.1px，
-          // 同样 7% 的擦除只能画出几像素的轨迹，看起来就是没有余晖。
-          // 所以 alpha 跟着流速缩放，让轨迹长度只由档位决定。
+          // 拖尾可见长度 L ≈ 3 * 每帧位移 / 擦除比例。
+          // 两件事要同时成立：
+          // 1) alpha 跟着流速缩放，L 才只由档位决定（否则缓速看不出余晖）
+          // 2) 0 档不能真的为 0，否则轨迹永久堆积、几十秒后满屏根须
+          // 用指数插值把 0..1 映射到擦除率：0 档 ≈ 95px 轨迹，255 档清屏
           const speedK = (s._speed || 0.25) / 0.25
-          const alpha = Math.min(1, Math.max(trailA * 0.2, 0.004) * speedK)
+          const alpha = Math.min(1, 0.008 * Math.pow(125, trailA) * speedK)
           ctx.globalCompositeOperation = 'destination-out'
           ctx.fillStyle = 'rgba(0,0,0,' + alpha.toFixed(4) + ')'
           ctx.fillRect(0, 0, w, h)
