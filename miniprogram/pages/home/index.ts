@@ -1055,6 +1055,9 @@ Page({
       if (prevCur < half && prevCur + 1 >= half && prevCur + 1 < this._titleGoal) text = '心愿过半'
     }
     if (!text) return ''
+    // 热重载或异常重建时实例字段可能丢失，这里惰性补一个，
+    // 否则 this._milestones[key] 会直接抛 TypeError 把整次 knock 打断
+    if (!this._milestones) this._milestones = {}
     const key = text + '@' + (text === '心愿过半' ? this._wishId : '')
     if (this._milestones[key]) return ''
     this._milestones[key] = 1
