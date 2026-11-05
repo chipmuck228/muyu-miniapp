@@ -201,18 +201,19 @@ const DENSITY: { [k: string]: number } = {
   high: 0.0028,
 }
 
-function particleCount(w: number, h: number, level?: string): number {
+function particleCount(w: number, h: number, densityLevel?: string): number {
   const area = Math.max(1, w * h)
-  const k = DENSITY[level || 'mid'] || DENSITY.mid
+  const k = DENSITY[densityLevel || 'mid'] || DENSITY.mid
   let n = Math.round(area * k)
   n = Math.max(180, Math.min(n, 1200))
-  let level = -1
+  // 低端机（benchmarkLevel < 20）降 30%，避免掉帧
+  let bench = -1
   try {
-    level = Number((wx.getSystemInfoSync() as any).benchmarkLevel)
+    bench = Number((wx.getSystemInfoSync() as any).benchmarkLevel)
   } catch (e) {
-    level = -1
+    bench = -1
   }
-  if (level > 0 && level < 20) n = Math.round(n * 0.7)
+  if (bench > 0 && bench < 20) n = Math.round(n * 0.7)
   return n
 }
 
