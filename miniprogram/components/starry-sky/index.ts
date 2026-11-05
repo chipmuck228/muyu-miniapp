@@ -297,7 +297,8 @@ Component({
       const t = Math.max(0, Math.min(1, v || 0))
       if (Math.abs(t - (s._tint || 0)) < 0.04) return
       s._tint = t
-      s.applyPalette(s._base || paletteOf(s.data.theme, s.data.palette))
+      // 只打标记，真正的换色在下一帧做：初始化路径上不碰 sprite 重建
+      s._needWarm = true
     },
     'theme, palette'(theme: string, palette: string) {
       const s: any = this
@@ -354,7 +355,6 @@ Component({
           s._h = info.height
           s._raf = 0
           s._running = false
-          s._inited = true
           s._dot = dotRadiusOf(info.width)
           s._tint = Math.max(0, Math.min(1, s.data.tint || 0))
           s._base = paletteOf(s.data.theme, s.data.palette)
@@ -363,8 +363,10 @@ Component({
           canvas.height = Math.floor(info.height * dpr)
           ctx.scale(dpr, dpr)
 
-          // 首次按 tint 直接生成（定课中途重新进入时不会是纯冷色）
-          this.applyPalette(s._base)
+          // 顺序很重要：先有调色盘和 sprite，再有粒子，最后才允许 start，
+          // 否则任何一步抛错都会让 tick 拿着 undefined 循环，画面永远空白
+          s._pal = s._base
+          s._sprites = this.buildSprites()
           s._pts = this.makeParticles(particleCount(info.width, info.height, s.data.density))
 
           // 画布保持透明：不铺底色，靠 destination-out 擦出拖尾
@@ -372,6 +374,7 @@ Component({
           s._trim = ctx.globalCompositeOperation === 'destination-out'
           ctx.globalCompositeOperation = 'source-over'
 
+          s._inited = true
           if (s.data.active) s.start()
         })
     },
@@ -379,9 +382,14 @@ Component({
     /** 换调色盘：重建 sprite 并清屏 */
     applyPalette(pal: SkyPalette) {
       const s: any = this
+      if (!pal || !pal.colors || !pal.colors.length) return
       s._base = pal
       const t = Math.max(0, Math.min(1, s._tint || 0))
-      s._pal = t > 0.01 ? warmPalette(pal, t) : pal
+      try {
+        s._pal = t > 0.01 ? warmPalette(pal, t) : pal
+      } catch (e) {
+        s._pal = pal
+      }
       s._sprites = this.buildSprites()
       if (s._ctx) s._ctx.clearRect(0, 0, s._w, s._h)
     },
@@ -459,6 +467,10 @@ Component({
       const pts: Particle[] = s._pts
       const sprites: any[] | null = s._sprites
       const pal: SkyPalette = s._pal
+      if (!ctx || !s._canvas || !pts || !pts.length || !pal || !pal.colors || !pal.colors.length) {
+        s._raf = s._canvas.requestAnimationFrame(() => s.tick())
+        return
+      }
 
       // 擦除上一帧的一部分：留下渐隐的拖尾，画布本身仍然透明
       if (s._trim) {
@@ -468,6 +480,19 @@ Component({
         ctx.globalCompositeOperation = 'source-over'
       } else {
         ctx.clearRect(0, 0, w, h)
+      }
+
+      // 定课暖色：按标记在绘制前重建一次色板
+      if (s._needWarm) {
+        s._needWarm = false
+        const t = Math.max(0, Math.min(1, s._tint || 0))
+        const base = s._base || s._pal
+        try {
+          s._pal = t > 0.01 ? warmPalette(base, t) : base
+        } catch (e) {
+          s._pal = base
+        }
+        s._sprites = this.buildSprites()
       }
 
       const spin = Math.PI * 2 * MOVE_SCALE
