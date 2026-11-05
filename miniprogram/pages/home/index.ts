@@ -286,6 +286,14 @@ Page({
       { id: 'fast', name: '疾', v: 0.45 },
     ],
     skyField: 'perlin',
+    skyTrail: 18,
+    skyTrails: [
+      { id: 'eternal', name: '绵绵', v: 0 },
+      { id: 'long', name: '悠长', v: 8 },
+      { id: 'std', name: '标准', v: 18 },
+      { id: 'short', name: '短促', v: 48 },
+      { id: 'none', name: '无', v: 255 },
+    ],
     skyFields: [
       { id: 'perlin', name: '梵高相位' },
       { id: 'curl', name: '旋度流体' },
@@ -1249,6 +1257,11 @@ Page({
 
   onPickSkyField(e: any) {
     this.setData({ skyField: e.currentTarget.dataset.id })
+  },
+
+  onPickSkyTrail(e: any) {
+    const v = Number(e.currentTarget.dataset.v)
+    this.setData({ skyTrail: isNaN(v) ? 18 : v })
   },
 
   onToggleSkyPause() {

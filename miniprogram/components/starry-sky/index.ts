@@ -429,6 +429,11 @@ Component({
       type: String,
       value: 'perlin',
     },
+    /** 拖尾余晖衰减 0~255：0 = 几乎不衰减（长轨迹），255 = 每帧擦净（无拖尾） */
+    trail: {
+      type: Number,
+      value: 18,
+    },
   },
 
   data: {},
@@ -476,6 +481,10 @@ Component({
     speed(v: number) {
       const s: any = this
       s._speed = Math.max(0.05, Math.min(2, v || 0.25))
+    },
+    trail(v: number) {
+      const s: any = this
+      s._trailA = Math.max(0, Math.min(255, v || 0)) / 255
     },
     'theme, palette'(theme: string, palette: string) {
       const s: any = this
@@ -535,6 +544,7 @@ Component({
           s._dot = dotRadiusOf(info.width)
           s._tint = Math.max(0, Math.min(1, s.data.tint || 0))
           s._speed = Math.max(0.05, Math.min(2, s.data.speed || 0.25))
+          s._trailA = Math.max(0, Math.min(255, s.data.trail || 0)) / 255
           s._base = paletteOf(s.data.theme, s.data.palette)
 
           canvas.width = Math.floor(info.width * dpr)
@@ -652,8 +662,10 @@ Component({
 
       // 擦除上一帧的一部分：留下渐隐的拖尾，画布本身仍然透明
       if (s._trim) {
+        // 拖尾余晖：每帧按 _trailA 比例擦掉一点旧轨迹
+        // 0 = 不擦（轨迹一直留着），1 = 全擦（没有拖尾）
         ctx.globalCompositeOperation = 'destination-out'
-        ctx.fillStyle = 'rgba(0,0,0,' + TRAIL + ')'
+        ctx.fillStyle = 'rgba(0,0,0,' + (s._trailA != null ? s._trailA : TRAIL).toFixed(3) + ')'
         ctx.fillRect(0, 0, w, h)
         ctx.globalCompositeOperation = 'source-over'
       } else {

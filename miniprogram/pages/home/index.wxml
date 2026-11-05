@@ -20,6 +20,7 @@
           tint="{{skyTint}}"
           speed="{{skySpeed}}"
           field="{{skyField}}"
+          trail="{{skyTrail}}"
         />
         <!-- 背景壁纸暂时停用，只保留星夜：需要恢复时把这整块放回来 -->
         <!-- 上下压暗：给顶部功课名和底部菜单留出干净的底，不被星尘吃掉对比度 -->
@@ -157,6 +158,18 @@
           class="sky-chip {{skySpeed === item.v ? 'on' : ''}}"
           data-v="{{item.v}}"
           catchtap="onPickSkySpeed"
+        >{{item.name}}</view>
+      </view>
+    </view>
+    <view class="sky-row">
+      <text class="sky-label">余晖</text>
+      <view class="sky-seg">
+        <view
+          wx:for="{{skyTrails}}"
+          wx:key="id"
+          class="sky-chip {{skyTrail === item.v ? 'on' : ''}}"
+          data-v="{{item.v}}"
+          catchtap="onPickSkyTrail"
         >{{item.name}}</view>
       </view>
     </view>
