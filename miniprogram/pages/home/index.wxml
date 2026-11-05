@@ -19,6 +19,8 @@
           <!-- 竖排功课名后面一团淡淡的暗，壁纸中间亮的时候字也看得清 -->
           <view class="paper-title-veil" style="opacity: {{paperClear}};"></view>
         </view>
+        <!-- 上下压暗：给顶部功课名和底部菜单留出干净的底，不被星尘和壁纸吃掉对比度 -->
+        <view class="sky-scrim"></view>
       </view>
       <smoke-gl class="smoke-gl-fill" theme="{{theme}}" fade="{{celebrateOn || sheetOn || sessionSheetOn || sessionDoneOn ? 0 : smokeFade}}" bind:risen="onSmokeRisen" />
 

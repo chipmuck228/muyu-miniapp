@@ -9,6 +9,9 @@
   z-index: 1;
   pointer-events: none;
   overflow: hidden;
+  /* 整层再压一档透明度：星尘只做背景质感，不能跟前景文字抢注意力。
+     万一某机型 canvas 同层渲染失效被强制置顶，半透明也不至于把菜单全部盖死 */
+  opacity: 0.6;
 }
 
 .sky-canvas {

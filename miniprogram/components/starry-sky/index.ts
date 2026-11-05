@@ -146,12 +146,13 @@ interface Particle {
  * 按屏幕面积算粒子数，而不是写死 2000：
  * 参考实现跑在桌面浏览器上（1400×900 ≈ 126 万像素），手机上只有 25 万，
  * 同样 2000 颗会挤成一片噪点，看不出流场形态。
- * 目标密度 0.0026 颗/px²：375×667 约 650 颗，间距约 20px，能看清星尘走向。
+ * 密度 0.0011 颗/px²：375×667 约 275 颗，间距约 30px。
+ * 再密就会糊在 UI 后面，菜单和木鱼都看不清了。
  */
 function particleCount(w: number, h: number): number {
   const area = Math.max(1, w * h)
-  let n = Math.round(area * 0.0026)
-  n = Math.max(320, Math.min(n, 1400))
+  let n = Math.round(area * 0.0011)
+  n = Math.max(180, Math.min(n, 700))
   // 低端机再降一档，优先保住帧率
   let level = -1
   try {

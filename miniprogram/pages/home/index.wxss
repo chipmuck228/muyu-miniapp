@@ -170,6 +170,20 @@
 .paper.on {
   opacity: 1;
 }
+
+/* 上下渐变压暗：顶部功课名、底部菜单所在的区域背景更沉，文字对比度才够 */
+.sky-scrim {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(8, 6, 4, 0.66) 0%, rgba(8, 6, 4, 0.28) 14%, rgba(8, 6, 4, 0) 26%),
+    linear-gradient(0deg, rgba(8, 6, 4, 0.7) 0%, rgba(8, 6, 4, 0.3) 12%, rgba(8, 6, 4, 0) 24%);
+}
 .paper-mist,
 .paper-breath,
 .paper-clear,
@@ -474,7 +488,9 @@
   min-width: 0;
   font-size: 34rpx;
   letter-spacing: 4rpx;
-  color: rgba(243, 234, 220, 0.88);
+  color: rgba(243, 234, 220, 0.94);
+  /* 背景是星空，文字必须自带一层阴影才压得住 */
+  text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.85), 0 0 18rpx rgba(0, 0, 0, 0.45);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -484,7 +500,8 @@
   margin-left: 16rpx;
   font-size: 24rpx;
   letter-spacing: 2rpx;
-  color: rgba(224, 181, 119, 0.55);
+  color: rgba(224, 181, 119, 0.78);
+  text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.8);
 }
 .lh-count {
   margin-top: 12rpx;
@@ -493,10 +510,12 @@
 .lh-cur {
   font-size: 44rpx;
   color: #e8c98a;
+  text-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.85);
 }
 .lh-goal {
   font-size: 28rpx;
-  color: rgba(224, 181, 119, 0.55);
+  color: rgba(224, 181, 119, 0.78);
+  text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.8);
 }
 .lh-bar {
   margin-top: 12rpx;
@@ -1026,7 +1045,8 @@
   align-items: center;
   font-size: 22rpx;
   letter-spacing: 2rpx;
-  color: rgba(243, 234, 220, 0.42);
+  color: rgba(243, 234, 220, 0.66);
+  text-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.8);
   font-variant-numeric: tabular-nums;
 }
 .lh-due {

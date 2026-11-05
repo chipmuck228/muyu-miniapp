@@ -37,7 +37,7 @@
 .icon {
   font-size: 44rpx;
   line-height: 1;
-  filter: grayscale(0.85) brightness(0.7);
+  filter: grayscale(0.75) brightness(0.88);
   transition: filter 0.2s ease, transform 0.2s ease;
 }
 
@@ -45,7 +45,8 @@
   margin-top: 2rpx;
   font-size: 24rpx;
   line-height: 1.2;
-  color: rgba(240, 230, 216, 0.45);
+  color: rgba(240, 230, 216, 0.72);
+  text-shadow: 0 1rpx 4rpx rgba(0, 0, 0, 0.6);
   transition: color 0.2s ease;
 }
 
