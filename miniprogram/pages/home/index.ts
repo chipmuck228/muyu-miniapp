@@ -14,7 +14,6 @@ import { playKnock, vibrate, vibrateLong, ensureKnock, ensureBell, playBell, Kno
 import { KnockQueue, TapSource } from '../../utils/knockQueue'
 import { mockEnabled } from '../../utils/devMock'
 import { concealTabBar, winInfo, fmtInt, dueText } from '../../utils/util'
-import { DAWN_FILE_ID, resolveCloudFile } from '../../utils/cloudFile'
 import { startAmbience, stopAmbience, fadeOutAmbience } from '../../utils/ambience'
 import { AmbienceId } from '../../utils/audioCatalog'
 import { parseTheme, themeEnds, ThemeId } from '../../utils/theme'
@@ -154,10 +153,12 @@ function planMinutes(p: SessionPlan): number {
 }
 
 function clockText(ms: number): string {
-  const sec = Math.max(0, Math.ceil(ms / 1000))
-  const m = Math.floor(sec / 60)
-  const s = sec % 60
-  return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s
+  const safeSec = Math.max(0, Math.ceil((Number(ms) || 0) / 1000))
+  const m = Math.floor(safeSec / 60)
+  const s = safeSec % 60
+  const mm = m < 10 ? '0' + m : String(m)
+  const ss = s < 10 ? '0' + s : String(s)
+  return `${mm}:${ss}`
 }
 
 // 木鱼材质（渲染参数在 pkg-smoke/muyuFish.ts；分包代码主包不能同步引用，这里只放名字和色点）
@@ -274,6 +275,54 @@ Page({
     theme: 'dawn' as ThemeId,
     floats: [] as FloatItem[],
     rippleOn: false,
+    skyPanelOn: false,
+    skyTint: 0,
+    skyDensity: 'mid',
+    skyPalette: 'auto',
+    skyPaused: false,
+    skySpeed: 1,
+    skySpeeds: [
+      { id: 'slow', name: '缓', v: 0.1 },
+      { id: 'normal', name: '常', v: 0.25 },
+      { id: 'fast', name: '疾', v: 0.45 },
+    ],
+    skyField: 'binary',
+    skyTrail: 12,
+    skyTrails: [
+      { id: 'eternal', name: '绵绵', v: 0 },
+      { id: 'long', name: '悠长', v: 6 },
+      { id: 'std', name: '标准', v: 12 },
+      { id: 'short', name: '短促', v: 36 },
+      { id: 'none', name: '无', v: 255 },
+    ],
+    skyFields: [
+      { id: 'perlin', name: '梵高相位' },
+      { id: 'curl', name: '旋度流体' },
+      { id: 'taylor', name: '洋流涡列' },
+      { id: 'laminar', name: '层流天河' },
+      { id: 'benard', name: '热对流' },
+      { id: 'langevin', name: '布朗运动' },
+      { id: 'fourier', name: '热传导' },
+      { id: 'maxwell', name: '气体膨胀' },
+      { id: 'binary', name: '双黑洞' },
+      { id: 'spiral', name: '银河旋臂' },
+      { id: 'solar', name: '太阳风' },
+      { id: 'clifford', name: '吸引子' },
+      { id: 'chladni', name: '克拉尼波' },
+      { id: 'dipole', name: '磁偶极' },
+    ],
+    sheetTop: 68,
+    skyDensities: [
+      { id: 'low', name: '少' },
+      { id: 'mid', name: '中' },
+      { id: 'high', name: '多' },
+    ],
+    skyPalettes: [
+      { id: 'auto', name: '跟随主题' },
+      { id: 'starry', name: '梵高' },
+      { id: 'emerald', name: '翡翠' },
+      { id: 'nebula', name: '星云' },
+    ],
     pulsing: false,
     enterPhase: 'done' as EnterPhase,
     enterKind: 'first' as EnterKind,
@@ -402,6 +451,14 @@ Page({
       Object.assign(
         {
           statusBarHeight: app.globalData.statusBarHeight || 20,
+          // 调参面板从顶部下拉，顶端要沉到胶囊按钮之下才点得到内容
+          sheetTop: (() => {
+            try {
+              const rect = wx.getMenuButtonBoundingClientRect()
+              if (rect && rect.bottom) return Math.round(rect.bottom + 10)
+            } catch (e) {}
+            return (app.globalData.statusBarHeight || 20) + 48
+          })(),
           readyToKnock: !!app.globalData.lessonChosen,
           ambience: cached.ambience,
           theme: cached.theme,
@@ -428,24 +485,12 @@ Page({
   },
 
   loadDawn() {
-    resolveCloudFile(DAWN_FILE_ID)
-      .then((src) => {
-        if (!this._alive) return
-        this.setData({ dawnSrc: src })
-        this.applyPaper()
-      })
-      .catch((e) => {
-        console.warn('dawn load failed', e)
-      })
+    // 纯星夜流场背景：停用原 dawn 晨曦图网络请求与挂接
   },
 
-  /** 该铺哪张背景图：心愿有自己的壁纸就用它；随机专注、没有壁纸或壁纸加载不了时用晨曦图 */
+  /** 纯星夜背景：停用静态壁纸遮罩 */
   paperPick(): { src: string; kind: 'dawn' | 'wish' } {
-    // 心愿进度还没拉回来：先不铺，免得先闪一下晨曦再换成壁纸
-    if (!this._lessonKind) return { src: '', kind: 'dawn' }
-    const id = this._lessonKind === 'wish' ? this._wishId : null
-    if (id && paperUrls[id]) return { src: paperUrls[id], kind: 'wish' }
-    return { src: this.data.dawnSrc, kind: 'dawn' }
+    return { src: '', kind: 'dawn' }
   },
 
   applyPaper() {
@@ -913,11 +958,11 @@ Page({
   },
 
   onKnockTap() {
-    // 刚拖过木鱼：这次松手不算敲击
-    if (this._dragging) {
-      this._dragging = false
-      return
-    }
+    // 只有真的拖动过（位移超过阈值）才吞掉这一下，
+    // 避免某些机型 touchmove 抖一下就把 _dragging 留在 true，之后每下都被丢掉
+    const dragged = !!this._dragging && (this._touchMoved || 0) > DRAG_SLOP * 2
+    this._dragging = false
+    if (dragged) return
     this.knock('hand')
   },
 
@@ -980,7 +1025,7 @@ Page({
   },
 
   knock(source: TapSource) {
-    if (!this._alive || this.entering() || !this.data.readyToKnock || this.overlayOn()) return
+    if (!this._alive || !this.data.readyToKnock || this.overlayOn()) return
     const d = this.data
     playKnock(d.soundOn, this.knockTimbre())
     vibrate(d.vibrateOn, source === 'auto' ? 'light' : 'heavy')
@@ -1006,6 +1051,7 @@ Page({
       knockHint: false,
       pulsing: false,
       rippleOn: false,
+      skyTint: this.skyWarmth(),
     })
     if (floats) patch.floats = floats
     this.setData(patch)
@@ -1032,6 +1078,9 @@ Page({
       if (prevCur < half && prevCur + 1 >= half && prevCur + 1 < this._titleGoal) text = '心愿过半'
     }
     if (!text) return ''
+    // 热重载或异常重建时实例字段可能丢失，这里惰性补一个，
+    // 否则 this._milestones[key] 会直接抛 TypeError 把整次 knock 打断
+    if (!this._milestones) this._milestones = {}
     const key = text + '@' + (text === '心愿过半' ? this._wishId : '')
     if (this._milestones[key]) return ''
     this._milestones[key] = 1
@@ -1139,12 +1188,78 @@ Page({
 
   /** 弹窗 / 面板盖在香案上：画布是原生层，要暂停木鱼、隐去烟和竖排标题 */
   overlayOn(): boolean {
-    return this.data.celebrateOn || this.data.sheetOn || this.data.sessionSheetOn || this.data.sessionDoneOn
+    return (
+      this.data.celebrateOn ||
+      this.data.sheetOn ||
+      this.data.sessionSheetOn ||
+      this.data.sessionDoneOn ||
+      this.data.skyPanelOn
+    )
   },
 
   onOpenLessonPanel() {
     if (this.entering() || this.overlayOn()) return
     this.openSheet(false)
+  },
+
+  /** 星夜调参：长按顶部功课名打开 */
+  onOpenSkyPanel() {
+    if (this.entering() || this.overlayOn()) return
+    this.stopAuto()
+    this.setData({ skyPanelOn: true })
+  },
+
+  /**
+   * 星尘暖化程度：定课中按定课进度，平时按当前功课进度。
+   * 敲满一遍，星尘从冷色走到纯金
+   */
+  skyWarmth(): number {
+    const s = this._session
+    if (s) {
+      const p =
+        s.kind === 'count'
+          ? (s.hand + s.auto) / Math.max(1, s.value)
+          : s.elapsedMs / Math.max(1, s.goalMs)
+      return Math.max(0, Math.min(1, p))
+    }
+    return Math.max(0, Math.min(1, this._titleCurrent / Math.max(1, this._titleGoal)))
+  },
+
+  closeSkyPanel() {
+    if (!this.data.skyPanelOn) return
+    this.setData({ skyPanelOn: false })
+    if (this.data.autoMode && !this.entering() && !this.data.celebrateOn) this.startAuto()
+  },
+
+  onPickSkyDensity(e: any) {
+    this.setData({ skyDensity: e.currentTarget.dataset.id })
+  },
+
+  onPickSkyPalette(e: any) {
+    this.setData({ skyPalette: e.currentTarget.dataset.id })
+  },
+
+  onPickSkySpeed(e: any) {
+    const v = Number(e.currentTarget.dataset.v) || 0.25
+    this.setData({ skySpeed: v })
+  },
+
+  onPickSkyField(e: any) {
+    this.setData({ skyField: e.currentTarget.dataset.id })
+  },
+
+  onPickSkyTrail(e: any) {
+    const v = Number(e.currentTarget.dataset.v)
+    this.setData({ skyTrail: isNaN(v) ? 12 : v })
+  },
+
+  onToggleSkyPause() {
+    this.setData({ skyPaused: !this.data.skyPaused })
+  },
+
+  onReseedSky() {
+    const c: any = this.selectComponent('#sky')
+    if (c && typeof c.reseed === 'function') c.reseed()
   },
 
   openSheet(first: boolean) {
@@ -1404,16 +1519,21 @@ Page({
     if (this.data.autoMode && !this.entering() && !this.overlayOn()) this.startAuto()
   },
 
-  sessionPatch(): { sessionBig: string; sessionSmall: string; sessionStick: number } {
+  sessionPatch(): { sessionBig: string; sessionSmall: string; sessionStick: number; skyTint: number } {
     const s = this._session
-    if (!s) return { sessionBig: '', sessionSmall: '', sessionStick: STICK_ICON_LEN }
+    if (!s) return { sessionBig: '', sessionSmall: '', sessionStick: STICK_ICON_LEN, skyTint: 0 }
     const n = s.hand + s.auto
-    if (s.kind === 'count') return { sessionBig: String(n), sessionSmall: '/ ' + s.value, sessionStick: STICK_ICON_LEN }
+    if (s.kind === 'count') {
+      // 计数定课：敲到目标，星尘从冷色走满金色
+      const t = Math.min(1, n / Math.max(1, s.value))
+      return { sessionBig: String(n), sessionSmall: '/ ' + s.value, sessionStick: STICK_ICON_LEN, skyTint: t }
+    }
     const burnt = Math.max(0, Math.min(1, s.elapsedMs / s.goalMs))
     return {
       sessionBig: clockText(s.goalMs - s.elapsedMs),
       sessionSmall: '已敲 ' + n,
       sessionStick: Math.max(4, Math.round(STICK_ICON_LEN * (1 - burnt))),
+      skyTint: burnt,
     }
   },
 
@@ -1464,7 +1584,7 @@ Page({
   endSession() {
     this.stopSessionTick()
     this._session = null
-    this.setData({ sessionOn: false })
+    this.setData({ sessionOn: false, skyTint: 0 })
   },
 
   /** 时间到 / 念珠满：停下自动敲；成品定课先让声音淡出，再响一声钟钵，给小结 */

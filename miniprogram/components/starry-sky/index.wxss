@@ -1,0 +1,19 @@
+:host {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  /* 压在主题天色之上、木鱼 UI 之下 */
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.sky-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}

@@ -162,11 +162,27 @@
   top: 0;
   right: 0;
   bottom: 0;
+  /* 压在星夜层（z-index 1）之上：壁纸是前景，星尘只做背景 */
+  z-index: 2;
   opacity: 0;
   transition: opacity 0.6s ease;
 }
 .paper.on {
   opacity: 1;
+}
+
+/* 上下渐变压暗：顶部功课名、底部菜单所在的区域背景更沉，文字对比度才够 */
+.sky-scrim {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(8, 6, 4, 0.5) 0%, rgba(8, 6, 4, 0.2) 14%, rgba(8, 6, 4, 0) 26%),
+    linear-gradient(0deg, rgba(8, 6, 4, 0.55) 0%, rgba(8, 6, 4, 0.22) 12%, rgba(8, 6, 4, 0) 24%);
 }
 .paper-mist,
 .paper-breath,
@@ -347,7 +363,8 @@
   position: relative;
   flex-shrink: 0;
   height: 320rpx;
-  z-index: 3;
+  /* 提到竖排功课名 canvas（z-index 7）之上，飘字和涟漪才不会被它压住 */
+  z-index: 9;
 }
 
 .knock-pad {
@@ -472,7 +489,9 @@
   min-width: 0;
   font-size: 34rpx;
   letter-spacing: 4rpx;
-  color: rgba(243, 234, 220, 0.88);
+  color: rgba(243, 234, 220, 0.94);
+  /* 背景是星空，文字必须自带一层阴影才压得住 */
+  text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.85), 0 0 18rpx rgba(0, 0, 0, 0.45);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -482,7 +501,8 @@
   margin-left: 16rpx;
   font-size: 24rpx;
   letter-spacing: 2rpx;
-  color: rgba(224, 181, 119, 0.55);
+  color: rgba(224, 181, 119, 0.78);
+  text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.8);
 }
 .lh-count {
   margin-top: 12rpx;
@@ -491,10 +511,12 @@
 .lh-cur {
   font-size: 44rpx;
   color: #e8c98a;
+  text-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.85);
 }
 .lh-goal {
   font-size: 28rpx;
-  color: rgba(224, 181, 119, 0.55);
+  color: rgba(224, 181, 119, 0.78);
+  text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.8);
 }
 .lh-bar {
   margin-top: 12rpx;
@@ -638,7 +660,8 @@
 .muyu-stage {
   position: absolute;
   left: 50%;
-  bottom: 0;
+  /* 下移，让木鱼下缘与右侧「定课」的下缘齐平 */
+  bottom: -30rpx;
   z-index: 2;
   width: 520rpx;
   height: 480rpx;
@@ -652,7 +675,8 @@
   height: 100%;
 }
 .knock-pad {
-  bottom: 40rpx;
+  bottom: 36rpx;
+  z-index: 7;
   width: 400rpx;
   height: 400rpx;
   margin-left: -200rpx;
@@ -667,7 +691,7 @@
 }
 /* 飘字从木鱼上方升起，不压在木鱼身上 */
 .float-text {
-  bottom: 72%;
+  bottom: 96%;
 }
 
 /* 木鱼材质色点：竖排在左侧，避开中间的敲击热区 */
@@ -1024,7 +1048,8 @@
   align-items: center;
   font-size: 22rpx;
   letter-spacing: 2rpx;
-  color: rgba(243, 234, 220, 0.42);
+  color: rgba(243, 234, 220, 0.66);
+  text-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.8);
   font-variant-numeric: tabular-nums;
 }
 .lh-due {
@@ -1457,4 +1482,108 @@
 .home-page .lh-due.late {
   color: rgba(240, 150, 120, 0.9);
   background: rgba(220, 110, 80, 0.12);
+}
+
+
+/* 星夜调参面板：长按顶部功课名打开 */
+.sky-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 86;
+  display: flex;
+  flex-direction: column;
+  padding: calc(env(safe-area-inset-top) + 48rpx) 40rpx 36rpx;
+  box-sizing: border-box;
+  /* 模型列表有 14 项，面板加高后允许内部滚动，且不越过屏幕 */
+  max-height: 82vh;
+  overflow-y: scroll;
+  background: linear-gradient(180deg, #1d1610 0%, #15100b 55%, #120d09 100%);
+  border-bottom: 1rpx solid rgba(224, 181, 119, 0.26);
+  border-radius: 0 0 32rpx 32rpx;
+  box-shadow: 0 24rpx 64rpx rgba(0, 0, 0, 0.5);
+  animation: sheet-down 0.36s ease both;
+}
+@keyframes sheet-down {
+  from { transform: translateY(-100%); }
+  to { transform: none; }
+}
+.sky-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 24rpx;
+}
+.sky-title {
+  font-family: var(--serif);
+  font-size: 32rpx;
+  letter-spacing: 10rpx;
+  color: #e8c98a;
+}
+.sky-close {
+  font-size: 24rpx;
+  letter-spacing: 4rpx;
+  color: rgba(224, 181, 119, 0.6);
+  padding: 8rpx 4rpx;
+}
+.sky-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+.sky-label {
+  flex-shrink: 0;
+  width: 96rpx;
+  font-size: 24rpx;
+  letter-spacing: 2rpx;
+  color: rgba(243, 234, 220, 0.5);
+}
+.sky-seg {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+}
+.sky-chip {
+  margin: 0 12rpx 12rpx 0;
+  padding: 10rpx 24rpx;
+  font-size: 24rpx;
+  letter-spacing: 2rpx;
+  border-radius: 999rpx;
+  color: rgba(224, 181, 119, 0.66);
+  background: rgba(224, 181, 119, 0.08);
+  border: 1rpx solid rgba(224, 181, 119, 0.16);
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+.sky-chip.on {
+  color: #1b1208;
+  background: #e0b577;
+  border-color: #e0b577;
+  font-weight: 600;
+}
+.sky-actions {
+  display: flex;
+  margin-top: 8rpx;
+}
+.sky-btn {
+  flex: 1;
+  margin-right: 16rpx;
+  padding: 20rpx 0;
+  text-align: center;
+  font-size: 26rpx;
+  letter-spacing: 4rpx;
+  border-radius: 16rpx;
+  color: rgba(240, 230, 216, 0.86);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1rpx solid rgba(224, 181, 119, 0.18);
+}
+.sky-btn:last-child {
+  margin-right: 0;
+}
+.sky-tip {
+  margin-top: 18rpx;
+  font-size: 20rpx;
+  letter-spacing: 2rpx;
+  color: rgba(243, 234, 220, 0.32);
+  text-align: center;
 }
