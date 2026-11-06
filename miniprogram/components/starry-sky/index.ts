@@ -6,7 +6,7 @@
 // 这样即使被置顶，也只有稀疏的星点浮在上面，菜单文字照样看得清。
 import { winInfo } from '../../utils/util'
 
-const MOVE_SCALE = 750
+const MOVE_SCALE = 800
 /** 星点半径（直径 2.8px） */
 const DOT_RADIUS = 1.4
 /** 默认每帧擦除比例，越小拖尾越长（对应 12/255） */
@@ -16,172 +16,293 @@ interface SkyPalette {
   colors: string[]
 }
 
-/** 模型速度场的公共环境量，每帧算一次，循环内不再重复 */
-interface FlowEnv {
-  w: number
-  h: number
-  halfW: number
-  halfH: number
-  /** 累计帧数，驱动时间演化 */
-  t: number
-  /** 流速档位：每帧位移 px（对应文档的 moveSpeed） */
-  step: number
-  scale: number
-  spin: number
-  /** 双黑洞本帧的公转位置 */
-  holes: number[][]
+// —— 经典 3D 柏林噪声 (Ken Perlin Improved Noise，与 StarryCanvas.tsx 中的 p5.noise 严格对齐) ——
+const PERM = new Uint8Array(512)
+;(function seedPerm() {
+  const permutation = [
+    151, 160, 137, 91, 90, 15, 131, 13, 201, 95, 96, 53, 194, 233, 7, 225, 140, 36, 103, 30, 69, 142,
+    8, 99, 37, 240, 21, 10, 23, 190, 6, 148, 247, 120, 234, 75, 0, 26, 197, 62, 94, 252, 219, 203,
+    117, 35, 11, 32, 57, 177, 33, 88, 237, 149, 56, 87, 174, 20, 125, 136, 171, 168, 68, 175, 74,
+    165, 71, 134, 139, 48, 27, 166, 77, 146, 158, 231, 83, 111, 229, 122, 60, 211, 133, 230, 220,
+    105, 92, 41, 55, 46, 245, 40, 244, 102, 143, 54, 65, 25, 63, 161, 1, 216, 80, 73, 209, 76, 132,
+    187, 208, 89, 18, 169, 200, 196, 135, 130, 116, 188, 159, 86, 164, 100, 109, 198, 173, 186, 3,
+    64, 52, 217, 226, 250, 124, 123, 5, 202, 38, 147, 118, 126, 255, 82, 85, 212, 207, 206, 59, 227,
+    47, 16, 58, 17, 182, 189, 28, 42, 223, 183, 170, 213, 119, 248, 152, 2, 44, 154, 163, 70, 221,
+    153, 101, 155, 167, 43, 172, 9, 129, 22, 39, 253, 19, 98, 108, 110, 79, 113, 224, 232, 178, 185,
+    112, 104, 218, 246, 97, 228, 251, 34, 242, 193, 238, 210, 144, 12, 191, 179, 162, 241, 81, 51,
+    145, 235, 249, 14, 239, 107, 49, 192, 214, 31, 181, 199, 106, 157, 184, 84, 204, 176, 115, 121,
+    50, 45, 127, 4, 150, 254, 138, 236, 205, 93, 222, 114, 67, 29, 24, 72, 243, 141, 128, 195, 78,
+    66, 215, 61, 156, 180,
+  ]
+  for (let i = 0; i < 256; i++) {
+    PERM[i] = permutation[i]
+    PERM[256 + i] = permutation[i]
+  }
+})()
+
+function grad3(hash: number, x: number, y: number, z: number): number {
+  const h = hash & 15
+  const u = h < 8 ? x : y
+  const v = h < 4 ? y : h === 12 || h === 14 ? x : z
+  return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v)
+}
+
+function noise(x: number, y: number = 0, z: number = 0): number {
+  const fx = Math.floor(x)
+  const fy = Math.floor(y)
+  const fz = Math.floor(z)
+  const X = fx & 255
+  const Y = fy & 255
+  const Z = fz & 255
+  const xf = x - fx
+  const yf = y - fy
+  const zf = z - fz
+  const u = xf * xf * xf * (xf * (xf * 6 - 15) + 10)
+  const v = yf * yf * yf * (yf * (yf * 6 - 15) + 10)
+  const w = zf * zf * zf * (zf * (zf * 6 - 15) + 10)
+
+  const A = PERM[X] + Y
+  const AA = PERM[A] + Z
+  const AB = PERM[A + 1] + Z
+  const B = PERM[X + 1] + Y
+  const BA = PERM[B] + Z
+  const BB = PERM[B + 1] + Z
+
+  const a0 = grad3(PERM[AA], xf, yf, zf)
+  const b0 = grad3(PERM[BA], xf - 1, yf, zf)
+  const a1 = grad3(PERM[AB], xf, yf - 1, zf)
+  const b1 = grad3(PERM[BB], xf - 1, yf - 1, zf)
+  const a2 = grad3(PERM[AA + 1], xf, yf, zf - 1)
+  const b2 = grad3(PERM[BA + 1], xf - 1, yf, zf - 1)
+  const a3 = grad3(PERM[AB + 1], xf, yf - 1, zf - 1)
+  const b3 = grad3(PERM[BB + 1], xf - 1, yf - 1, zf - 1)
+
+  const x1 = a0 + u * (b0 - a0)
+  const x2 = a1 + u * (b1 - a1)
+  const y1 = x1 + v * (x2 - x1)
+
+  const x3 = a2 + u * (b2 - a2)
+  const x4 = a3 + u * (b3 - a3)
+  const y2 = x3 + v * (x4 - x3)
+
+  return (y1 + w * (y2 - y1) + 1) * 0.5
 }
 
 /**
- * 各动力学 / 热力学模型的本征速度向量（未按 step 缩放）。
- * tick 里统一做归一化后再乘流速档位，所以这里只关心方向场的形态，
- * 不必担心某个模型的输出幅度不一致。
+ * 严格按照 src/components/StarryCanvas.tsx 移植的 14 套动力学 / 热力学本征速度场
  */
-function flow(model: string, x: number, y: number, e: FlowEnv): { x: number; y: number } {
-  const S = e.scale
-  const n = noise2(x / S, y / S)
+function computeDelta(
+  model: string,
+  px: number,
+  py: number,
+  moveSpeed: number,
+  moveScale: number,
+  w: number,
+  h: number,
+  halfW: number,
+  halfH: number,
+  frameCount: number,
+  hole1X: number,
+  hole1Y: number,
+  hole2X: number,
+  hole2Y: number,
+  tgK: number,
+  northX: number,
+  northY: number,
+  southX: number,
+  southY: number,
+  invWPi: number,
+  invHPi: number
+): { dx: number; dy: number } {
   switch (model) {
-    // 2.2 旋度不可压缩流场：标量流函数的中心差分旋度，处处零散度
+    case 'phaseWrap':
+    case 'perlin': {
+      // 1. 原版高频相位缠绕 (Van Gogh Turbulence with Subtle 3D Time Drift)
+      const timeDrift = frameCount * 0.00025
+      const angle = noise(px / moveScale, py / moveScale, timeDrift) * Math.PI * 2 * moveScale
+      return { dx: Math.cos(angle) * moveSpeed, dy: Math.sin(angle) * moveSpeed }
+    }
+
+    case 'curlFluid':
     case 'curl': {
-      const eps = 3.0
-      const nY1 = noise2(x / S, (y + eps) / S)
-      const nY0 = noise2(x / S, (y - eps) / S)
-      const nX1 = noise2((x + eps) / S, y / S)
-      const nX0 = noise2((x - eps) / S, y / S)
-      return { x: (nY1 - nY0) / (2 * eps), y: -(nX1 - nX0) / (2 * eps) }
+      // 2. 旋度不可压缩流体 (Incompressible Curl Noise Fluid: ∇ · v = 0)
+      const eps = 3
+      const nY1 = noise(px / moveScale, (py + eps) / moveScale)
+      const nY0 = noise(px / moveScale, (py - eps) / moveScale)
+      const nX1 = noise((px + eps) / moveScale, py / moveScale)
+      const nX0 = noise((px - eps) / moveScale, py / moveScale)
+      const curlX = (nY1 - nY0) / (2 * eps)
+      const curlY = -(nX1 - nX0) / (2 * eps)
+      const curlMag = Math.sqrt(curlX * curlX + curlY * curlY) || 0.0001
+      return { dx: (curlX / curlMag) * moveSpeed * 1.5, dy: (curlY / curlMag) * moveSpeed * 1.5 }
     }
-    // 2.3 泰勒-格林中尺度涡列（纳维-斯托克斯周期域解析解）+ 湍流微扰
-    case 'taylor': {
-      const k = (Math.PI * 4) / Math.min(e.w, e.h)
-      const na = n * Math.PI * 4
-      return {
-        x: Math.sin(k * x) * Math.cos(k * y) * 0.8 + Math.cos(na) * 0.2,
-        y: -Math.cos(k * x) * Math.sin(k * y) * 0.8 + Math.sin(na) * 0.2,
-      }
-    }
-    // 2.4 低频层流：角度倍频降到 8π，流线平滑
-    case 'laminar': {
-      const a = n * Math.PI * 8
-      return { x: Math.cos(a), y: Math.sin(a) }
-    }
-    // 3.1 瑞利-贝纳德热对流胞 + 垂直浮力（底热顶冷）
+
+    case 'rayleighBenard':
     case 'benard': {
-      const uK = (Math.PI * 4) / e.w
-      const vK = Math.PI / e.h
-      const thermal = (n - 0.5) * 0.3
-      const buoyancy = ((e.h - y) / e.h - 0.5) * 0.4
-      return {
-        x: Math.sin(uK * x) * Math.cos(vK * y) + thermal,
-        y: -Math.cos(uK * x) * Math.sin(vK * y) - buoyancy + thermal,
-      }
+      // 3. 瑞利-贝纳德热对流胞 (Rayleigh-Bénard Convection Cells)
+      const nRolls = 4
+      const uK = (Math.PI * nRolls) / w
+      const vK = Math.PI / h
+      const vxConvect = Math.sin(uK * px) * Math.cos(vK * py)
+      const vyConvect = -Math.cos(uK * px) * Math.sin(vK * py)
+      const tempGrad = (h - py) / h
+      const buoyancy = (tempGrad - 0.5) * 0.45
+      const tNoise = (noise(px / moveScale, py / moveScale) - 0.5) * 0.3
+      return { dx: (vxConvect + tNoise) * moveSpeed * 1.5, dy: (vyConvect - buoyancy + tNoise) * moveSpeed * 1.5 }
     }
-    // 3.2 朗之万方程（过阻尼极限）：漂移场 + Box-Muller 高斯热涨落
+
+    case 'brownianMotion':
     case 'langevin': {
-      const da = n * Math.PI * 4
-      const u1 = Math.max(0.0001, Math.random())
-      const u2 = Math.random()
-      const r = Math.sqrt(-2 * Math.log(u1))
-      const T = 0.85
+      // 4. 朗之万布朗热运动 (Langevin Equation & Brownian Thermal Motion)
+      const dAngle = noise(px / moveScale, py / moveScale) * Math.PI * 4
+      const driftX = Math.cos(dAngle) * 0.55
+      const driftY = Math.sin(dAngle) * 0.55
+      const randAng = Math.random() * Math.PI * 2
+      const randAmp = Math.sqrt(-2.0 * Math.log(Math.max(0.0001, Math.random())))
       return {
-        x: Math.cos(da) * 0.6 + r * Math.cos(2 * Math.PI * u2) * T,
-        y: Math.sin(da) * 0.6 + r * Math.sin(2 * Math.PI * u2) * T,
+        dx: (driftX + Math.cos(randAng) * randAmp * 0.75) * moveSpeed * 1.4,
+        dy: (driftY + Math.sin(randAng) * randAmp * 0.75) * moveSpeed * 1.4,
       }
     }
-    // 3.3 傅里叶热传导：沿温度负梯度扩散 + 等温线切向环流
+
+    case 'thermalEntropy':
     case 'fourier': {
-      const rX = x - e.halfW
-      const rY = y - e.halfH
-      const dist = Math.sqrt(rX * rX + rY * rY) + 1
-      const gX = rX / dist
-      const gY = rY / dist
-      const flux = Math.min(2.5, 300 / (dist + 50))
-      const ent = n * Math.PI * 2
+      // 5. 傅里叶热传导与熵增温度梯度 (Heat Conduction & Entropy Gradient)
+      const rxH = px - halfW
+      const ryH = py - halfH
+      const dH = Math.sqrt(rxH * rxH + ryH * ryH) + 1.0
+      const gTx = rxH / dH
+      const gTy = ryH / dH
+      const hFlux = Math.min(2.5, 320 / (dH + 40))
+      const entPerturb = noise(px / moveScale, py / moveScale) * Math.PI * 2
       return {
-        x: gX * flux - gY * 0.5 + Math.cos(ent) * 0.3,
-        y: gY * flux + gX * 0.5 + Math.sin(ent) * 0.3,
+        dx: (gTx * hFlux - gTy * 0.45 + Math.cos(entPerturb) * 0.3) * moveSpeed,
+        dy: (gTy * hFlux + gTx * 0.45 + Math.sin(entPerturb) * 0.3) * moveSpeed,
       }
     }
-    // 3.4 麦克斯韦-玻尔兹曼：核心高压的径向绝热膨胀
+
+    case 'maxwellBoltzmann':
     case 'maxwell': {
-      const rX = x - e.halfW
-      const rY = y - e.halfH
-      const r = Math.sqrt(rX * rX + rY * rY) + 1
-      const force = Math.min(2.2, 500 / (r + 80))
-      const mb = noise2(x * 0.005 + e.t * 0.005, y * 0.005) + 0.4
-      return { x: (rX / r) * force * mb, y: (rY / r) * force * mb }
+      // 6. 麦克斯韦-玻尔兹曼气体热膨胀 (Maxwell-Boltzmann Gas Expansion)
+      const rxM = px - halfW
+      const ryM = py - halfH
+      const distM = Math.sqrt(rxM * rxM + ryM * ryM) + 1.0
+      const radAng = Math.atan2(ryM, rxM)
+      const expF = Math.min(2.2, 550 / (distM + 70))
+      const mbV = noise(px * 0.005, py * 0.005, frameCount * 0.005) + 0.45
+      return { dx: Math.cos(radAng) * expF * mbV * moveSpeed, dy: Math.sin(radAng) * expF * mbV * moveSpeed }
     }
-    // 4.1 双黑洞引力轨 + 吸积盘切向角动量（软化 eps=35）
-    case 'binary': {
-      let fx = 0
-      let fy = 0
-      for (let i = 0; i < 2; i++) {
-        const dxh = e.holes[i][0] - x
-        const dyh = e.holes[i][1] - y
-        const dist = Math.sqrt(dxh * dxh + dyh * dyh) + 35
-        const f = 1400 / (dist * dist)
-        // 径向引力在近洞处翻成斥力，形成一个稳定的吸积环：
-        // 纯向心场 + 定步长没有离心力平衡，粒子必然塌缩成一个点，
-        // 所以用「远吸近斥」把粒子锚在半径 ~75px 的环带上绕转
-        const pull = Math.max(-0.45, Math.min(1, (dist - 110) / 140))
-        fx += (dxh / dist) * f * 0.52 * pull + (-dyh / dist) * f * 1.48
-        fy += (dyh / dist) * f * 0.52 * pull + (dxh / dist) * f * 1.48
-      }
-      // 增加磁旋转热压湍流扰动，杜绝 4 点拉格朗日驻波死锁
-      const bg = n * Math.PI * 4
-      const thermal = (Math.random() - 0.5) * 0.12
-      return { x: fx + Math.cos(bg) * e.step * 0.35 + thermal, y: fy + Math.sin(bg) * e.step * 0.35 + thermal }
-    }
-    // 4.2 林家翘-徐遐生密度波：对数螺旋切向流（螺距角约 18.5°）
-    case 'spiral': {
-      const theta = Math.atan2(y - e.halfH, x - e.halfW)
-      const angle = (theta + Math.PI / 2 + 0.32) * 0.72 + n * Math.PI * 2 * 0.28
-      return { x: Math.cos(angle), y: Math.sin(angle) }
-    }
-    // 4.3 太阳风：辐射状帕克流 + 磁绳扭转波（时间维用帧相位近似）
-    case 'solar': {
-      const rX = x - e.halfW
-      const rY = y - e.halfH
-      const rad = Math.sqrt(rX * rX + rY * rY) + 1
-      const flare = noise2(x / S, y / S + e.t * 0.01)
-      const angle = Math.atan2(rY, rX) + Math.sin(rad * 0.02 + flare * Math.PI) * 1.2
-      return { x: Math.cos(angle), y: Math.sin(angle) }
-    }
-    // 5.1 克利福德奇异吸引子 (a=-1.4, b=1.6, c=1.0, d=0.7)
+
+    case 'cliffordAttractor':
     case 'clifford': {
-      const nx = (x - e.halfW) / (e.halfW * 0.45)
-      const ny = (y - e.halfH) / (e.halfH * 0.45)
-      const tx = Math.sin(-1.4 * ny) + Math.cos(-1.4 * nx)
-      const ty = Math.sin(1.6 * nx) + 0.7 * Math.cos(1.6 * ny)
-      const angle = Math.atan2(ty - ny, tx - nx) + (n - 0.5) * 1.2
-      return { x: Math.cos(angle), y: Math.sin(angle) }
+      // 7. 克利福德奇异吸引子 (Clifford Strange Attractor)
+      const nx = (px - halfW) / (halfW * 0.45)
+      const ny = (py - halfH) / (halfH * 0.45)
+      const ca = -1.4, cb = 1.6, cc = 1.0, cd = 0.7
+      const targetX = Math.sin(ca * ny) + cc * Math.cos(ca * nx)
+      const targetY = Math.sin(cb * nx) + cd * Math.cos(cb * ny)
+      const targetAngle = Math.atan2(targetY - ny, targetX - nx)
+      const noisePerturb = (noise(px / moveScale, py / moveScale) - 0.5) * 1.2
+      const angle = targetAngle + noisePerturb
+      return { dx: Math.cos(angle) * moveSpeed, dy: Math.sin(angle) * moveSpeed }
     }
-    // 5.2 克拉尼驻波：微尘沿节线（W=0 等位线）沉降
+
+    case 'binaryOrbit':
+    case 'binary': {
+      // 8. 双星/双黑洞引力轨 (Binary Gravitational Orbit with Anti-Stagnation Swirl，与 StarryCanvas.tsx 完全一致)
+      const d1x = hole1X - px, d1y = hole1Y - py
+      const dist1 = Math.sqrt(d1x * d1x + d1y * d1y) + 32
+      const d2x = hole2X - px, d2y = hole2Y - py
+      const dist2 = Math.sqrt(d2x * d2x + d2y * d2y) + 32
+
+      const force1 = 1450 / (dist1 * dist1)
+      const force2 = 1450 / (dist2 * dist2)
+
+      const fx = (d1x / dist1) * force1 * 0.52 + (-d1y / dist1) * force1 * 1.48 +
+                 (d2x / dist2) * force2 * 0.52 + (-d2y / dist2) * force2 * 1.48
+      const fy = (d1y / dist1) * force1 * 0.52 + (d1x / dist1) * force1 * 1.48 +
+                 (d2y / dist2) * force2 * 0.52 + (d2x / dist2) * force2 * 1.48
+
+      // 磁旋转热压扩散微扰 (杜绝静态拉格朗日四点聚集)
+      const thermalAngle = noise(px * 0.005, py * 0.005, frameCount * 0.002) * Math.PI * 4
+      const thermalDispersion = (Math.random() - 0.5) * 0.15
+      return {
+        dx: fx + Math.cos(thermalAngle) * (moveSpeed * 0.38) + thermalDispersion,
+        dy: fy + Math.sin(thermalAngle) * (moveSpeed * 0.38) + thermalDispersion,
+      }
+    }
+
+    case 'cosmicVortex':
+    case 'spiral': {
+      // 9. 银河对数螺旋臂 (Logarithmic Spiral Galaxy Arms)
+      const rx = px - halfW
+      const ry = py - halfH
+      const theta = Math.atan2(ry, rx)
+      const spiralAngle = theta + Math.PI / 2 + 0.32
+      const baseNoise = noise(px / moveScale, py / moveScale) * Math.PI * 2
+      const angle = spiralAngle * 0.72 + baseNoise * 0.28
+      return { dx: Math.cos(angle) * moveSpeed, dy: Math.sin(angle) * moveSpeed }
+    }
+
+    case 'taylorGreenGyre':
+    case 'taylor': {
+      // 10. 泰勒-格林大洋中尺度涡 (Taylor-Green Oceanic Gyres)
+      const tgX = Math.sin(tgK * px) * Math.cos(tgK * py)
+      const tgY = -Math.cos(tgK * px) * Math.sin(tgK * py)
+      const nAngle = noise(px / moveScale, py / moveScale) * Math.PI * 4
+      return {
+        dx: (tgX * 0.8 + Math.cos(nAngle) * 0.2) * moveSpeed * 1.6,
+        dy: (tgY * 0.8 + Math.sin(nAngle) * 0.2) * moveSpeed * 1.6,
+      }
+    }
+
+    case 'chladniWave':
     case 'chladni': {
-      const u = x * (Math.PI / e.w)
-      const v = y * (Math.PI / e.h)
+      // 11. 克拉尼声波驻波共振节线 (Chladni Cymatic Standing Waves)
+      const u = px * invWPi
+      const v = py * invHPi
       const dWdu = -3 * Math.sin(3 * u) * Math.cos(5 * v) + 5 * Math.sin(5 * u) * Math.cos(3 * v)
       const dWdv = -5 * Math.cos(3 * u) * Math.sin(5 * v) + 3 * Math.cos(5 * u) * Math.sin(3 * v)
-      const angle = Math.atan2(dWdu, -dWdv) + (n - 0.5) * 1.2
-      return { x: Math.cos(angle), y: Math.sin(angle) }
+      const cymaticAngle = Math.atan2(dWdu, -dWdv)
+      const waveNoise = (noise(px / moveScale, py / moveScale) - 0.5) * 1.2
+      const angle = cymaticAngle + waveNoise
+      return { dx: Math.cos(angle) * moveSpeed, dy: Math.sin(angle) * moveSpeed }
     }
-    // 5.3 磁偶极子：两极磁通量线矢量和的切向
+
+    case 'magneticDipole':
     case 'dipole': {
-      const poleDist = Math.min(e.halfW, e.halfH) * 0.35
-      const rNx = x - (e.halfW - poleDist)
-      const rNy = y - e.halfH
-      const rSx = x - (e.halfW + poleDist)
-      const rSy = y - e.halfH
-      const dN = Math.sqrt(rNx * rNx + rNy * rNy) + 25
-      const dS = Math.sqrt(rSx * rSx + rSy * rSy) + 25
-      const bx = rNx / (dN * dN * dN) - rSx / (dS * dS * dS)
-      const by = rNy / (dN * dN * dN) - rSy / (dS * dS * dS)
-      const angle = Math.atan2(by, bx) + (n - 0.5) * 0.8
-      return { x: Math.cos(angle), y: Math.sin(angle) }
+      // 12. 磁偶极子通量线 (Magnetic Dipole Field Lines)
+      const rNx = px - northX, rNy = py - northY
+      const distN = Math.sqrt(rNx * rNx + rNy * rNy) + 25
+      const rSx = px - southX, rSy = py - southY
+      const distS = Math.sqrt(rSx * rSx + rSy * rSy) + 25
+      const bx = (rNx / (distN * distN * distN)) - (rSx / (distS * distS * distS))
+      const by = (rNy / (distN * distN * distN)) - (rSy / (distS * distS * distS))
+      const bAngle = Math.atan2(by, bx)
+      const dipoleNoise = (noise(px / moveScale, py / moveScale) - 0.5) * 0.8
+      const angle = bAngle + dipoleNoise
+      return { dx: Math.cos(angle) * moveSpeed, dy: Math.sin(angle) * moveSpeed }
     }
-    // 2.1 原版高频相位缠绕（默认）
+
+    case 'solarCorona':
+    case 'solar': {
+      // 13. 日冕喷发与太阳风 (Solar Corona Ejection & Coronal Mass Loops)
+      const rx = px - halfW
+      const ry = py - halfH
+      const radDist = Math.sqrt(rx * rx + ry * ry) + 1
+      const radAngle = Math.atan2(ry, rx)
+      const flareNoise = noise(px / moveScale, py / moveScale, frameCount * 0.006)
+      const twist = Math.sin(radDist * 0.02 + flareNoise * Math.PI) * 1.2
+      const angle = radAngle + twist
+      return { dx: Math.cos(angle) * (moveSpeed * 1.2), dy: Math.sin(angle) * (moveSpeed * 1.2) }
+    }
+
+    case 'smoothStream':
+    case 'laminar':
     default: {
-      const a = n * e.spin
-      return { x: Math.cos(a), y: Math.sin(a) }
+      // 14. 平滑天河层流 (Smooth Laminar River)
+      const angle = noise(px / moveScale, py / moveScale) * Math.PI * 8
+      return { dx: Math.cos(angle) * moveSpeed, dy: Math.sin(angle) * moveSpeed }
     }
   }
 }
@@ -302,57 +423,7 @@ function paletteOf(theme: string, want: string): SkyPalette {
   return PALETTES[key] || PALETTES.dawn
 }
 
-// —— 经典柏林噪声（参考实现的标准置换表）——
-const PERM = new Uint8Array(512)
-;(function seedPerm() {
-  const permutation = [
-    151, 160, 137, 91, 90, 15, 131, 13, 201, 95, 96, 53, 194, 233, 7, 225, 140, 36, 103, 30, 69, 142,
-    8, 99, 37, 240, 21, 10, 23, 190, 6, 148, 247, 120, 234, 75, 0, 26, 197, 62, 94, 252, 219, 203,
-    117, 35, 11, 32, 57, 177, 33, 88, 237, 149, 56, 87, 174, 20, 125, 136, 171, 168, 68, 175, 74,
-    165, 71, 134, 139, 48, 27, 166, 77, 146, 158, 231, 83, 111, 229, 122, 60, 211, 133, 230, 220,
-    105, 92, 41, 55, 46, 245, 40, 244, 102, 143, 54, 65, 25, 63, 161, 1, 216, 80, 73, 209, 76, 132,
-    187, 208, 89, 18, 169, 200, 196, 135, 130, 116, 188, 159, 86, 164, 100, 109, 198, 173, 186, 3,
-    64, 52, 217, 226, 250, 124, 123, 5, 202, 38, 147, 118, 126, 255, 82, 85, 212, 207, 206, 59, 227,
-    47, 16, 58, 17, 182, 189, 28, 42, 223, 183, 170, 213, 119, 248, 152, 2, 44, 154, 163, 70, 221,
-    153, 101, 155, 167, 43, 172, 9, 129, 22, 39, 253, 19, 98, 108, 110, 79, 113, 224, 232, 178, 185,
-    112, 104, 218, 246, 97, 228, 251, 34, 242, 193, 238, 210, 144, 12, 191, 179, 162, 241, 81, 51,
-    145, 235, 249, 14, 239, 107, 49, 192, 214, 31, 181, 199, 106, 157, 184, 84, 204, 176, 115, 121,
-    50, 45, 127, 4, 150, 254, 138, 236, 205, 93, 222, 114, 67, 29, 24, 72, 243, 141, 128, 195, 78,
-    66, 215, 61, 156, 180,
-  ]
-  for (let i = 0; i < 256; i++) {
-    PERM[i] = permutation[i]
-    PERM[256 + i] = permutation[i]
-  }
-})()
 
-function grad2(hash: number, gx: number, gy: number): number {
-  const h = hash & 7
-  const uu = h < 4 ? gx : gy
-  const vv = h < 4 ? gy : gx
-  return ((h & 1) === 0 ? uu : -uu) + ((h & 2) === 0 ? vv : -vv)
-}
-
-/** 返回 0..1，与参考实现 noise2D 等价 */
-function noise2(x: number, y: number): number {
-  const fx = Math.floor(x)
-  const fy = Math.floor(y)
-  const X = fx & 255
-  const Y = fy & 255
-  const xf = x - fx
-  const yf = y - fy
-  const u = xf * xf * xf * (xf * (xf * 6 - 15) + 10)
-  const v = yf * yf * yf * (yf * (yf * 6 - 15) + 10)
-  const A = PERM[X] + Y
-  const B = PERM[X + 1] + Y
-  const a0 = grad2(PERM[A], xf, yf)
-  const b0 = grad2(PERM[B], xf - 1, yf)
-  const a1 = grad2(PERM[A + 1], xf, yf - 1)
-  const b1 = grad2(PERM[B + 1], xf - 1, yf - 1)
-  const x1 = a0 + u * (b0 - a0)
-  const x2 = a1 + u * (b1 - a1)
-  return (x1 + v * (x2 - x1) + 1) * 0.5
-}
 
 interface Particle {
   x: number
@@ -643,8 +714,8 @@ Component({
           x: Math.random() * w,
           y: Math.random() * h,
           c: Math.floor(Math.random() * total),
-          age: Math.floor(Math.random() * 450),
-          maxAge: Math.floor(450 + Math.random() * 650),
+          age: Math.floor(Math.random() * 600),
+          maxAge: Math.floor(700 + Math.random() * 800),
         })
       }
       return pts
@@ -681,7 +752,6 @@ Component({
       }
 
       // 擦除上一帧的一部分：留下渐隐的拖尾余晖，画布本身仍然透明
-      // 长拖尾时还要同时把点画淡，否则叠加几十次后变成不透明色块
       let dotA = 1
       if (s._trim) {
         const trailA = s._trailA != null ? s._trailA : TRAIL
@@ -689,20 +759,13 @@ Component({
         if (trailA >= 0.999) {
           ctx.clearRect(0, 0, w, h)
         } else {
-          // 拖尾可见长度 L ≈ 3 * 每帧位移 / 擦除比例。
-          // 两件事要同时成立：
-          // 1) alpha 跟着流速缩放，L 才只由档位决定（否则缓速看不出余晖）
-          // 2) 0 档不能真的为 0，否则轨迹永久堆积、几十秒后满屏根须
-          // 指数插值把 0..1 映射到擦除率：0 档 ≈ 55px 轨迹，255 档清屏
+          // 指数插值把 0..1 映射到擦除率：trail 默认 12 档对应真实 12/255 衰减比例
           const speedK = (s._speed || 0.25) / 0.25
           const alpha = Math.min(1, 0.0136 * Math.pow(73.5, trailA) * speedK)
           ctx.globalCompositeOperation = 'destination-out'
           ctx.fillStyle = 'rgba(0,0,0,' + alpha.toFixed(4) + ')'
           ctx.fillRect(0, 0, w, h)
           ctx.globalCompositeOperation = 'source-over'
-          // 轨迹越长，同一位置被重复叠加的次数越多，稳态亮度 ≈ a/(a+b)。
-          // b 很小的时候不管 a 多小都会趋近 1，所以还要按档位整体压暗，
-          // 让长拖尾呈现为"淡淡的雾"而不是糊上一块实色
           dotA = 0.4 + 0.6 * Math.min(1, trailA / 0.35)
         }
       } else {
@@ -722,95 +785,91 @@ Component({
         s._sprites = this.buildSprites()
       }
 
-      const spin = Math.PI * 2 * MOVE_SCALE
       const d = Math.ceil((s._dot || DOT_RADIUS) + 1)
       const vx = s._vortex
-      const vorR = 140
+      const vorR = 160
       const vorR2 = vorR * vorR
-      // 流速档位直接就是每帧位移 px
       const step = s._speed || 0.25
       s._frame = (s._frame || 0) + 1
-      const model = s.data.field || 'perlin'
-      // 每帧只算一次的环境量（双黑洞位置等）
-      const env: FlowEnv = {
-        w: w,
-        h: h,
-        halfW: w / 2,
-        halfH: h / 2,
-        t: s._frame,
-        step: step,
-        scale: MOVE_SCALE,
-        spin: spin,
-        holes: [],
-      }
-      if (model === 'binary') {
-        const wobble = 1 + 0.055 * Math.sin(s._frame * 0.016)
-        const orbitR = Math.min(w, h) * 0.28 * wobble
-        const ta = s._frame * 0.01
-        const precess = s._frame * 0.00035
-        env.holes = [
-          [w / 2 + Math.cos(ta + precess) * orbitR, h / 2 + Math.sin(ta + precess) * orbitR],
-          [w / 2 - Math.cos(ta - precess) * orbitR, h / 2 - Math.sin(ta - precess) * orbitR],
-        ]
-      }
+      const frameCount = s._frame
+      const model = s.data.field || 'binary'
+
+      // 与 StarryCanvas.tsx 严格对齐的空间几何度量与时间常数
+      const halfW = w / 2
+      const halfH = h / 2
+      const orbitWobble = 1 + 0.06 * Math.sin(frameCount * 0.016)
+      const orbitR = Math.min(halfW, halfH) * 0.28 * orbitWobble
+      const timeAngle = frameCount * 0.01
+      const precession = frameCount * 0.0004
+      const hole1X = halfW + Math.cos(timeAngle + precession) * orbitR
+      const hole1Y = halfH + Math.sin(timeAngle + precession) * orbitR
+      const hole2X = halfW - Math.cos(timeAngle - precession) * orbitR
+      const hole2Y = halfH - Math.sin(timeAngle - precession) * orbitR
+
+      const tgK = (Math.PI * 4) / Math.min(w, h)
+      const poleDist = Math.min(halfW, halfH) * 0.35
+      const northX = halfW - poleDist
+      const northY = halfH
+      const southX = halfW + poleDist
+      const southY = halfH
+      const invWPi = Math.PI / w
+      const invHPi = Math.PI / h
+
       if (dotA < 0.999) ctx.globalAlpha = dotA
       for (let i = 0; i < pts.length; i++) {
         const p = pts[i]
-        p.age = (p.age || 0) + 1
-        if (model === 'perlin') {
-          // 慢速 3D 时间漂移微扰：保持梵高纹理质感的同时消除奇点停滞
-          const angle = noise2(p.x / MOVE_SCALE + s._frame * 0.00025, p.y / MOVE_SCALE) * spin
-          p.x += Math.cos(angle) * step
-          p.y += Math.sin(angle) * step
-        } else if (model === 'binary') {
-          // 双黑洞引力场：切向自旋与向心引力随距离平滑变化
-          const v = flow(model, p.x, p.y, env)
-          const curSpeed = Math.sqrt(v.x * v.x + v.y * v.y) || 0.0001
-          const maxV = step * 3.8
-          const scale = curSpeed > maxV ? maxV / curSpeed : step * 1.6
-          p.x += v.x * scale
-          p.y += v.y * scale
-        } else {
-          // 模型只给方向场，归一化后按流速档位走，各模型幅度天然一致
-          const v = flow(model, p.x, p.y, env)
-          const len = Math.sqrt(v.x * v.x + v.y * v.y) || 0.0001
-          p.x += (v.x / len) * step
-          p.y += (v.y / len) * step
-        }
 
-        // 漩涡：切向力把粒子卷向中心，随 life 衰减
+        // 14 种动力学/热力学模型的本征位移向量（与 StarryCanvas.tsx 完全一致）
+        const delta = computeDelta(
+          model,
+          p.x,
+          p.y,
+          step,
+          MOVE_SCALE,
+          w,
+          h,
+          halfW,
+          halfH,
+          frameCount,
+          hole1X,
+          hole1Y,
+          hole2X,
+          hole2Y,
+          tgK,
+          northX,
+          northY,
+          southX,
+          southY,
+          invWPi,
+          invHPi
+        )
+
+        let dx = delta.dx
+        let dy = delta.dy
+
+        // 敲击或交互激发的漩涡力场
         if (vx && vx.life > 0.02) {
           const ddx = p.x - vx.x
           const ddy = p.y - vx.y
           const dd = ddx * ddx + ddy * ddy
           if (dd < vorR2 && dd > 4) {
             const dist = Math.sqrt(dd)
-            const f = (1 - dist / vorR) * 2.1 * vx.life
-            p.x += (-ddy / dist) * f
-            p.y += (ddx / dist) * f
+            const force = (1 - dist / vorR) * 2.5 * vx.life
+            dx += (-ddy / dist) * force
+            dy += (ddx / dist) * force
           }
         }
 
-        // 自然新陈代谢生命周期与边界重置 (杜绝长时间停滞聚团)
+        p.x += dx
+        p.y += dy
+        p.age = (p.age || 0) + 1
+
+        // 边界越界重置与生命周期自然重塑 (严格对齐 StarryCanvas.tsx 解决拓扑死点聚集停滞的工业级解法)
         if (p.x < 0 || p.x > w || p.y < 0 || p.y > h || p.age > p.maxAge) {
           p.x = Math.random() * w
           p.y = Math.random() * h
           p.age = 0
-          p.maxAge = Math.floor(450 + Math.random() * 650)
-        } else if (model === 'binary') {
-          // 掉进视界内的粒子重新抛回外围，避免长期累积成两个亮点
-          for (let k = 0; k < 2; k++) {
-            const hx = p.x - env.holes[k][0]
-            const hy = p.y - env.holes[k][1]
-            if (hx * hx + hy * hy < 900) {
-              const a = Math.random() * Math.PI * 2
-              const r = 90 + Math.random() * Math.min(w, h) * 0.35
-              p.x = env.holes[k][0] + Math.cos(a) * r
-              p.y = env.holes[k][1] + Math.sin(a) * r
-              p.age = 0
-              break
-            }
-          }
+          p.maxAge = Math.floor(700 + Math.random() * 800)
         }
 
         if (sprites) {
@@ -823,7 +882,6 @@ Component({
         }
       }
       if (dotA < 0.999) ctx.globalAlpha = 1
-
 
       if (s._vortex) {
         s._vortex.life *= 0.975
